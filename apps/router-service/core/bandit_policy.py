@@ -1,451 +1,440 @@
-"""Bandit policy for cost optimization and routing decisions."""
+"""Bandit policy for router decision making."""
 
 import asyncio
+import time
 import math
 import random
-from typing import Dict, Any, List, Optional, Tuple
-from uuid import UUID
+from typing import Dict, List, Any, Optional, Tuple
 import structlog
 import redis.asyncio as redis
-from dataclasses import dataclass
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
 logger = structlog.get_logger(__name__)
 
 
-@dataclass
-class RouterTier:
-    """Router tier definition."""
-    name: str
-    cost_per_request: float
-    latency_ms: float
-    success_rate: float
-    max_tokens: int
-    capabilities: List[str]
-
-
-@dataclass
-class RoutingDecision:
-    """Routing decision result."""
-    tier: str
-    confidence: float
-    expected_cost: float
-    expected_latency: float
-    reasons: List[str]
-    policy_escalation: bool
-
-
 class BanditPolicy:
-    """Bandit policy for intelligent routing decisions."""
+    """Bandit policy for minimizing cost + λ·error."""
     
-    def __init__(self, redis_client: redis.Redis):
+    def __init__(
+        self,
+        redis_client: redis.Redis,
+        lambda_error: float = 0.1,
+        exploration_rate: float = 0.1,
+        min_samples: int = 100
+    ):
         self.redis = redis_client
-        self.tiers = {
-            "SLM_A": RouterTier(
-                name="SLM_A",
-                cost_per_request=0.001,
-                latency_ms=50,
-                success_rate=0.85,
-                max_tokens=1000,
-                capabilities=["simple_qa", "classification", "json_validation"]
-            ),
-            "SLM_B": RouterTier(
-                name="SLM_B", 
-                cost_per_request=0.005,
-                latency_ms=200,
-                success_rate=0.92,
-                max_tokens=2000,
-                capabilities=["complex_qa", "reasoning", "multi_step"]
-            ),
-            "LLM": RouterTier(
-                name="LLM",
-                cost_per_request=0.02,
-                latency_ms=1000,
-                success_rate=0.95,
-                max_tokens=4000,
-                capabilities=["advanced_reasoning", "creative", "complex_analysis"]
-            )
+        self.lambda_error = lambda_error
+        self.exploration_rate = exploration_rate
+        self.min_samples = min_samples
+        
+        # Agent tiers and their costs
+        self.tier_costs = {
+            'A': 0.01,  # Fast, cheap
+            'B': 0.05,  # Medium
+            'C': 0.20   # Slow, expensive but accurate
         }
         
-        # Bandit parameters
-        self.exploration_rate = 0.1  # 10% exploration
-        self.learning_rate = 0.01
-        self.confidence_threshold = 0.8
-        
-        # Cost optimization parameters
-        self.cost_weight = 0.3
-        self.quality_weight = 0.7
-        self.latency_weight = 0.1
+        # Initialize models for each tenant
+        self.models = {}
+        self.calibrated_models = {}
     
-    async def decide_route(
+    async def decide(
         self,
         features: Dict[str, Any],
-        tenant_id: UUID,
-        request_id: str
-    ) -> RoutingDecision:
-        """Make routing decision using bandit policy."""
+        tenant_id: str,
+        user_id: Optional[str] = None
+    ) -> Tuple[str, float, str]:
+        """
+        Decide on agent tier using bandit policy.
+        
+        Returns:
+            (tier, confidence, reasoning)
+        """
         try:
-            # Calculate tier scores
-            tier_scores = await self._calculate_tier_scores(features, tenant_id)
+            # Get or create model for tenant
+            model = await self._get_tenant_model(tenant_id)
             
-            # Apply bandit policy
-            selected_tier = await self._select_tier(tier_scores, tenant_id)
+            # Extract feature vector
+            feature_vector = self._extract_feature_vector(features)
             
-            # Calculate confidence and expected values
-            confidence = tier_scores[selected_tier]["confidence"]
-            expected_cost = self.tiers[selected_tier].cost_per_request
-            expected_latency = self.tiers[selected_tier].latency_ms
+            # Check if we have enough samples for confident prediction
+            if await self._has_enough_samples(tenant_id):
+                # Use calibrated model for prediction
+                tier, confidence, reasoning = await self._predict_with_model(
+                    model, feature_vector, tenant_id
+                )
+            else:
+                # Use exploration strategy
+                tier, confidence, reasoning = await self._explore_tier(
+                    feature_vector, tenant_id
+                )
             
-            # Generate reasons
-            reasons = self._generate_reasons(features, selected_tier, tier_scores)
+            # Record decision for learning
+            await self._record_decision(
+                tenant_id, user_id, features, tier, confidence
+            )
             
-            # Check if policy escalation is needed
-            policy_escalation = confidence < self.confidence_threshold
-            
-            decision = RoutingDecision(
-                tier=selected_tier,
+            logger.info(
+                "Bandit decision made",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                tier=tier,
                 confidence=confidence,
-                expected_cost=expected_cost,
-                expected_latency=expected_latency,
-                reasons=reasons,
-                policy_escalation=policy_escalation
+                reasoning=reasoning
             )
             
-            # Store decision for learning
-            await self._store_decision(request_id, features, decision, tenant_id)
-            
-            logger.info("Routing decision made", 
-                       tier=selected_tier, 
-                       confidence=confidence,
-                       tenant_id=tenant_id)
-            
-            return decision
+            return tier, confidence, reasoning
             
         except Exception as e:
-            logger.error("Routing decision failed", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            # Fallback to LLM tier
-            return RoutingDecision(
-                tier="LLM",
-                confidence=0.5,
-                expected_cost=self.tiers["LLM"].cost_per_request,
-                expected_latency=self.tiers["LLM"].latency_ms,
-                reasons=["Fallback due to error"],
-                policy_escalation=True
+            logger.error(
+                "Bandit decision failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                user_id=user_id
             )
+            # Fallback to tier A
+            return 'A', 0.5, "Fallback due to error"
     
-    async def _calculate_tier_scores(
-        self, 
-        features: Dict[str, Any], 
-        tenant_id: UUID
-    ) -> Dict[str, Dict[str, float]]:
-        """Calculate scores for each tier."""
-        scores = {}
+    async def _get_tenant_model(self, tenant_id: str) -> Any:
+        """Get or create model for tenant."""
+        if tenant_id not in self.models:
+            # Create new model
+            self.models[tenant_id] = RandomForestClassifier(
+                n_estimators=100,
+                max_depth=10,
+                random_state=42
+            )
+            
+            # Create calibrated model
+            self.calibrated_models[tenant_id] = CalibratedClassifierCV(
+                self.models[tenant_id],
+                method='isotonic',
+                cv=3
+            )
+            
+            # Load existing data if available
+            await self._load_tenant_data(tenant_id)
         
-        for tier_name, tier in self.tiers.items():
-            # Get historical performance for this tier
-            performance = await self._get_tier_performance(tier_name, tenant_id)
-            
-            # Calculate base score
-            base_score = self._calculate_base_score(features, tier)
-            
-            # Apply historical performance
-            historical_factor = self._calculate_historical_factor(performance)
-            
-            # Calculate confidence
-            confidence = self._calculate_confidence(features, tier, performance)
-            
-            # Calculate final score
-            final_score = base_score * historical_factor
-            
-            scores[tier_name] = {
-                "score": final_score,
-                "confidence": confidence,
-                "base_score": base_score,
-                "historical_factor": historical_factor
-            }
-        
-        return scores
+        return self.calibrated_models[tenant_id]
     
-    def _calculate_base_score(self, features: Dict[str, Any], tier: RouterTier) -> float:
-        """Calculate base score for tier based on features."""
-        score = 0.0
-        
-        # Text complexity scoring
-        text_length = features.get("text_length", 0)
-        word_count = features.get("word_count", 0)
-        avg_word_length = features.get("avg_word_length", 0)
-        
-        # Simple requests favor SLM_A
-        if text_length < 100 and word_count < 20:
-            if tier.name == "SLM_A":
-                score += 0.8
-            elif tier.name == "SLM_B":
-                score += 0.6
-            else:
-                score += 0.4
-        
-        # Complex requests favor higher tiers
-        elif text_length > 500 or word_count > 100:
-            if tier.name == "LLM":
-                score += 0.9
-            elif tier.name == "SLM_B":
-                score += 0.7
-            else:
-                score += 0.3
-        
-        # Intent-based scoring
-        if features.get("has_question", False):
-            if tier.name == "SLM_A":
-                score += 0.6
-            elif tier.name == "SLM_B":
-                score += 0.8
-            else:
-                score += 0.7
-        
-        if features.get("has_technical_terms", False):
-            if tier.name == "LLM":
-                score += 0.8
-            elif tier.name == "SLM_B":
-                score += 0.6
-            else:
-                score += 0.3
-        
-        # Urgency scoring
-        if features.get("has_urgency", False):
-            # Urgent requests favor faster tiers
-            if tier.name == "SLM_A":
-                score += 0.7
-            elif tier.name == "SLM_B":
-                score += 0.8
-            else:
-                score += 0.5
-        
-        # Cost optimization
-        cost_factor = 1.0 - (tier.cost_per_request * self.cost_weight)
-        score *= cost_factor
-        
-        # Latency optimization
-        latency_factor = 1.0 - (tier.latency_ms / 1000.0 * self.latency_weight)
-        score *= latency_factor
-        
-        return max(0.0, min(1.0, score))
-    
-    async def _get_tier_performance(self, tier_name: str, tenant_id: UUID) -> Dict[str, float]:
-        """Get historical performance for tier."""
+    async def _has_enough_samples(self, tenant_id: str) -> bool:
+        """Check if we have enough samples for confident prediction."""
         try:
-            performance_key = f"tier_performance:{tier_name}:{tenant_id}"
-            performance = await self.redis.hgetall(performance_key)
-            
-            if performance:
-                return {
-                    "success_rate": float(performance.get("success_rate", 0.0)),
-                    "avg_latency": float(performance.get("avg_latency", 0.0)),
-                    "request_count": int(performance.get("request_count", 0)),
-                    "last_updated": float(performance.get("last_updated", 0.0))
-                }
-            else:
-                # Default performance based on tier
-                tier = self.tiers[tier_name]
-                return {
-                    "success_rate": tier.success_rate,
-                    "avg_latency": tier.latency_ms,
-                    "request_count": 0,
-                    "last_updated": 0.0
-                }
-                
+            samples_key = f"bandit_samples:{tenant_id}"
+            sample_count = await self.redis.scard(samples_key)
+            return sample_count >= self.min_samples
         except Exception as e:
-            logger.error("Failed to get tier performance", 
-                        tier_name=tier_name, 
-                        error=str(e))
-            return {
-                "success_rate": 0.0,
-                "avg_latency": 0.0,
-                "request_count": 0,
-                "last_updated": 0.0
-            }
-    
-    def _calculate_historical_factor(self, performance: Dict[str, float]) -> float:
-        """Calculate historical performance factor."""
-        success_rate = performance["success_rate"]
-        request_count = performance["request_count"]
-        
-        # Weight by request count (more data = more reliable)
-        weight = min(1.0, request_count / 100.0)
-        
-        # Factor in success rate
-        factor = success_rate * weight + (1.0 - weight) * 0.5
-        
-        return max(0.1, min(1.0, factor))
-    
-    def _calculate_confidence(
-        self, 
-        features: Dict[str, Any], 
-        tier: RouterTier, 
-        performance: Dict[str, float]
-    ) -> float:
-        """Calculate confidence in routing decision."""
-        # Base confidence on tier capabilities
-        capability_match = 0.0
-        if features.get("has_question", False) and "simple_qa" in tier.capabilities:
-            capability_match += 0.3
-        if features.get("has_technical_terms", False) and "advanced_reasoning" in tier.capabilities:
-            capability_match += 0.4
-        if features.get("text_length", 0) > 500 and "complex_analysis" in tier.capabilities:
-            capability_match += 0.3
-        
-        # Historical confidence
-        historical_confidence = performance["success_rate"]
-        
-        # Combine factors
-        confidence = (capability_match + historical_confidence) / 2.0
-        
-        return max(0.0, min(1.0, confidence))
-    
-    async def _select_tier(
-        self, 
-        tier_scores: Dict[str, Dict[str, float]], 
-        tenant_id: UUID
-    ) -> str:
-        """Select tier using bandit policy."""
-        # Check if we should explore
-        if random.random() < self.exploration_rate:
-            # Exploration: select random tier
-            return random.choice(list(tier_scores.keys()))
-        
-        # Exploitation: select best tier
-        best_tier = max(tier_scores.keys(), key=lambda t: tier_scores[t]["score"])
-        
-        # Check for canary mode
-        if await self._is_canary_mode(tenant_id):
-            # 10% chance to use different tier for A/B testing
-            if random.random() < 0.1:
-                alternatives = [t for t in tier_scores.keys() if t != best_tier]
-                if alternatives:
-                    return random.choice(alternatives)
-        
-        return best_tier
-    
-    async def _is_canary_mode(self, tenant_id: UUID) -> bool:
-        """Check if tenant is in canary mode."""
-        try:
-            canary_key = f"canary_mode:{tenant_id}"
-            return await self.redis.get(canary_key) == "true"
-        except Exception:
+            logger.error("Failed to check sample count", error=str(e))
             return False
     
-    def _generate_reasons(
-        self, 
-        features: Dict[str, Any], 
-        selected_tier: str, 
-        tier_scores: Dict[str, Dict[str, float]]
-    ) -> List[str]:
-        """Generate human-readable reasons for decision."""
-        reasons = []
-        
-        # Text complexity reasons
-        text_length = features.get("text_length", 0)
-        if text_length < 100:
-            reasons.append("Short request suitable for fast processing")
-        elif text_length > 500:
-            reasons.append("Complex request requires advanced processing")
-        
-        # Intent-based reasons
-        if features.get("has_question", False):
-            reasons.append("Question detected - using appropriate tier")
-        
-        if features.get("has_technical_terms", False):
-            reasons.append("Technical content requires advanced capabilities")
-        
-        # Cost reasons
-        if selected_tier == "SLM_A":
-            reasons.append("Cost-optimized for simple request")
-        elif selected_tier == "LLM":
-            reasons.append("Complex request requires full LLM capabilities")
-        
-        # Historical reasons
-        score_info = tier_scores[selected_tier]
-        if score_info["historical_factor"] > 0.8:
-            reasons.append("Strong historical performance for this tier")
-        
-        return reasons
+    async def _predict_with_model(
+        self,
+        model: Any,
+        feature_vector: np.ndarray,
+        tenant_id: str
+    ) -> Tuple[str, float, str]:
+        """Predict using trained model."""
+        try:
+            # Get prediction probabilities
+            probabilities = model.predict_proba([feature_vector])[0]
+            
+            # Get class labels
+            classes = model.classes_
+            
+            # Calculate expected cost for each tier
+            expected_costs = {}
+            for i, tier in enumerate(classes):
+                cost = self.tier_costs.get(tier, 1.0)
+                error_prob = 1 - probabilities[i]
+                expected_cost = cost + self.lambda_error * error_prob
+                expected_costs[tier] = expected_cost
+            
+            # Select tier with minimum expected cost
+            best_tier = min(expected_costs, key=expected_costs.get)
+            confidence = probabilities[classes.tolist().index(best_tier)]
+            
+            reasoning = f"Expected cost: {expected_costs[best_tier]:.3f}, " \
+                       f"Confidence: {confidence:.3f}"
+            
+            return best_tier, confidence, reasoning
+            
+        except Exception as e:
+            logger.error("Model prediction failed", error=str(e))
+            return 'A', 0.5, "Model prediction failed"
     
-    async def _store_decision(
-        self, 
-        request_id: str, 
-        features: Dict[str, Any], 
-        decision: RoutingDecision, 
-        tenant_id: UUID
-    ):
-        """Store decision for learning and analysis."""
+    async def _explore_tier(
+        self,
+        feature_vector: np.ndarray,
+        tenant_id: str
+    ) -> Tuple[str, float, str]:
+        """Explore tier selection when we don't have enough samples."""
+        try:
+            # Get historical performance for each tier
+            tier_performance = await self._get_tier_performance(tenant_id)
+            
+            # Calculate UCB (Upper Confidence Bound) for each tier
+            ucb_scores = {}
+            for tier in self.tier_costs.keys():
+                if tier in tier_performance:
+                    success_rate = tier_performance[tier]['success_rate']
+                    sample_count = tier_performance[tier]['sample_count']
+                    
+                    # UCB calculation
+                    if sample_count > 0:
+                        confidence_radius = math.sqrt(
+                            2 * math.log(sum(tier_performance[t]['sample_count'] 
+                                           for t in tier_performance)) / sample_count
+                        )
+                        ucb_score = success_rate + confidence_radius
+                    else:
+                        ucb_score = 1.0  # High exploration for untested tiers
+                else:
+                    ucb_score = 1.0  # High exploration for new tiers
+                
+                ucb_scores[tier] = ucb_score
+            
+            # Select tier with highest UCB score
+            best_tier = max(ucb_scores, key=ucb_scores.get)
+            confidence = min(ucb_scores[best_tier], 1.0)
+            
+            reasoning = f"UCB exploration, UCB score: {ucb_scores[best_tier]:.3f}"
+            
+            return best_tier, confidence, reasoning
+            
+        except Exception as e:
+            logger.error("UCB exploration failed", error=str(e))
+            return 'A', 0.5, "UCB exploration failed"
+    
+    async def _get_tier_performance(self, tenant_id: str) -> Dict[str, Dict[str, float]]:
+        """Get historical performance for each tier."""
+        try:
+            performance_key = f"tier_performance:{tenant_id}"
+            performance_data = await self.redis.hgetall(performance_key)
+            
+            tier_performance = {}
+            for tier in self.tier_costs.keys():
+                tier_key = f"{tier}_performance"
+                if tier_key in performance_data:
+                    import json
+                    tier_performance[tier] = json.loads(performance_data[tier_key])
+                else:
+                    tier_performance[tier] = {
+                        'success_rate': 0.5,
+                        'sample_count': 0,
+                        'avg_latency': 0.0
+                    }
+            
+            return tier_performance
+            
+        except Exception as e:
+            logger.error("Failed to get tier performance", error=str(e))
+            return {}
+    
+    async def _record_decision(
+        self,
+        tenant_id: str,
+        user_id: Optional[str],
+        features: Dict[str, Any],
+        tier: str,
+        confidence: float
+    ) -> None:
+        """Record decision for learning."""
         try:
             decision_data = {
-                "request_id": request_id,
-                "tier": decision.tier,
-                "confidence": decision.confidence,
-                "features": features,
-                "timestamp": time.time(),
-                "tenant_id": str(tenant_id)
+                'tenant_id': tenant_id,
+                'user_id': user_id,
+                'features': features,
+                'tier': tier,
+                'confidence': confidence,
+                'timestamp': time.time()
             }
             
-            # Store in Redis
-            decision_key = f"routing_decisions:{tenant_id}"
-            import json
+            # Store decision
+            decision_key = f"bandit_decisions:{tenant_id}"
             await self.redis.lpush(decision_key, json.dumps(decision_data))
-            await self.redis.ltrim(decision_key, 0, 10000)  # Keep last 10k decisions
-            await self.redis.expire(decision_key, 86400 * 7)  # 7 days
+            await self.redis.ltrim(decision_key, 0, 9999)  # Keep last 10k decisions
+            
+            # Add to samples for model training
+            samples_key = f"bandit_samples:{tenant_id}"
+            await self.redis.sadd(samples_key, json.dumps(decision_data))
             
         except Exception as e:
-            logger.error("Failed to store decision", 
-                        request_id=request_id, 
-                        error=str(e))
+            logger.error("Failed to record decision", error=str(e))
     
     async def update_performance(
-        self, 
-        tier: str, 
-        success: bool, 
-        latency_ms: float, 
-        tenant_id: UUID
-    ):
-        """Update tier performance based on actual results."""
+        self,
+        tenant_id: str,
+        tier: str,
+        success: bool,
+        latency: float
+    ) -> None:
+        """Update tier performance based on outcome."""
         try:
-            performance_key = f"tier_performance:{tier}:{tenant_id}"
+            performance_key = f"tier_performance:{tenant_id}"
+            tier_key = f"{tier}_performance"
             
             # Get current performance
-            current = await self.redis.hgetall(performance_key)
-            if not current:
-                current = {
-                    "success_rate": "0.0",
-                    "avg_latency": "0.0",
-                    "request_count": "0",
-                    "last_updated": "0.0"
+            current_data = await self.redis.hget(tier_key, tier_key)
+            if current_data:
+                import json
+                performance = json.loads(current_data)
+            else:
+                performance = {
+                    'success_rate': 0.5,
+                    'sample_count': 0,
+                    'avg_latency': 0.0
                 }
             
-            # Update metrics
-            success_rate = float(current["success_rate"])
-            avg_latency = float(current["avg_latency"])
-            request_count = int(current["request_count"])
-            
-            # Update with exponential moving average
-            new_success_rate = (success_rate * request_count + (1.0 if success else 0.0)) / (request_count + 1)
-            new_avg_latency = (avg_latency * request_count + latency_ms) / (request_count + 1)
-            new_request_count = request_count + 1
+            # Update performance
+            performance['sample_count'] += 1
+            performance['success_rate'] = (
+                (performance['success_rate'] * (performance['sample_count'] - 1) + 
+                 (1.0 if success else 0.0)) / performance['sample_count']
+            )
+            performance['avg_latency'] = (
+                (performance['avg_latency'] * (performance['sample_count'] - 1) + 
+                 latency) / performance['sample_count']
+            )
             
             # Store updated performance
-            await self.redis.hset(performance_key, mapping={
-                "success_rate": str(new_success_rate),
-                "avg_latency": str(new_avg_latency),
-                "request_count": str(new_request_count),
-                "last_updated": str(time.time())
-            })
+            await self.redis.hset(performance_key, tier_key, json.dumps(performance))
             
-            logger.debug("Performance updated", 
-                        tier=tier, 
-                        success=success, 
-                        latency_ms=latency_ms,
-                        tenant_id=tenant_id)
+            logger.info(
+                "Tier performance updated",
+                tenant_id=tenant_id,
+                tier=tier,
+                success=success,
+                latency=latency,
+                new_success_rate=performance['success_rate']
+            )
             
         except Exception as e:
-            logger.error("Failed to update performance", 
-                        tier=tier, 
-                        error=str(e))
+            logger.error("Failed to update performance", error=str(e))
+    
+    async def retrain_model(self, tenant_id: str) -> bool:
+        """Retrain model with latest data."""
+        try:
+            if tenant_id not in self.models:
+                return False
+            
+            # Get training data
+            samples_key = f"bandit_samples:{tenant_id}"
+            samples = await self.redis.smembers(samples_key)
+            
+            if len(samples) < self.min_samples:
+                logger.warning("Not enough samples for retraining", tenant_id=tenant_id)
+                return False
+            
+            # Parse samples
+            X = []
+            y = []
+            for sample in samples:
+                try:
+                    import json
+                    sample_data = json.loads(sample)
+                    feature_vector = self._extract_feature_vector(sample_data['features'])
+                    X.append(feature_vector)
+                    y.append(sample_data['tier'])
+                except Exception as e:
+                    logger.error("Failed to parse sample", error=str(e))
+                    continue
+            
+            if len(X) < self.min_samples:
+                return False
+            
+            # Train model
+            X = np.array(X)
+            y = np.array(y)
+            
+            self.models[tenant_id].fit(X, y)
+            self.calibrated_models[tenant_id].fit(X, y)
+            
+            logger.info(
+                "Model retrained successfully",
+                tenant_id=tenant_id,
+                sample_count=len(X)
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error("Model retraining failed", error=str(e))
+            return False
+    
+    def _extract_feature_vector(self, features: Dict[str, Any]) -> np.ndarray:
+        """Extract feature vector from features dict."""
+        # Define feature order for consistency
+        feature_order = [
+            'text_length', 'word_count', 'sentence_count', 'paragraph_count',
+            'char_count', 'digit_count', 'punctuation_count', 'uppercase_ratio',
+            'has_question', 'has_exclamation', 'has_currency', 'has_email',
+            'has_url', 'avg_word_length', 'unique_word_ratio',
+            'intent_order', 'intent_support', 'intent_product', 'intent_account',
+            'intent_shipping', 'sentiment_positive', 'sentiment_negative',
+            'urgency_high', 'technical_complexity', 'user_success_rate',
+            'tenant_success_rate', 'hour_of_day', 'day_of_week', 'is_weekend',
+            'is_business_hours', 'session_duration', 'session_message_count'
+        ]
+        
+        # Extract features in order
+        feature_vector = []
+        for feature_name in feature_order:
+            value = features.get(feature_name, 0)
+            if isinstance(value, bool):
+                value = 1.0 if value else 0.0
+            elif isinstance(value, str):
+                value = 0.0  # Skip string features for now
+            feature_vector.append(float(value))
+        
+        return np.array(feature_vector)
+    
+    async def _load_tenant_data(self, tenant_id: str) -> None:
+        """Load existing data for tenant."""
+        try:
+            # Load performance data
+            performance_key = f"tier_performance:{tenant_id}"
+            performance_data = await self.redis.hgetall(performance_key)
+            
+            # Load samples
+            samples_key = f"bandit_samples:{tenant_id}"
+            samples = await self.redis.smembers(samples_key)
+            
+            logger.info(
+                "Loaded tenant data",
+                tenant_id=tenant_id,
+                performance_entries=len(performance_data),
+                sample_count=len(samples)
+            )
+            
+        except Exception as e:
+            logger.error("Failed to load tenant data", error=str(e))
+    
+    async def get_bandit_stats(self, tenant_id: str) -> Dict[str, Any]:
+        """Get bandit statistics for tenant."""
+        try:
+            # Get tier performance
+            tier_performance = await self._get_tier_performance(tenant_id)
+            
+            # Get sample count
+            samples_key = f"bandit_samples:{tenant_id}"
+            sample_count = await self.redis.scard(samples_key)
+            
+            # Get decision count
+            decisions_key = f"bandit_decisions:{tenant_id}"
+            decision_count = await self.redis.llen(decisions_key)
+            
+            return {
+                'tenant_id': tenant_id,
+                'tier_performance': tier_performance,
+                'sample_count': sample_count,
+                'decision_count': decision_count,
+                'lambda_error': self.lambda_error,
+                'exploration_rate': self.exploration_rate,
+                'min_samples': self.min_samples
+            }
+            
+        except Exception as e:
+            logger.error("Failed to get bandit stats", error=str(e))
+            return {'tenant_id': tenant_id, 'error': str(e)}

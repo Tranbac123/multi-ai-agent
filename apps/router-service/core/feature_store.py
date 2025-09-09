@@ -1,352 +1,357 @@
-"""Feature store for router decision making."""
+"""Feature store for router v2 with 24+ signals."""
 
 import asyncio
 import time
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from uuid import UUID
+import json
+import re
+from typing import Dict, List, Any, Optional, Tuple
 import structlog
 import redis.asyncio as redis
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, update
+from datetime import datetime, timedelta
 
 logger = structlog.get_logger(__name__)
 
 
 class FeatureStore:
-    """Feature store for storing and retrieving request features."""
+    """Feature store for router decision making."""
     
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
         self.feature_ttl = 3600  # 1 hour
-        self.batch_size = 100
     
     async def extract_features(
         self,
-        request_text: str,
-        context: Dict[str, Any],
-        tenant_id: UUID
+        message: str,
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Extract features from request and context."""
+        """Extract 24+ features from request."""
         try:
             features = {}
             
-            # Text-based features
-            features.update(self._extract_text_features(request_text))
+            # Basic text features
+            features.update(await self._extract_text_features(message))
             
-            # Context features
-            features.update(self._extract_context_features(context))
-            
-            # Tenant features
-            features.update(await self._extract_tenant_features(tenant_id))
+            # Domain-specific features
+            features.update(await self._extract_domain_features(message))
             
             # Historical features
-            features.update(await self._extract_historical_features(tenant_id, request_text))
+            features.update(await self._extract_historical_features(tenant_id, user_id))
             
-            # Domain features
-            features.update(self._extract_domain_features(request_text))
+            # Context features
+            features.update(await self._extract_context_features(context or {}))
             
-            # Add timestamp
-            features["timestamp"] = time.time()
-            features["tenant_id"] = str(tenant_id)
+            # User preference features
+            features.update(await self._extract_user_preferences(tenant_id, user_id))
             
-            logger.debug("Features extracted", 
-                        feature_count=len(features), 
-                        tenant_id=tenant_id)
+            # Session features
+            features.update(await self._extract_session_features(session_id, tenant_id))
+            
+            # Add metadata
+            features['extraction_timestamp'] = time.time()
+            features['tenant_id'] = tenant_id
+            features['user_id'] = user_id
+            features['session_id'] = session_id
+            
+            # Cache features
+            await self._cache_features(tenant_id, user_id, features)
+            
+            logger.info(
+                "Features extracted successfully",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                feature_count=len(features)
+            )
             
             return features
             
         except Exception as e:
-            logger.error("Feature extraction failed", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
+            logger.error(
+                "Feature extraction failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                user_id=user_id
+            )
             return {}
     
-    def _extract_text_features(self, text: str) -> Dict[str, Any]:
-        """Extract text-based features."""
+    async def _extract_text_features(self, message: str) -> Dict[str, Any]:
+        """Extract basic text features."""
         features = {}
         
-        # Basic text features
-        features["text_length"] = len(text)
-        features["word_count"] = len(text.split())
-        features["sentence_count"] = text.count('.') + text.count('!') + text.count('?')
-        features["char_count"] = len(text.replace(' ', ''))
+        # Text length features
+        features['text_length'] = len(message)
+        features['word_count'] = len(message.split())
+        features['sentence_count'] = len(re.split(r'[.!?]+', message))
+        features['paragraph_count'] = len(message.split('\n\n'))
+        
+        # Character features
+        features['char_count'] = len(message)
+        features['digit_count'] = len(re.findall(r'\d', message))
+        features['punctuation_count'] = len(re.findall(r'[^\w\s]', message))
+        features['uppercase_ratio'] = len(re.findall(r'[A-Z]', message)) / max(len(message), 1)
+        
+        # Language features
+        features['has_question'] = '?' in message
+        features['has_exclamation'] = '!' in message
+        features['has_currency'] = bool(re.search(r'[$€£¥₹]', message))
+        features['has_email'] = bool(re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', message))
+        features['has_url'] = bool(re.search(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message))
         
         # Complexity features
-        features["avg_word_length"] = features["char_count"] / max(features["word_count"], 1)
-        features["avg_sentence_length"] = features["word_count"] / max(features["sentence_count"], 1)
-        
-        # Special characters
-        features["question_marks"] = text.count('?')
-        features["exclamation_marks"] = text.count('!')
-        features["numbers"] = sum(c.isdigit() for c in text)
-        features["uppercase_ratio"] = sum(c.isupper() for c in text) / max(len(text), 1)
-        
-        # Language patterns
-        features["has_greeting"] = any(word in text.lower() for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon'])
-        features["has_question"] = '?' in text
-        features["has_urgency"] = any(word in text.lower() for word in ['urgent', 'asap', 'immediately', 'emergency'])
-        features["has_politeness"] = any(word in text.lower() for word in ['please', 'thank you', 'thanks', 'appreciate'])
+        features['avg_word_length'] = sum(len(word) for word in message.split()) / max(len(message.split()), 1)
+        features['unique_word_ratio'] = len(set(word.lower() for word in message.split())) / max(len(message.split()), 1)
         
         return features
     
-    def _extract_context_features(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract context-based features."""
-        features = {}
-        
-        # Session features
-        features["session_length"] = context.get("session_length", 0)
-        features["message_count"] = context.get("message_count", 0)
-        features["time_since_last_message"] = context.get("time_since_last_message", 0)
-        
-        # Channel features
-        features["channel"] = context.get("channel", "unknown")
-        features["is_mobile"] = context.get("is_mobile", False)
-        features["is_web"] = context.get("is_web", False)
-        
-        # User features
-        features["user_type"] = context.get("user_type", "unknown")
-        features["is_returning_user"] = context.get("is_returning_user", False)
-        features["user_plan"] = context.get("user_plan", "free")
-        
-        # Time features
-        current_hour = datetime.now().hour
-        features["hour_of_day"] = current_hour
-        features["is_business_hours"] = 9 <= current_hour <= 17
-        features["is_weekend"] = datetime.now().weekday() >= 5
-        
-        return features
-    
-    async def _extract_tenant_features(self, tenant_id: UUID) -> Dict[str, Any]:
-        """Extract tenant-specific features."""
-        features = {}
-        
-        try:
-            # Get tenant info from cache
-            tenant_key = f"tenant_features:{tenant_id}"
-            cached_features = await self.redis.hgetall(tenant_key)
-            
-            if cached_features:
-                features.update({
-                    "tenant_plan": cached_features.get("plan", "free"),
-                    "tenant_region": cached_features.get("region", "us-east-1"),
-                    "tenant_created_at": float(cached_features.get("created_at", 0)),
-                    "tenant_message_count": int(cached_features.get("message_count", 0)),
-                    "tenant_success_rate": float(cached_features.get("success_rate", 0.0))
-                })
-            else:
-                # Default values if not cached
-                features.update({
-                    "tenant_plan": "free",
-                    "tenant_region": "us-east-1",
-                    "tenant_created_at": time.time(),
-                    "tenant_message_count": 0,
-                    "tenant_success_rate": 0.0
-                })
-            
-        except Exception as e:
-            logger.error("Failed to extract tenant features", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            # Use default values
-            features.update({
-                "tenant_plan": "free",
-                "tenant_region": "us-east-1",
-                "tenant_created_at": time.time(),
-                "tenant_message_count": 0,
-                "tenant_success_rate": 0.0
-            })
-        
-        return features
-    
-    async def _extract_historical_features(
-        self, 
-        tenant_id: UUID, 
-        request_text: str
-    ) -> Dict[str, Any]:
-        """Extract historical features based on past requests."""
-        features = {}
-        
-        try:
-            # Get recent request patterns
-            pattern_key = f"request_patterns:{tenant_id}"
-            patterns = await self.redis.hgetall(pattern_key)
-            
-            if patterns:
-                features.update({
-                    "avg_request_length": float(patterns.get("avg_length", 0)),
-                    "common_intent": patterns.get("common_intent", "unknown"),
-                    "success_rate_24h": float(patterns.get("success_rate_24h", 0.0)),
-                    "escalation_rate": float(patterns.get("escalation_rate", 0.0))
-                })
-            else:
-                features.update({
-                    "avg_request_length": 0,
-                    "common_intent": "unknown",
-                    "success_rate_24h": 0.0,
-                    "escalation_rate": 0.0
-                })
-            
-            # Check for similar requests
-            similar_requests = await self._find_similar_requests(tenant_id, request_text)
-            features["similar_request_count"] = len(similar_requests)
-            features["has_similar_requests"] = len(similar_requests) > 0
-            
-        except Exception as e:
-            logger.error("Failed to extract historical features", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            features.update({
-                "avg_request_length": 0,
-                "common_intent": "unknown",
-                "success_rate_24h": 0.0,
-                "escalation_rate": 0.0,
-                "similar_request_count": 0,
-                "has_similar_requests": False
-            })
-        
-        return features
-    
-    def _extract_domain_features(self, text: str) -> Dict[str, Any]:
+    async def _extract_domain_features(self, message: str) -> Dict[str, Any]:
         """Extract domain-specific features."""
         features = {}
         
         # Intent keywords
         intent_keywords = {
-            "faq": ["what", "how", "why", "when", "where", "can you", "do you know"],
-            "order": ["order", "purchase", "buy", "checkout", "payment", "shipping"],
-            "support": ["help", "problem", "issue", "error", "bug", "fix"],
-            "billing": ["bill", "invoice", "payment", "charge", "refund", "cancel"],
-            "technical": ["api", "integration", "code", "technical", "developer"]
+            'order': ['order', 'buy', 'purchase', 'cart', 'checkout', 'payment'],
+            'support': ['help', 'support', 'issue', 'problem', 'error', 'bug'],
+            'product': ['product', 'item', 'price', 'specification', 'feature'],
+            'account': ['account', 'login', 'register', 'profile', 'settings'],
+            'shipping': ['shipping', 'delivery', 'track', 'address', 'location']
         }
         
-        text_lower = text.lower()
+        message_lower = message.lower()
         for intent, keywords in intent_keywords.items():
-            features[f"has_{intent}_keywords"] = any(keyword in text_lower for keyword in keywords)
+            features[f'intent_{intent}'] = any(keyword in message_lower for keyword in keywords)
         
         # Sentiment indicators
-        positive_words = ["good", "great", "excellent", "amazing", "love", "perfect"]
-        negative_words = ["bad", "terrible", "awful", "hate", "worst", "disappointed"]
+        positive_words = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'perfect']
+        negative_words = ['bad', 'terrible', 'awful', 'horrible', 'disappointed', 'angry']
         
-        features["positive_sentiment"] = any(word in text_lower for word in positive_words)
-        features["negative_sentiment"] = any(word in text_lower for word in negative_words)
+        features['sentiment_positive'] = any(word in message_lower for word in positive_words)
+        features['sentiment_negative'] = any(word in message_lower for word in negative_words)
         
-        # Complexity indicators
-        features["has_technical_terms"] = any(term in text_lower for term in ["api", "json", "xml", "database", "server"])
-        features["has_business_terms"] = any(term in text_lower for term in ["revenue", "profit", "customer", "business", "strategy"])
+        # Urgency indicators
+        urgency_words = ['urgent', 'asap', 'immediately', 'emergency', 'critical', 'rush']
+        features['urgency_high'] = any(word in message_lower for word in urgency_words)
+        
+        # Technical complexity
+        technical_terms = ['api', 'database', 'server', 'code', 'bug', 'error', 'exception']
+        features['technical_complexity'] = any(term in message_lower for term in technical_terms)
         
         return features
     
-    async def _find_similar_requests(
-        self, 
-        tenant_id: UUID, 
-        request_text: str, 
-        limit: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Find similar requests from history."""
+    async def _extract_historical_features(
+        self,
+        tenant_id: str,
+        user_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Extract historical features."""
+        features = {}
+        
         try:
-            # Simple similarity based on word overlap
-            request_words = set(request_text.lower().split())
-            similar_requests = []
+            # Get user history if available
+            if user_id:
+                user_history = await self._get_user_history(tenant_id, user_id)
+                features.update(user_history)
             
-            # Get recent requests from cache
-            history_key = f"request_history:{tenant_id}"
-            recent_requests = await self.redis.lrange(history_key, 0, 100)
-            
-            for request_data in recent_requests:
-                try:
-                    import json
-                    data = json.loads(request_data)
-                    history_words = set(data.get("text", "").lower().split())
-                    
-                    # Calculate word overlap
-                    overlap = len(request_words.intersection(history_words))
-                    total_words = len(request_words.union(history_words))
-                    
-                    if total_words > 0:
-                        similarity = overlap / total_words
-                        if similarity > 0.3:  # 30% similarity threshold
-                            similar_requests.append({
-                                "text": data.get("text", ""),
-                                "similarity": similarity,
-                                "timestamp": data.get("timestamp", 0)
-                            })
-                except Exception:
-                    continue
-            
-            # Sort by similarity and return top results
-            similar_requests.sort(key=lambda x: x["similarity"], reverse=True)
-            return similar_requests[:limit]
+            # Get tenant history
+            tenant_history = await self._get_tenant_history(tenant_id)
+            features.update(tenant_history)
             
         except Exception as e:
-            logger.error("Failed to find similar requests", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return []
+            logger.error("Failed to extract historical features", error=str(e))
+        
+        return features
     
-    async def store_features(
-        self,
-        request_id: str,
-        features: Dict[str, Any],
-        tenant_id: UUID
-    ):
-        """Store features for later analysis."""
+    async def _get_user_history(self, tenant_id: str, user_id: str) -> Dict[str, Any]:
+        """Get user-specific historical features."""
         try:
-            # Store in Redis with TTL
-            feature_key = f"features:{request_id}"
-            await self.redis.hset(feature_key, mapping=features)
-            await self.redis.expire(feature_key, self.feature_ttl)
+            # Get user's recent interactions
+            user_key = f"user_history:{tenant_id}:{user_id}"
+            history_data = await self.redis.hgetall(user_key)
             
-            # Store in request history
-            history_key = f"request_history:{tenant_id}"
-            request_data = {
-                "request_id": request_id,
-                "text": features.get("text", ""),
-                "timestamp": time.time(),
-                "features": features
+            if not history_data:
+                return {
+                    'user_interaction_count': 0,
+                    'user_success_rate': 0.0,
+                    'user_avg_latency': 0.0,
+                    'user_last_interaction': 0
+                }
+            
+            return {
+                'user_interaction_count': int(history_data.get('interaction_count', 0)),
+                'user_success_rate': float(history_data.get('success_rate', 0.0)),
+                'user_avg_latency': float(history_data.get('avg_latency', 0.0)),
+                'user_last_interaction': float(history_data.get('last_interaction', 0))
             }
             
-            import json
-            await self.redis.lpush(history_key, json.dumps(request_data))
-            await self.redis.ltrim(history_key, 0, 1000)  # Keep last 1000 requests
-            await self.redis.expire(history_key, 86400)  # 24 hours
-            
-            logger.debug("Features stored", 
-                        request_id=request_id, 
-                        tenant_id=tenant_id)
-            
         except Exception as e:
-            logger.error("Failed to store features", 
-                        request_id=request_id, 
-                        error=str(e))
+            logger.error("Failed to get user history", error=str(e))
+            return {}
     
-    async def get_features(self, request_id: str) -> Optional[Dict[str, Any]]:
-        """Get stored features for request."""
+    async def _get_tenant_history(self, tenant_id: str) -> Dict[str, Any]:
+        """Get tenant-specific historical features."""
         try:
-            feature_key = f"features:{request_id}"
-            features = await self.redis.hgetall(feature_key)
+            # Get tenant's recent performance
+            tenant_key = f"tenant_history:{tenant_id}"
+            history_data = await self.redis.hgetall(tenant_key)
             
-            if features:
-                # Convert string values back to appropriate types
-                converted_features = {}
-                for key, value in features.items():
-                    try:
-                        # Try to convert to float
-                        converted_features[key] = float(value)
-                    except ValueError:
-                        try:
-                            # Try to convert to int
-                            converted_features[key] = int(value)
-                        except ValueError:
-                            # Keep as string
-                            converted_features[key] = value
-                
-                return converted_features
+            if not history_data:
+                return {
+                    'tenant_success_rate': 0.0,
+                    'tenant_avg_latency': 0.0,
+                    'tenant_error_rate': 0.0,
+                    'tenant_throughput': 0.0
+                }
             
-            return None
+            return {
+                'tenant_success_rate': float(history_data.get('success_rate', 0.0)),
+                'tenant_avg_latency': float(history_data.get('avg_latency', 0.0)),
+                'tenant_error_rate': float(history_data.get('error_rate', 0.0)),
+                'tenant_throughput': float(history_data.get('throughput', 0.0))
+            }
             
         except Exception as e:
-            logger.error("Failed to get features", 
-                        request_id=request_id, 
-                        error=str(e))
-            return None
+            logger.error("Failed to get tenant history", error=str(e))
+            return {}
+    
+    async def _extract_context_features(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract context-based features."""
+        features = {}
+        
+        # Time-based features
+        now = datetime.now()
+        features['hour_of_day'] = now.hour
+        features['day_of_week'] = now.weekday()
+        features['is_weekend'] = now.weekday() >= 5
+        features['is_business_hours'] = 9 <= now.hour <= 17
+        
+        # Request context
+        features['has_context'] = bool(context)
+        features['context_keys'] = list(context.keys()) if context else []
+        features['context_size'] = len(str(context)) if context else 0
+        
+        # Source features
+        features['source'] = context.get('source', 'unknown')
+        features['user_agent'] = context.get('user_agent', '')
+        features['ip_address'] = context.get('ip_address', '')
+        
+        return features
+    
+    async def _extract_user_preferences(
+        self,
+        tenant_id: str,
+        user_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Extract user preference features."""
+        features = {}
+        
+        if not user_id:
+            return features
+        
+        try:
+            # Get user preferences
+            prefs_key = f"user_prefs:{tenant_id}:{user_id}"
+            prefs_data = await self.redis.hgetall(prefs_key)
+            
+            if prefs_data:
+                features['preferred_agent'] = prefs_data.get('preferred_agent', '')
+                features['preferred_tier'] = prefs_data.get('preferred_tier', 'A')
+                features['language'] = prefs_data.get('language', 'en')
+                features['timezone'] = prefs_data.get('timezone', 'UTC')
+            else:
+                features['preferred_agent'] = ''
+                features['preferred_tier'] = 'A'
+                features['language'] = 'en'
+                features['timezone'] = 'UTC'
+                
+        except Exception as e:
+            logger.error("Failed to extract user preferences", error=str(e))
+        
+        return features
+    
+    async def _extract_session_features(
+        self,
+        session_id: Optional[str],
+        tenant_id: str
+    ) -> Dict[str, Any]:
+        """Extract session-based features."""
+        features = {}
+        
+        if not session_id:
+            return features
+        
+        try:
+            # Get session data
+            session_key = f"session:{tenant_id}:{session_id}"
+            session_data = await self.redis.hgetall(session_key)
+            
+            if session_data:
+                features['session_duration'] = float(session_data.get('duration', 0))
+                features['session_message_count'] = int(session_data.get('message_count', 0))
+                features['session_agent_switches'] = int(session_data.get('agent_switches', 0))
+                features['session_escalations'] = int(session_data.get('escalations', 0))
+            else:
+                features['session_duration'] = 0.0
+                features['session_message_count'] = 0
+                features['session_agent_switches'] = 0
+                features['session_escalations'] = 0
+                
+        except Exception as e:
+            logger.error("Failed to extract session features", error=str(e))
+        
+        return features
+    
+    async def _cache_features(
+        self,
+        tenant_id: str,
+        user_id: Optional[str],
+        features: Dict[str, Any]
+    ) -> None:
+        """Cache extracted features."""
+        try:
+            cache_key = f"features:{tenant_id}:{user_id or 'anonymous'}:{int(time.time())}"
+            await self.redis.setex(
+                cache_key,
+                self.feature_ttl,
+                json.dumps(features)
+            )
+        except Exception as e:
+            logger.error("Failed to cache features", error=str(e))
+    
+    async def get_feature_importance(self, tenant_id: str) -> Dict[str, float]:
+        """Get feature importance scores for a tenant."""
+        try:
+            # This would typically be calculated from historical data
+            # For now, return default importance scores
+            return {
+                'text_length': 0.1,
+                'word_count': 0.1,
+                'intent_order': 0.15,
+                'intent_support': 0.15,
+                'sentiment_negative': 0.1,
+                'urgency_high': 0.1,
+                'technical_complexity': 0.1,
+                'user_success_rate': 0.1,
+                'tenant_success_rate': 0.1
+            }
+        except Exception as e:
+            logger.error("Failed to get feature importance", error=str(e))
+            return {}
+    
+    async def update_feature_importance(
+        self,
+        tenant_id: str,
+        feature_importance: Dict[str, float]
+    ) -> bool:
+        """Update feature importance scores for a tenant."""
+        try:
+            importance_key = f"feature_importance:{tenant_id}"
+            await self.redis.setex(
+                importance_key,
+                86400,  # 24 hours
+                json.dumps(feature_importance)
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to update feature importance", error=str(e))
+            return False
