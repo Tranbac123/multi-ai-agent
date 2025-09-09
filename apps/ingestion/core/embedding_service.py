@@ -1,187 +1,257 @@
-"""Embedding service for document vectorization."""
+"""Embedding service for document chunks."""
 
 import asyncio
+import time
 from typing import List, Dict, Any, Optional
-from uuid import UUID
 import structlog
 import openai
-from openai import AsyncOpenAI
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 logger = structlog.get_logger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating document embeddings."""
+    """Service for generating embeddings for document chunks."""
     
-    def __init__(self, api_key: str, model: str = "text-embedding-ada-002"):
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model
-        self.batch_size = 100  # Process embeddings in batches
-        self.max_tokens = 8191  # OpenAI embedding limit
+    def __init__(
+        self,
+        openai_api_key: str,
+        model_name: str = "text-embedding-ada-002",
+        batch_size: int = 100,
+        max_retries: int = 3
+    ):
+        self.openai_api_key = openai_api_key
+        self.model_name = model_name
+        self.batch_size = batch_size
+        self.max_retries = max_retries
+        
+        # Initialize OpenAI client
+        openai.api_key = openai_api_key
+        
+        # Initialize local embedding model as fallback
+        self.local_model = None
+        self._init_local_model()
+    
+    def _init_local_model(self):
+        """Initialize local embedding model as fallback."""
+        try:
+            self.local_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Local embedding model initialized")
+        except Exception as e:
+            logger.warning("Failed to initialize local embedding model", error=str(e))
     
     async def generate_embeddings(
-        self, 
-        texts: List[str], 
-        tenant_id: UUID
-    ) -> List[List[float]]:
-        """Generate embeddings for list of texts."""
-        try:
-            # Split texts into batches
-            batches = self._split_into_batches(texts)
-            all_embeddings = []
-            
-            for batch in batches:
-                embeddings = await self._process_batch(batch, tenant_id)
-                all_embeddings.extend(embeddings)
-            
-            logger.info("Embeddings generated", 
-                       text_count=len(texts), 
-                       embedding_count=len(all_embeddings),
-                       tenant_id=tenant_id)
-            
-            return all_embeddings
-            
-        except Exception as e:
-            logger.error("Failed to generate embeddings", 
-                        text_count=len(texts), 
-                        error=str(e))
-            raise
-    
-    async def generate_embedding(
-        self, 
-        text: str, 
-        tenant_id: UUID
-    ) -> List[float]:
-        """Generate embedding for single text."""
-        try:
-            # Truncate text if too long
-            if len(text) > self.max_tokens:
-                text = text[:self.max_tokens]
-            
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=text
-            )
-            
-            embedding = response.data[0].embedding
-            
-            logger.debug("Embedding generated", 
-                        text_length=len(text), 
-                        embedding_dim=len(embedding),
-                        tenant_id=tenant_id)
-            
-            return embedding
-            
-        except Exception as e:
-            logger.error("Failed to generate embedding", 
-                        text_length=len(text), 
-                        error=str(e))
-            raise
-    
-    async def chunk_document(
-        self, 
-        content: str, 
-        chunk_size: int = 1000, 
-        overlap: int = 200
+        self,
+        chunks: List[Dict[str, Any]],
+        tenant_id: str
     ) -> List[Dict[str, Any]]:
-        """Chunk document into smaller pieces for embedding."""
+        """Generate embeddings for document chunks."""
         try:
-            chunks = []
-            start = 0
+            # Extract text content from chunks
+            texts = [chunk['content'] for chunk in chunks]
             
-            while start < len(content):
-                end = start + chunk_size
-                chunk_text = content[start:end]
-                
-                # Try to break at sentence boundary
-                if end < len(content):
-                    last_period = chunk_text.rfind('.')
-                    last_newline = chunk_text.rfind('\n')
-                    break_point = max(last_period, last_newline)
-                    
-                    if break_point > start + chunk_size // 2:
-                        end = start + break_point + 1
-                        chunk_text = content[start:end]
-                
-                chunks.append({
-                    "text": chunk_text.strip(),
-                    "start": start,
-                    "end": end,
-                    "length": len(chunk_text)
-                })
-                
-                start = end - overlap
+            # Generate embeddings in batches
+            embeddings = await self._generate_embeddings_batch(texts, tenant_id)
             
-            logger.info("Document chunked", 
-                       original_length=len(content), 
-                       chunk_count=len(chunks))
+            # Combine chunks with embeddings
+            result = []
+            for i, chunk in enumerate(chunks):
+                chunk_with_embedding = chunk.copy()
+                chunk_with_embedding['embedding'] = embeddings[i]
+                chunk_with_embedding['embedding_model'] = self.model_name
+                chunk_with_embedding['embedding_timestamp'] = time.time()
+                result.append(chunk_with_embedding)
             
-            return chunks
-            
-        except Exception as e:
-            logger.error("Failed to chunk document", 
-                        content_length=len(content), 
-                        error=str(e))
-            raise
-    
-    def _split_into_batches(self, texts: List[str]) -> List[List[str]]:
-        """Split texts into batches for processing."""
-        batches = []
-        current_batch = []
-        current_length = 0
-        
-        for text in texts:
-            text_length = len(text)
-            
-            # If adding this text would exceed batch size, start new batch
-            if current_length + text_length > self.batch_size and current_batch:
-                batches.append(current_batch)
-                current_batch = [text]
-                current_length = text_length
-            else:
-                current_batch.append(text)
-                current_length += text_length
-        
-        if current_batch:
-            batches.append(current_batch)
-        
-        return batches
-    
-    async def _process_batch(
-        self, 
-        batch: List[str], 
-        tenant_id: UUID
-    ) -> List[List[float]]:
-        """Process a batch of texts for embedding."""
-        try:
-            # Truncate texts if necessary
-            truncated_batch = [text[:self.max_tokens] for text in batch]
-            
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=truncated_batch
+            logger.info(
+                "Embeddings generated successfully",
+                tenant_id=tenant_id,
+                chunks_count=len(chunks),
+                model=self.model_name
             )
             
-            embeddings = [data.embedding for data in response.data]
+            return result
             
-            logger.debug("Batch processed", 
-                        batch_size=len(batch), 
-                        tenant_id=tenant_id)
-            
+        except Exception as e:
+            logger.error(
+                "Embedding generation failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                chunks_count=len(chunks)
+            )
+            raise
+    
+    async def _generate_embeddings_batch(
+        self,
+        texts: List[str],
+        tenant_id: str
+    ) -> List[List[float]]:
+        """Generate embeddings for a batch of texts."""
+        try:
+            # Try OpenAI first
+            embeddings = await self._generate_openai_embeddings(texts, tenant_id)
             return embeddings
             
         except Exception as e:
-            logger.error("Batch processing failed", 
-                        batch_size=len(batch), 
-                        error=str(e))
+            logger.warning(
+                "OpenAI embedding failed, trying local model",
+                error=str(e),
+                tenant_id=tenant_id
+            )
+            
+            # Fallback to local model
+            try:
+                embeddings = await self._generate_local_embeddings(texts, tenant_id)
+                return embeddings
+            except Exception as e2:
+                logger.error(
+                    "Local embedding also failed",
+                    error=str(e2),
+                    tenant_id=tenant_id
+                )
+                raise
+    
+    async def _generate_openai_embeddings(
+        self,
+        texts: List[str],
+        tenant_id: str
+    ) -> List[List[float]]:
+        """Generate embeddings using OpenAI API."""
+        embeddings = []
+        
+        # Process in batches
+        for i in range(0, len(texts), self.batch_size):
+            batch_texts = texts[i:i + self.batch_size]
+            
+            for attempt in range(self.max_retries):
+                try:
+                    response = await openai.Embedding.acreate(
+                        input=batch_texts,
+                        model=self.model_name
+                    )
+                    
+                    batch_embeddings = [item['embedding'] for item in response['data']]
+                    embeddings.extend(batch_embeddings)
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.1)
+                    break
+                    
+                except Exception as e:
+                    if attempt == self.max_retries - 1:
+                        raise
+                    
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(
+                        "OpenAI embedding attempt failed, retrying",
+                        attempt=attempt + 1,
+                        error=str(e),
+                        wait_time=wait_time
+                    )
+                    await asyncio.sleep(wait_time)
+        
+        return embeddings
+    
+    async def _generate_local_embeddings(
+        self,
+        texts: List[str],
+        tenant_id: str
+    ) -> List[List[float]]:
+        """Generate embeddings using local model."""
+        if not self.local_model:
+            raise RuntimeError("Local embedding model not available")
+        
+        # Run in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        embeddings = await loop.run_in_executor(
+            None,
+            self.local_model.encode,
+            texts
+        )
+        
+        # Convert to list of lists
+        return [embedding.tolist() for embedding in embeddings]
+    
+    async def generate_query_embedding(
+        self,
+        query: str,
+        tenant_id: str
+    ) -> List[float]:
+        """Generate embedding for a search query."""
+        try:
+            embeddings = await self._generate_embeddings_batch([query], tenant_id)
+            return embeddings[0]
+            
+        except Exception as e:
+            logger.error(
+                "Query embedding generation failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                query=query
+            )
             raise
     
-    async def get_embedding_dimension(self) -> int:
-        """Get the dimension of embeddings."""
+    async def compute_similarity(
+        self,
+        embedding1: List[float],
+        embedding2: List[float]
+    ) -> float:
+        """Compute cosine similarity between two embeddings."""
         try:
-            # Generate a test embedding to get dimension
-            test_embedding = await self.generate_embedding("test", UUID("00000000-0000-0000-0000-000000000000"))
-            return len(test_embedding)
+            # Convert to numpy arrays
+            vec1 = np.array(embedding1)
+            vec2 = np.array(embedding2)
+            
+            # Compute cosine similarity
+            dot_product = np.dot(vec1, vec2)
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
+            
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+            
+            similarity = dot_product / (norm1 * norm2)
+            return float(similarity)
+            
         except Exception as e:
-            logger.error("Failed to get embedding dimension", error=str(e))
-            return 1536  # Default for text-embedding-ada-002
+            logger.error("Similarity computation failed", error=str(e))
+            return 0.0
+    
+    async def find_similar_chunks(
+        self,
+        query_embedding: List[float],
+        chunk_embeddings: List[Dict[str, Any]],
+        top_k: int = 10,
+        threshold: float = 0.7
+    ) -> List[Dict[str, Any]]:
+        """Find most similar chunks to query embedding."""
+        similarities = []
+        
+        for chunk in chunk_embeddings:
+            similarity = await self.compute_similarity(
+                query_embedding,
+                chunk['embedding']
+            )
+            
+            if similarity >= threshold:
+                similarities.append({
+                    'chunk': chunk,
+                    'similarity': similarity
+                })
+        
+        # Sort by similarity (descending)
+        similarities.sort(key=lambda x: x['similarity'], reverse=True)
+        
+        # Return top-k results
+        return similarities[:top_k]
+    
+    async def get_embedding_stats(self, tenant_id: str) -> Dict[str, Any]:
+        """Get embedding statistics for a tenant."""
+        # This would typically query a database
+        # For now, return mock stats
+        return {
+            'tenant_id': tenant_id,
+            'total_embeddings': 0,
+            'models_used': [self.model_name],
+            'last_updated': time.time()
+        }

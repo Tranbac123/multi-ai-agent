@@ -1,16 +1,18 @@
 """Document processor for ingestion pipeline."""
 
+import asyncio
 import hashlib
 import mimetypes
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Union
-from uuid import UUID
-import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, update, delete
-import aiohttp
-import aiofiles
+import time
+from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
+import structlog
+import aiofiles
+import PyPDF2
+import docx
+import openpyxl
+from PIL import Image
+import json
 
 logger = structlog.get_logger(__name__)
 
@@ -18,281 +20,363 @@ logger = structlog.get_logger(__name__)
 class DocumentProcessor:
     """Processes documents for ingestion pipeline."""
     
-    def __init__(self):
+    def __init__(self, max_file_size: int = 100 * 1024 * 1024):  # 100MB
+        self.max_file_size = max_file_size
         self.supported_types = {
             'text/plain': self._process_text,
-            'text/html': self._process_html,
+            'text/markdown': self._process_text,
             'application/pdf': self._process_pdf,
-            'application/json': self._process_json,
-            'text/markdown': self._process_markdown,
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document': self._process_docx,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': self._process_xlsx,
+            'image/jpeg': self._process_image,
+            'image/png': self._process_image,
+            'application/json': self._process_json,
         }
-        self.max_file_size = 10 * 1024 * 1024  # 10MB
     
     async def process_document(
         self,
-        doc_id: str,
-        filename: str,
-        content: bytes,
-        tenant_id: UUID,
-        db: AsyncSession
+        file_path: str,
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        permissions: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Process uploaded document."""
+        """Process a document and return metadata and chunks."""
         try:
-            # Calculate content hash for idempotency
-            content_hash = hashlib.sha256(content).hexdigest()
+            # Validate file
+            file_info = await self._validate_file(file_path)
+            if not file_info:
+                raise ValueError("Invalid file")
             
-            # Check if document already exists
-            existing_doc = await self._get_document_by_hash(content_hash, tenant_id, db)
-            if existing_doc:
-                logger.info("Document already exists", doc_id=doc_id, hash=content_hash)
-                return existing_doc
+            # Generate document hash for idempotency
+            doc_hash = await self._generate_file_hash(file_path)
             
-            # Detect content type
-            content_type = self._detect_content_type(filename, content)
+            # Check if document already processed
+            if await self._is_document_processed(doc_hash, tenant_id):
+                logger.info("Document already processed", doc_hash=doc_hash, tenant_id=tenant_id)
+                return await self._get_existing_document(doc_hash, tenant_id)
             
-            # Process content based on type
-            if content_type in self.supported_types:
-                processed_content = await self.supported_types[content_type](content)
-            else:
-                raise ValueError(f"Unsupported content type: {content_type}")
+            # Process document based on type
+            mime_type = file_info['mime_type']
+            if mime_type not in self.supported_types:
+                raise ValueError(f"Unsupported file type: {mime_type}")
             
-            # Extract metadata
-            metadata = await self._extract_metadata(filename, content, processed_content)
+            processor = self.supported_types[mime_type]
+            content, metadata = await processor(file_path)
             
-            # Store document
-            doc_data = {
-                "id": doc_id,
-                "tenant_id": tenant_id,
-                "filename": filename,
-                "content_type": content_type,
-                "content_hash": content_hash,
-                "size_bytes": len(content),
-                "metadata": metadata,
-                "status": "processed",
-                "created_at": datetime.utcnow()
+            # Chunk content
+            chunks = await self._chunk_content(content, metadata)
+            
+            # Create document metadata
+            document_metadata = {
+                'doc_id': str(uuid.uuid4()),
+                'tenant_id': tenant_id,
+                'user_id': user_id,
+                'doc_hash': doc_hash,
+                'file_path': file_path,
+                'file_name': Path(file_path).name,
+                'file_size': file_info['size'],
+                'mime_type': mime_type,
+                'created_at': time.time(),
+                'permissions': permissions or {},
+                'metadata': metadata,
+                'chunks': chunks,
+                'status': 'processed'
             }
             
-            await self._store_document(doc_data, db)
+            # Store document metadata
+            await self._store_document_metadata(document_metadata)
             
-            # Publish indexing event
-            await self._publish_indexing_event(doc_id, tenant_id, processed_content, metadata)
+            logger.info(
+                "Document processed successfully",
+                doc_id=document_metadata['doc_id'],
+                tenant_id=tenant_id,
+                chunks_count=len(chunks)
+            )
             
-            logger.info("Document processed successfully", 
-                       doc_id=doc_id, 
-                       filename=filename,
-                       content_type=content_type)
+            return document_metadata
+            
+        except Exception as e:
+            logger.error(
+                "Document processing failed",
+                error=str(e),
+                file_path=file_path,
+                tenant_id=tenant_id
+            )
+            raise
+    
+    async def _validate_file(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """Validate file and return file info."""
+        try:
+            path = Path(file_path)
+            if not path.exists():
+                return None
+            
+            # Check file size
+            size = path.stat().st_size
+            if size > self.max_file_size:
+                raise ValueError(f"File too large: {size} bytes")
+            
+            # Detect MIME type
+            mime_type, _ = mimetypes.guess_type(file_path)
+            if not mime_type:
+                # Try to detect from file extension
+                mime_type = self._detect_mime_type_from_extension(path.suffix)
             
             return {
-                "doc_id": doc_id,
-                "filename": filename,
-                "content_type": content_type,
-                "size_bytes": len(content),
-                "status": "processed",
-                "metadata": metadata
+                'size': size,
+                'mime_type': mime_type,
+                'extension': path.suffix
             }
             
         except Exception as e:
-            logger.error("Document processing failed", 
-                        doc_id=doc_id, 
-                        filename=filename, 
-                        error=str(e))
-            raise
+            logger.error("File validation failed", error=str(e), file_path=file_path)
+            return None
     
-    async def process_url(
-        self,
-        doc_id: str,
-        url: str,
-        tenant_id: UUID,
-        db: AsyncSession
-    ) -> Dict[str, Any]:
-        """Process document from URL."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to fetch URL: {response.status}")
-                    
-                    content = await response.read()
-                    filename = url.split('/')[-1] or 'webpage.html'
-                    
-                    return await self.process_document(
-                        doc_id, filename, content, tenant_id, db
-                    )
-                    
-        except Exception as e:
-            logger.error("URL processing failed", doc_id=doc_id, url=url, error=str(e))
-            raise
+    async def _generate_file_hash(self, file_path: str) -> str:
+        """Generate SHA-256 hash of file content."""
+        hash_sha256 = hashlib.sha256()
+        async with aiofiles.open(file_path, 'rb') as f:
+            while chunk := await f.read(8192):
+                hash_sha256.update(chunk)
+        return hash_sha256.hexdigest()
     
-    async def get_documents(
-        self,
-        tenant_id: UUID,
-        limit: int,
-        offset: int,
-        db: AsyncSession
-    ) -> List[Dict[str, Any]]:
-        """Get documents for tenant."""
-        try:
-            stmt = select("documents").where(
-                "documents.tenant_id == tenant_id"
-            ).order_by("documents.created_at.desc()).limit(limit).offset(offset)
-            
-            result = await db.execute(stmt)
-            rows = result.fetchall()
-            
-            documents = []
-            for row in rows:
-                documents.append({
-                    "id": row.id,
-                    "filename": row.filename,
-                    "content_type": row.content_type,
-                    "size_bytes": row.size_bytes,
-                    "status": row.status,
-                    "created_at": row.created_at.isoformat(),
-                    "metadata": row.metadata
-                })
-            
-            return documents
-            
-        except Exception as e:
-            logger.error("Failed to get documents", tenant_id=tenant_id, error=str(e))
-            return []
+    async def _is_document_processed(self, doc_hash: str, tenant_id: str) -> bool:
+        """Check if document is already processed."""
+        # This would typically check a database
+        # For now, return False
+        return False
     
-    async def delete_document(
-        self,
-        doc_id: str,
-        tenant_id: UUID,
-        db: AsyncSession
-    ):
-        """Delete document."""
-        try:
-            stmt = delete("documents").where(
-                "documents.id == doc_id",
-                "documents.tenant_id == tenant_id"
-            )
-            await db.execute(stmt)
-            await db.commit()
-            
-            logger.info("Document deleted", doc_id=doc_id, tenant_id=tenant_id)
-            
-        except Exception as e:
-            logger.error("Failed to delete document", doc_id=doc_id, error=str(e))
-            raise
+    async def _get_existing_document(self, doc_hash: str, tenant_id: str) -> Dict[str, Any]:
+        """Get existing document metadata."""
+        # This would typically fetch from database
+        # For now, return empty dict
+        return {}
     
-    def _detect_content_type(self, filename: str, content: bytes) -> str:
-        """Detect content type from filename and content."""
-        # Try MIME type detection from filename
-        content_type, _ = mimetypes.guess_type(filename)
-        
-        if content_type:
-            return content_type
-        
-        # Fallback to content-based detection
-        if content.startswith(b'%PDF'):
-            return 'application/pdf'
-        elif content.startswith(b'<!DOCTYPE html') or content.startswith(b'<html'):
-            return 'text/html'
-        elif content.startswith(b'{') or content.startswith(b'['):
-            return 'application/json'
-        else:
-            return 'text/plain'
+    async def _store_document_metadata(self, metadata: Dict[str, Any]) -> None:
+        """Store document metadata."""
+        # This would typically store in database
+        logger.info("Document metadata stored", doc_id=metadata['doc_id'])
     
-    async def _process_text(self, content: bytes) -> str:
-        """Process plain text content."""
-        return content.decode('utf-8', errors='ignore')
-    
-    async def _process_html(self, content: bytes) -> str:
-        """Process HTML content."""
-        # Simple HTML processing - in production, use BeautifulSoup
-        text = content.decode('utf-8', errors='ignore')
-        # Remove HTML tags (basic implementation)
-        import re
-        clean_text = re.sub(r'<[^>]+>', '', text)
-        return clean_text
-    
-    async def _process_pdf(self, content: bytes) -> str:
-        """Process PDF content."""
-        # In production, use PyPDF2 or pdfplumber
-        # For now, return placeholder
-        return f"PDF content ({len(content)} bytes)"
-    
-    async def _process_json(self, content: bytes) -> str:
-        """Process JSON content."""
-        import json
-        data = json.loads(content.decode('utf-8'))
-        return json.dumps(data, indent=2)
-    
-    async def _process_markdown(self, content: bytes) -> str:
-        """Process Markdown content."""
-        return content.decode('utf-8', errors='ignore')
-    
-    async def _process_docx(self, content: bytes) -> str:
-        """Process DOCX content."""
-        # In production, use python-docx
-        return f"DOCX content ({len(content)} bytes)"
-    
-    async def _extract_metadata(
-        self, 
-        filename: str, 
-        content: bytes, 
-        processed_content: str
-    ) -> Dict[str, Any]:
-        """Extract metadata from document."""
-        return {
-            "filename": filename,
-            "size_bytes": len(content),
-            "word_count": len(processed_content.split()),
-            "line_count": len(processed_content.splitlines()),
-            "language": "en",  # In production, use language detection
-            "extracted_at": datetime.utcnow().isoformat()
+    def _detect_mime_type_from_extension(self, extension: str) -> str:
+        """Detect MIME type from file extension."""
+        extension_map = {
+            '.txt': 'text/plain',
+            '.md': 'text/markdown',
+            '.pdf': 'application/pdf',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.json': 'application/json',
         }
+        return extension_map.get(extension.lower(), 'application/octet-stream')
     
-    async def _get_document_by_hash(
-        self, 
-        content_hash: str, 
-        tenant_id: UUID, 
-        db: AsyncSession
-    ) -> Optional[Dict[str, Any]]:
-        """Check if document exists by content hash."""
+    async def _process_text(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process text file."""
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            content = await f.read()
+        
+        metadata = {
+            'type': 'text',
+            'encoding': 'utf-8',
+            'line_count': len(content.splitlines()),
+            'word_count': len(content.split())
+        }
+        
+        return content, metadata
+    
+    async def _process_pdf(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process PDF file."""
+        content = ""
+        metadata = {
+            'type': 'pdf',
+            'page_count': 0,
+            'has_images': False,
+            'has_tables': False
+        }
+        
         try:
-            stmt = select("documents").where(
-                "documents.content_hash == content_hash",
-                "documents.tenant_id == tenant_id"
-            )
-            result = await db.execute(stmt)
-            row = result.first()
-            
-            if row:
-                return {
-                    "doc_id": row.id,
-                    "filename": row.filename,
-                    "content_type": row.content_type,
-                    "status": row.status
-                }
-            
-            return None
-            
+            with open(file_path, 'rb') as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                metadata['page_count'] = len(pdf_reader.pages)
+                
+                for page in pdf_reader.pages:
+                    page_text = page.extract_text()
+                    content += page_text + "\n"
+                
+                # Check for images and tables (simplified)
+                if '/XObject' in pdf_reader.pages[0].get('/Resources', {}):
+                    metadata['has_images'] = True
+                
         except Exception as e:
-            logger.error("Failed to check document hash", error=str(e))
-            return None
+            logger.error("PDF processing failed", error=str(e), file_path=file_path)
+            raise
+        
+        return content, metadata
     
-    async def _store_document(self, doc_data: Dict[str, Any], db: AsyncSession):
-        """Store document in database."""
-        stmt = insert("documents").values(**doc_data)
-        await db.execute(stmt)
-        await db.commit()
+    async def _process_docx(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process DOCX file."""
+        content = ""
+        metadata = {
+            'type': 'docx',
+            'paragraph_count': 0,
+            'has_tables': False,
+            'has_images': False
+        }
+        
+        try:
+            doc = docx.Document(file_path)
+            metadata['paragraph_count'] = len(doc.paragraphs)
+            
+            for paragraph in doc.paragraphs:
+                content += paragraph.text + "\n"
+            
+            # Check for tables
+            if doc.tables:
+                metadata['has_tables'] = True
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            content += cell.text + " "
+                        content += "\n"
+            
+            # Check for images (simplified)
+            if any(rel.target_ref for rel in doc.part.rels.values() if 'image' in rel.target_ref):
+                metadata['has_images'] = True
+                
+        except Exception as e:
+            logger.error("DOCX processing failed", error=str(e), file_path=file_path)
+            raise
+        
+        return content, metadata
     
-    async def _publish_indexing_event(
-        self, 
-        doc_id: str, 
-        tenant_id: UUID, 
-        content: str, 
-        metadata: Dict[str, Any]
-    ):
-        """Publish document indexing event."""
-        # This would publish to NATS event bus
-        # For now, just log
-        logger.info("Indexing event published", 
-                   doc_id=doc_id, 
-                   tenant_id=tenant_id,
-                   content_length=len(content))
+    async def _process_xlsx(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process XLSX file."""
+        content = ""
+        metadata = {
+            'type': 'xlsx',
+            'sheet_count': 0,
+            'has_formulas': False
+        }
+        
+        try:
+            workbook = openpyxl.load_workbook(file_path)
+            metadata['sheet_count'] = len(workbook.sheetnames)
+            
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                content += f"Sheet: {sheet_name}\n"
+                
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = " ".join(str(cell) for cell in row if cell is not None)
+                    content += row_text + "\n"
+                
+        except Exception as e:
+            logger.error("XLSX processing failed", error=str(e), file_path=file_path)
+            raise
+        
+        return content, metadata
+    
+    async def _process_image(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process image file."""
+        try:
+            with Image.open(file_path) as img:
+                metadata = {
+                    'type': 'image',
+                    'width': img.width,
+                    'height': img.height,
+                    'format': img.format,
+                    'mode': img.mode,
+                    'has_transparency': img.mode in ('RGBA', 'LA', 'P')
+                }
+                
+                # For images, we'll store basic metadata as content
+                content = f"Image: {Path(file_path).name}\n"
+                content += f"Dimensions: {img.width}x{img.height}\n"
+                content += f"Format: {img.format}\n"
+                content += f"Mode: {img.mode}\n"
+                
+        except Exception as e:
+            logger.error("Image processing failed", error=str(e), file_path=file_path)
+            raise
+        
+        return content, metadata
+    
+    async def _process_json(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Process JSON file."""
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            content = await f.read()
+        
+        try:
+            json_data = json.loads(content)
+            metadata = {
+                'type': 'json',
+                'is_valid_json': True,
+                'structure': self._analyze_json_structure(json_data)
+            }
+        except json.JSONDecodeError:
+            metadata = {
+                'type': 'json',
+                'is_valid_json': False,
+                'structure': {}
+            }
+        
+        return content, metadata
+    
+    def _analyze_json_structure(self, data: Any) -> Dict[str, Any]:
+        """Analyze JSON structure."""
+        if isinstance(data, dict):
+            return {
+                'type': 'object',
+                'keys': list(data.keys()),
+                'key_count': len(data)
+            }
+        elif isinstance(data, list):
+            return {
+                'type': 'array',
+                'length': len(data),
+                'item_types': list(set(type(item).__name__ for item in data))
+            }
+        else:
+            return {
+                'type': type(data).__name__
+            }
+    
+    async def _chunk_content(self, content: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Chunk content into smaller pieces."""
+        chunks = []
+        chunk_size = 1000  # characters
+        overlap = 100  # characters
+        
+        if len(content) <= chunk_size:
+            # Single chunk
+            chunks.append({
+                'chunk_id': str(uuid.uuid4()),
+                'content': content,
+                'start_index': 0,
+                'end_index': len(content),
+                'metadata': metadata
+            })
+        else:
+            # Multiple chunks with overlap
+            start = 0
+            chunk_index = 0
+            
+            while start < len(content):
+                end = min(start + chunk_size, len(content))
+                chunk_content = content[start:end]
+                
+                chunks.append({
+                    'chunk_id': str(uuid.uuid4()),
+                    'content': chunk_content,
+                    'start_index': start,
+                    'end_index': end,
+                    'chunk_index': chunk_index,
+                    'metadata': metadata
+                })
+                
+                start = end - overlap
+                chunk_index += 1
+        
+        return chunks

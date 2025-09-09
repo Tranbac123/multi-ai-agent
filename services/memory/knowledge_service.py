@@ -1,212 +1,357 @@
-"""Knowledge service for document retrieval and management."""
+"""Knowledge service for permissioned retrieval."""
 
 import asyncio
-from typing import List, Dict, Any, Optional
-from uuid import UUID
+import time
+from typing import List, Dict, Any, Optional, Tuple
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as redis
 
-from apps.ingestion.core.embedding_service import EmbeddingService
 from apps.ingestion.core.vector_indexer import VectorIndexer
-from libs.clients.database import get_db_session
+from apps.ingestion.core.embedding_service import EmbeddingService
 
 logger = structlog.get_logger(__name__)
 
 
 class KnowledgeService:
-    """Service for knowledge retrieval and management."""
+    """Service for permissioned knowledge retrieval."""
     
-    def __init__(self, embedding_service: EmbeddingService, vector_indexer: VectorIndexer):
+    def __init__(
+        self,
+        redis_client: redis.Redis,
+        embedding_service: EmbeddingService,
+        vector_indexer: VectorIndexer
+    ):
+        self.redis = redis_client
         self.embedding_service = embedding_service
         self.vector_indexer = vector_indexer
     
     async def search_knowledge(
         self,
         query: str,
-        tenant_id: UUID,
-        limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        top_k: int = 10,
+        threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
-        """Search knowledge base for relevant documents."""
+        """Search knowledge base with permission filtering."""
         try:
             # Generate query embedding
-            query_embedding = await self.embedding_service.generate_embedding(query, tenant_id)
-            
-            # Search vector index
-            results = await self.vector_indexer.search_documents(
-                query=query,
-                query_embedding=query_embedding,
-                tenant_id=tenant_id,
-                limit=limit,
-                filters=filters
+            query_embedding = await self.embedding_service.generate_query_embedding(
+                query, tenant_id
             )
             
-            # Format results with relevance scores
-            formatted_results = []
-            for result in results:
-                formatted_results.append({
-                    "doc_id": result["doc_id"],
-                    "content": result["content"],
-                    "metadata": result["metadata"],
-                    "relevance_score": 1.0 - result["distance"],  # Convert distance to relevance
-                    "snippet": self._extract_snippet(result["content"], query)
-                })
+            # Search for similar chunks
+            similar_chunks = await self.vector_indexer.search_similar(
+                query_embedding, tenant_id, top_k * 2, threshold  # Get more to filter
+            )
             
-            logger.info("Knowledge search completed", 
-                       query=query, 
-                       result_count=len(formatted_results),
-                       tenant_id=tenant_id)
+            # Filter by permissions
+            filtered_chunks = await self._filter_by_permissions(
+                similar_chunks, tenant_id, user_id, roles
+            )
             
-            return formatted_results
+            # Return top-k results
+            result = filtered_chunks[:top_k]
+            
+            logger.info(
+                "Knowledge search completed",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                query_length=len(query),
+                results_count=len(result),
+                total_candidates=len(similar_chunks)
+            )
+            
+            return result
             
         except Exception as e:
-            logger.error("Knowledge search failed", 
-                        query=query, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
+            logger.error(
+                "Knowledge search failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                user_id=user_id,
+                query=query
+            )
             return []
     
-    async def get_document(
+    async def _filter_by_permissions(
         self,
-        doc_id: str,
-        tenant_id: UUID
-    ) -> Optional[Dict[str, Any]]:
-        """Get specific document by ID."""
-        try:
-            # Search for document with exact ID match
-            results = await self.vector_indexer.search_documents(
-                query="",  # Empty query to get all
-                query_embedding=[0.0] * 1536,  # Dummy embedding
-                tenant_id=tenant_id,
-                limit=1,
-                filters={"doc_id": doc_id}
+        chunks: List[Dict[str, Any]],
+        tenant_id: str,
+        user_id: Optional[str],
+        roles: Optional[List[str]]
+    ) -> List[Dict[str, Any]]:
+        """Filter chunks by user permissions."""
+        if not chunks:
+            return []
+        
+        filtered_chunks = []
+        
+        for chunk in chunks:
+            # Get chunk permissions
+            chunk_permissions = await self._get_chunk_permissions(
+                chunk['chunk_id'], tenant_id
             )
             
-            if results:
-                result = results[0]
-                return {
-                    "doc_id": result["doc_id"],
-                    "content": result["content"],
-                    "metadata": result["metadata"]
-                }
+            # Check if user has access
+            if await self._has_access(chunk_permissions, user_id, roles):
+                filtered_chunks.append(chunk)
+        
+        return filtered_chunks
+    
+    async def _get_chunk_permissions(
+        self,
+        chunk_id: str,
+        tenant_id: str
+    ) -> Dict[str, Any]:
+        """Get permissions for a chunk."""
+        try:
+            chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+            chunk_data = await self.redis.hgetall(chunk_key)
             
-            return None
+            if not chunk_data:
+                return {}
+            
+            # Parse permissions from metadata
+            metadata = chunk_data.get('metadata', '{}')
+            if isinstance(metadata, str):
+                import json
+                metadata = json.loads(metadata)
+            
+            return metadata.get('permissions', {})
             
         except Exception as e:
-            logger.error("Failed to get document", 
-                        doc_id=doc_id, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return None
+            logger.error(
+                "Failed to get chunk permissions",
+                error=str(e),
+                chunk_id=chunk_id,
+                tenant_id=tenant_id
+            )
+            return {}
     
-    async def add_document(
+    async def _has_access(
+        self,
+        permissions: Dict[str, Any],
+        user_id: Optional[str],
+        roles: Optional[List[str]]
+    ) -> bool:
+        """Check if user has access to chunk."""
+        if not permissions:
+            # No permissions set, allow access
+            return True
+        
+        # Check user-specific permissions
+        if user_id and 'users' in permissions:
+            if user_id in permissions['users']:
+                return True
+        
+        # Check role-based permissions
+        if roles and 'roles' in permissions:
+            for role in roles:
+                if role in permissions['roles']:
+                    return True
+        
+        # Check public access
+        if permissions.get('public', False):
+            return True
+        
+        # Check tenant access
+        if permissions.get('tenant_access', False):
+            return True
+        
+        return False
+    
+    async def get_document_chunks(
         self,
         doc_id: str,
-        tenant_id: UUID,
-        content: str,
-        metadata: Dict[str, Any]
-    ) -> bool:
-        """Add document to knowledge base."""
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        roles: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all chunks for a document with permission filtering."""
         try:
-            # Generate embedding
-            embedding = await self.embedding_service.generate_embedding(content, tenant_id)
+            # Get document chunks
+            doc_chunks = await self._get_document_chunks(doc_id, tenant_id)
             
-            # Index document
-            success = await self.vector_indexer.index_document(
+            # Filter by permissions
+            filtered_chunks = await self._filter_by_permissions(
+                doc_chunks, tenant_id, user_id, roles
+            )
+            
+            logger.info(
+                "Document chunks retrieved",
                 doc_id=doc_id,
                 tenant_id=tenant_id,
-                content=content,
-                metadata=metadata,
-                embedding=embedding
+                user_id=user_id,
+                chunks_count=len(filtered_chunks)
             )
             
-            if success:
-                logger.info("Document added to knowledge base", 
-                           doc_id=doc_id, 
-                           tenant_id=tenant_id)
-            
-            return success
+            return filtered_chunks
             
         except Exception as e:
-            logger.error("Failed to add document to knowledge base", 
-                        doc_id=doc_id, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return False
+            logger.error(
+                "Failed to get document chunks",
+                error=str(e),
+                doc_id=doc_id,
+                tenant_id=tenant_id,
+                user_id=user_id
+            )
+            return []
     
-    async def remove_document(
+    async def _get_document_chunks(
         self,
         doc_id: str,
-        tenant_id: UUID
-    ) -> bool:
-        """Remove document from knowledge base."""
+        tenant_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get all chunks for a document."""
         try:
-            success = await self.vector_indexer.delete_document(doc_id, tenant_id)
+            # Get chunk IDs for document
+            doc_chunks_key = f"doc_chunks:{tenant_id}:{doc_id}"
+            chunk_ids = await self.redis.smembers(doc_chunks_key)
             
-            if success:
-                logger.info("Document removed from knowledge base", 
-                           doc_id=doc_id, 
-                           tenant_id=tenant_id)
+            if not chunk_ids:
+                return []
             
-            return success
+            chunks = []
+            for chunk_id in chunk_ids:
+                chunk_id = chunk_id.decode('utf-8')
+                
+                # Get chunk data
+                chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+                chunk_data = await self.redis.hgetall(chunk_key)
+                
+                if chunk_data:
+                    chunks.append({
+                        'chunk_id': chunk_id,
+                        'content': chunk_data.get('content', ''),
+                        'start_index': int(chunk_data.get('start_index', 0)),
+                        'end_index': int(chunk_data.get('end_index', 0)),
+                        'chunk_index': int(chunk_data.get('chunk_index', 0)),
+                        'metadata': chunk_data.get('metadata', {})
+                    })
+            
+            # Sort by chunk index
+            chunks.sort(key=lambda x: x.get('chunk_index', 0))
+            
+            return chunks
             
         except Exception as e:
-            logger.error("Failed to remove document from knowledge base", 
-                        doc_id=doc_id, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
+            logger.error(
+                "Failed to get document chunks",
+                error=str(e),
+                doc_id=doc_id,
+                tenant_id=tenant_id
+            )
+            return []
+    
+    async def update_chunk_permissions(
+        self,
+        chunk_id: str,
+        tenant_id: str,
+        permissions: Dict[str, Any]
+    ) -> bool:
+        """Update permissions for a chunk."""
+        try:
+            chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+            
+            # Get current metadata
+            chunk_data = await self.redis.hgetall(chunk_key)
+            if not chunk_data:
+                return False
+            
+            # Update permissions in metadata
+            metadata = chunk_data.get('metadata', '{}')
+            if isinstance(metadata, str):
+                import json
+                metadata = json.loads(metadata)
+            
+            metadata['permissions'] = permissions
+            
+            # Update chunk data
+            await self.redis.hset(chunk_key, 'metadata', json.dumps(metadata))
+            
+            logger.info(
+                "Chunk permissions updated",
+                chunk_id=chunk_id,
+                tenant_id=tenant_id,
+                permissions=permissions
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(
+                "Failed to update chunk permissions",
+                error=str(e),
+                chunk_id=chunk_id,
+                tenant_id=tenant_id
+            )
             return False
     
-    async def get_tenant_stats(self, tenant_id: UUID) -> Dict[str, Any]:
-        """Get knowledge base statistics for tenant."""
+    async def get_tenant_knowledge_stats(
+        self,
+        tenant_id: str
+    ) -> Dict[str, Any]:
+        """Get knowledge base statistics for a tenant."""
         try:
-            # Get document count
-            doc_count = await self.vector_indexer.get_document_count(tenant_id)
+            # Get index stats
+            index_stats = await self.vector_indexer.get_index_stats(tenant_id)
             
-            # Get collection stats
-            collection_stats = await self.vector_indexer.get_collection_stats()
+            # Get document count
+            doc_count = await self._get_document_count(tenant_id)
+            
+            # Get chunk count by document
+            doc_chunks = await self._get_document_chunks_count(tenant_id)
             
             return {
-                "tenant_id": str(tenant_id),
-                "document_count": doc_count,
-                "total_documents": collection_stats.get("total_documents", 0),
-                "embedding_dimension": collection_stats.get("embedding_dimension", 1536)
+                'tenant_id': tenant_id,
+                'total_chunks': index_stats['chunk_count'],
+                'total_documents': doc_count,
+                'documents_chunks': doc_chunks,
+                'memory_usage_bytes': index_stats['memory_usage_bytes'],
+                'timestamp': time.time()
             }
             
         except Exception as e:
-            logger.error("Failed to get tenant stats", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return {}
+            logger.error(
+                "Failed to get tenant knowledge stats",
+                error=str(e),
+                tenant_id=tenant_id
+            )
+            return {
+                'tenant_id': tenant_id,
+                'total_chunks': 0,
+                'total_documents': 0,
+                'documents_chunks': {},
+                'memory_usage_bytes': 0,
+                'timestamp': time.time()
+            }
     
-    def _extract_snippet(self, content: str, query: str, max_length: int = 200) -> str:
-        """Extract relevant snippet from content."""
+    async def _get_document_count(self, tenant_id: str) -> int:
+        """Get total document count for tenant."""
         try:
-            # Find query terms in content (case-insensitive)
-            query_lower = query.lower()
-            content_lower = content.lower()
-            
-            # Find first occurrence of query
-            query_index = content_lower.find(query_lower)
-            
-            if query_index == -1:
-                # If query not found, return beginning of content
-                return content[:max_length] + "..." if len(content) > max_length else content
-            
-            # Extract snippet around query
-            start = max(0, query_index - max_length // 2)
-            end = min(len(content), query_index + max_length // 2)
-            
-            snippet = content[start:end]
-            
-            # Add ellipsis if truncated
-            if start > 0:
-                snippet = "..." + snippet
-            if end < len(content):
-                snippet = snippet + "..."
-            
-            return snippet
-            
+            # Get all document keys
+            pattern = f"doc_chunks:{tenant_id}:*"
+            keys = await self.redis.keys(pattern)
+            return len(keys)
         except Exception as e:
-            logger.error("Failed to extract snippet", error=str(e))
-            return content[:max_length] + "..." if len(content) > max_length else content
+            logger.error("Failed to get document count", error=str(e), tenant_id=tenant_id)
+            return 0
+    
+    async def _get_document_chunks_count(self, tenant_id: str) -> Dict[str, int]:
+        """Get chunk count per document for tenant."""
+        try:
+            doc_chunks = {}
+            pattern = f"doc_chunks:{tenant_id}:*"
+            keys = await self.redis.keys(pattern)
+            
+            for key in keys:
+                doc_id = key.decode('utf-8').split(':')[-1]
+                chunk_count = await self.redis.scard(key)
+                doc_chunks[doc_id] = chunk_count
+            
+            return doc_chunks
+        except Exception as e:
+            logger.error("Failed to get document chunks count", error=str(e), tenant_id=tenant_id)
+            return {}

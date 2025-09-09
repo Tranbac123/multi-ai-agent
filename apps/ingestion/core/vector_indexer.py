@@ -1,241 +1,341 @@
-"""Vector indexer for document storage and retrieval."""
+"""Vector indexer for document embeddings."""
 
 import asyncio
+import time
 from typing import List, Dict, Any, Optional, Tuple
-from uuid import UUID
 import structlog
-import chromadb
-from chromadb.config import Settings
+import redis.asyncio as redis
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 logger = structlog.get_logger(__name__)
 
 
 class VectorIndexer:
-    """Vector indexer using ChromaDB for document storage and retrieval."""
+    """Indexes document embeddings for similarity search."""
     
-    def __init__(self, host: str = "localhost", port: int = 8000):
-        self.client = chromadb.HttpClient(
-            host=host,
-            port=port,
-            settings=Settings(allow_reset=True)
-        )
-        self.collection_name = "documents"
-        self.collection = None
+    def __init__(self, redis_client: redis.Redis, index_name: str = "document_embeddings"):
+        self.redis = redis_client
+        self.index_name = index_name
+        self.embedding_dim = 1536  # OpenAI ada-002 dimension
     
-    async def initialize(self):
-        """Initialize the vector indexer."""
+    async def index_chunks(
+        self,
+        chunks: List[Dict[str, Any]],
+        tenant_id: str
+    ) -> Dict[str, Any]:
+        """Index document chunks with embeddings."""
         try:
-            # Get or create collection
-            try:
-                self.collection = self.client.get_collection(self.collection_name)
-                logger.info("Connected to existing collection", collection=self.collection_name)
-            except Exception:
-                self.collection = self.client.create_collection(
-                    name=self.collection_name,
-                    metadata={"description": "Document embeddings for multi-tenant AIaaS"}
-                )
-                logger.info("Created new collection", collection=self.collection_name)
-                
+            indexed_count = 0
+            failed_count = 0
+            
+            for chunk in chunks:
+                try:
+                    await self._index_single_chunk(chunk, tenant_id)
+                    indexed_count += 1
+                except Exception as e:
+                    logger.error(
+                        "Failed to index chunk",
+                        error=str(e),
+                        chunk_id=chunk.get('chunk_id'),
+                        tenant_id=tenant_id
+                    )
+                    failed_count += 1
+            
+            result = {
+                'tenant_id': tenant_id,
+                'indexed_count': indexed_count,
+                'failed_count': failed_count,
+                'total_chunks': len(chunks),
+                'timestamp': time.time()
+            }
+            
+            logger.info(
+                "Chunks indexed successfully",
+                tenant_id=tenant_id,
+                indexed_count=indexed_count,
+                failed_count=failed_count
+            )
+            
+            return result
+            
         except Exception as e:
-            logger.error("Failed to initialize vector indexer", error=str(e))
+            logger.error(
+                "Chunk indexing failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                chunks_count=len(chunks)
+            )
             raise
     
-    async def index_document(
-        self,
-        doc_id: str,
-        tenant_id: UUID,
-        content: str,
-        metadata: Dict[str, Any],
-        embedding: List[float]
-    ) -> bool:
-        """Index document with embedding."""
-        try:
-            if not self.collection:
-                await self.initialize()
-            
-            # Prepare document data
-            document_data = {
-                "ids": [f"{tenant_id}:{doc_id}"],
-                "embeddings": [embedding],
-                "documents": [content],
-                "metadatas": [{
-                    **metadata,
-                    "tenant_id": str(tenant_id),
-                    "doc_id": doc_id
-                }]
-            }
-            
-            # Add to collection
-            self.collection.add(**document_data)
-            
-            logger.info("Document indexed", 
-                       doc_id=doc_id, 
-                       tenant_id=tenant_id,
-                       content_length=len(content))
-            
-            return True
-            
-        except Exception as e:
-            logger.error("Failed to index document", 
-                        doc_id=doc_id, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return False
+    async def _index_single_chunk(self, chunk: Dict[str, Any], tenant_id: str) -> None:
+        """Index a single chunk."""
+        chunk_id = chunk['chunk_id']
+        embedding = chunk['embedding']
+        
+        # Store chunk metadata
+        chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+        chunk_data = {
+            'chunk_id': chunk_id,
+            'tenant_id': tenant_id,
+            'content': chunk['content'],
+            'start_index': chunk.get('start_index', 0),
+            'end_index': chunk.get('end_index', 0),
+            'chunk_index': chunk.get('chunk_index', 0),
+            'metadata': chunk.get('metadata', {}),
+            'embedding_model': chunk.get('embedding_model', 'unknown'),
+            'embedding_timestamp': chunk.get('embedding_timestamp', time.time()),
+            'indexed_at': time.time()
+        }
+        
+        await self.redis.hset(chunk_key, mapping=chunk_data)
+        await self.redis.expire(chunk_key, 86400 * 30)  # 30 days TTL
+        
+        # Store embedding for similarity search
+        embedding_key = f"embedding:{tenant_id}:{chunk_id}"
+        await self.redis.set(embedding_key, np.array(embedding).tobytes())
+        await self.redis.expire(embedding_key, 86400 * 30)  # 30 days TTL
+        
+        # Add to tenant index
+        tenant_index_key = f"tenant_index:{tenant_id}"
+        await self.redis.sadd(tenant_index_key, chunk_id)
+        await self.redis.expire(tenant_index_key, 86400 * 30)  # 30 days TTL
     
-    async def search_documents(
+    async def search_similar(
         self,
-        query: str,
         query_embedding: List[float],
-        tenant_id: UUID,
-        limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None
+        tenant_id: str,
+        top_k: int = 10,
+        threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
-        """Search documents by query."""
+        """Search for similar chunks using vector similarity."""
         try:
-            if not self.collection:
-                await self.initialize()
+            # Get all chunk IDs for tenant
+            tenant_index_key = f"tenant_index:{tenant_id}"
+            chunk_ids = await self.redis.smembers(tenant_index_key)
             
-            # Prepare search parameters
-            search_params = {
-                "query_embeddings": [query_embedding],
-                "n_results": limit,
-                "where": {
-                    "tenant_id": str(tenant_id)
-                }
-            }
+            if not chunk_ids:
+                return []
             
-            # Add additional filters
-            if filters:
-                search_params["where"].update(filters)
+            similarities = []
             
-            # Search collection
-            results = self.collection.query(**search_params)
-            
-            # Format results
-            documents = []
-            if results["ids"] and results["ids"][0]:
-                for i, doc_id in enumerate(results["ids"][0]):
-                    documents.append({
-                        "doc_id": doc_id.split(":", 1)[1] if ":" in doc_id else doc_id,
-                        "content": results["documents"][0][i],
-                        "metadata": results["metadatas"][0][i],
-                        "distance": results["distances"][0][i] if "distances" in results else 0.0
+            # Compute similarities
+            for chunk_id in chunk_ids:
+                chunk_id = chunk_id.decode('utf-8')
+                
+                # Get chunk metadata
+                chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+                chunk_data = await self.redis.hgetall(chunk_key)
+                
+                if not chunk_data:
+                    continue
+                
+                # Get embedding
+                embedding_key = f"embedding:{tenant_id}:{chunk_id}"
+                embedding_bytes = await self.redis.get(embedding_key)
+                
+                if not embedding_bytes:
+                    continue
+                
+                # Convert embedding back to numpy array
+                chunk_embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
+                
+                # Compute cosine similarity
+                similarity = self._compute_cosine_similarity(query_embedding, chunk_embedding)
+                
+                if similarity >= threshold:
+                    similarities.append({
+                        'chunk_id': chunk_id,
+                        'similarity': similarity,
+                        'content': chunk_data.get('content', ''),
+                        'metadata': chunk_data.get('metadata', {}),
+                        'start_index': int(chunk_data.get('start_index', 0)),
+                        'end_index': int(chunk_data.get('end_index', 0))
                     })
             
-            logger.info("Document search completed", 
-                       query_length=len(query), 
-                       result_count=len(documents),
-                       tenant_id=tenant_id)
+            # Sort by similarity (descending)
+            similarities.sort(key=lambda x: x['similarity'], reverse=True)
             
-            return documents
+            # Return top-k results
+            return similarities[:top_k]
             
         except Exception as e:
-            logger.error("Failed to search documents", 
-                        query=query, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
+            logger.error(
+                "Similarity search failed",
+                error=str(e),
+                tenant_id=tenant_id,
+                top_k=top_k
+            )
             return []
     
-    async def delete_document(
+    def _compute_cosine_similarity(
         self,
-        doc_id: str,
-        tenant_id: UUID
-    ) -> bool:
-        """Delete document from index."""
+        embedding1: List[float],
+        embedding2: np.ndarray
+    ) -> float:
+        """Compute cosine similarity between two embeddings."""
         try:
-            if not self.collection:
-                await self.initialize()
+            # Convert to numpy arrays
+            vec1 = np.array(embedding1).reshape(1, -1)
+            vec2 = embedding2.reshape(1, -1)
             
-            # Delete from collection
-            self.collection.delete(
-                ids=[f"{tenant_id}:{doc_id}"],
-                where={"tenant_id": str(tenant_id)}
-            )
+            # Compute cosine similarity
+            similarity = cosine_similarity(vec1, vec2)[0][0]
+            return float(similarity)
             
-            logger.info("Document deleted from index", 
-                       doc_id=doc_id, 
-                       tenant_id=tenant_id)
+        except Exception as e:
+            logger.error("Cosine similarity computation failed", error=str(e))
+            return 0.0
+    
+    async def delete_chunk(self, chunk_id: str, tenant_id: str) -> bool:
+        """Delete a chunk from the index."""
+        try:
+            # Remove from tenant index
+            tenant_index_key = f"tenant_index:{tenant_id}"
+            await self.redis.srem(tenant_index_key, chunk_id)
             
+            # Delete chunk metadata
+            chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+            await self.redis.delete(chunk_key)
+            
+            # Delete embedding
+            embedding_key = f"embedding:{tenant_id}:{chunk_id}"
+            await self.redis.delete(embedding_key)
+            
+            logger.info("Chunk deleted from index", chunk_id=chunk_id, tenant_id=tenant_id)
             return True
             
         except Exception as e:
-            logger.error("Failed to delete document from index", 
-                        doc_id=doc_id, 
-                        tenant_id=tenant_id, 
-                        error=str(e))
+            logger.error(
+                "Failed to delete chunk from index",
+                error=str(e),
+                chunk_id=chunk_id,
+                tenant_id=tenant_id
+            )
             return False
     
-    async def get_document_count(self, tenant_id: UUID) -> int:
-        """Get document count for tenant."""
+    async def delete_tenant_index(self, tenant_id: str) -> bool:
+        """Delete all chunks for a tenant."""
         try:
-            if not self.collection:
-                await self.initialize()
+            # Get all chunk IDs for tenant
+            tenant_index_key = f"tenant_index:{tenant_id}"
+            chunk_ids = await self.redis.smembers(tenant_index_key)
             
-            # Count documents for tenant
-            results = self.collection.get(
-                where={"tenant_id": str(tenant_id)},
-                include=["metadatas"]
+            deleted_count = 0
+            for chunk_id in chunk_ids:
+                chunk_id = chunk_id.decode('utf-8')
+                if await self.delete_chunk(chunk_id, tenant_id):
+                    deleted_count += 1
+            
+            # Delete tenant index
+            await self.redis.delete(tenant_index_key)
+            
+            logger.info(
+                "Tenant index deleted",
+                tenant_id=tenant_id,
+                deleted_count=deleted_count
             )
-            
-            count = len(results["ids"]) if results["ids"] else 0
-            
-            logger.debug("Document count retrieved", 
-                        tenant_id=tenant_id, 
-                        count=count)
-            
-            return count
+            return True
             
         except Exception as e:
-            logger.error("Failed to get document count", 
-                        tenant_id=tenant_id, 
-                        error=str(e))
-            return 0
+            logger.error(
+                "Failed to delete tenant index",
+                error=str(e),
+                tenant_id=tenant_id
+            )
+            return False
     
-    async def get_collection_stats(self) -> Dict[str, Any]:
-        """Get collection statistics."""
+    async def get_index_stats(self, tenant_id: str) -> Dict[str, Any]:
+        """Get index statistics for a tenant."""
         try:
-            if not self.collection:
-                await self.initialize()
+            # Get chunk count
+            tenant_index_key = f"tenant_index:{tenant_id}"
+            chunk_count = await self.redis.scard(tenant_index_key)
             
-            # Get collection info
-            collection_info = self.collection.get()
+            # Get memory usage
+            memory_usage = await self.redis.memory_usage(tenant_index_key)
             
-            stats = {
-                "total_documents": len(collection_info["ids"]) if collection_info["ids"] else 0,
-                "collection_name": self.collection_name,
-                "embedding_dimension": 1536  # Default for text-embedding-ada-002
+            return {
+                'tenant_id': tenant_id,
+                'chunk_count': chunk_count,
+                'memory_usage_bytes': memory_usage,
+                'index_name': self.index_name,
+                'timestamp': time.time()
             }
             
-            # Count by tenant
-            tenant_counts = {}
-            if collection_info["metadatas"]:
-                for metadata in collection_info["metadatas"]:
-                    tenant_id = metadata.get("tenant_id", "unknown")
-                    tenant_counts[tenant_id] = tenant_counts.get(tenant_id, 0) + 1
-            
-            stats["tenant_counts"] = tenant_counts
-            
-            logger.info("Collection stats retrieved", stats=stats)
-            
-            return stats
-            
         except Exception as e:
-            logger.error("Failed to get collection stats", error=str(e))
-            return {}
+            logger.error(
+                "Failed to get index stats",
+                error=str(e),
+                tenant_id=tenant_id
+            )
+            return {
+                'tenant_id': tenant_id,
+                'chunk_count': 0,
+                'memory_usage_bytes': 0,
+                'index_name': self.index_name,
+                'timestamp': time.time()
+            }
     
-    async def reset_collection(self) -> bool:
-        """Reset collection (delete all documents)."""
+    async def rebuild_index(self, tenant_id: str) -> Dict[str, Any]:
+        """Rebuild index for a tenant."""
         try:
-            if not self.collection:
-                await self.initialize()
+            # Get all chunks for tenant
+            tenant_index_key = f"tenant_index:{tenant_id}"
+            chunk_ids = await self.redis.smembers(tenant_index_key)
             
-            # Delete all documents
-            self.collection.delete(where={})
+            if not chunk_ids:
+                return {
+                    'tenant_id': tenant_id,
+                    'status': 'no_chunks',
+                    'processed_count': 0
+                }
             
-            logger.info("Collection reset completed")
+            # Rebuild index
+            processed_count = 0
+            for chunk_id in chunk_ids:
+                chunk_id = chunk_id.decode('utf-8')
+                
+                # Get chunk data
+                chunk_key = f"chunk:{tenant_id}:{chunk_id}"
+                chunk_data = await self.redis.hgetall(chunk_key)
+                
+                if chunk_data:
+                    # Re-index chunk
+                    await self._index_single_chunk({
+                        'chunk_id': chunk_id,
+                        'content': chunk_data.get('content', ''),
+                        'start_index': int(chunk_data.get('start_index', 0)),
+                        'end_index': int(chunk_data.get('end_index', 0)),
+                        'chunk_index': int(chunk_data.get('chunk_index', 0)),
+                        'metadata': chunk_data.get('metadata', {}),
+                        'embedding': [],  # Will be fetched from embedding key
+                        'embedding_model': chunk_data.get('embedding_model', 'unknown'),
+                        'embedding_timestamp': float(chunk_data.get('embedding_timestamp', time.time()))
+                    }, tenant_id)
+                    
+                    processed_count += 1
             
-            return True
+            logger.info(
+                "Index rebuilt successfully",
+                tenant_id=tenant_id,
+                processed_count=processed_count
+            )
+            
+            return {
+                'tenant_id': tenant_id,
+                'status': 'success',
+                'processed_count': processed_count
+            }
             
         except Exception as e:
-            logger.error("Failed to reset collection", error=str(e))
-            return False
+            logger.error(
+                "Index rebuild failed",
+                error=str(e),
+                tenant_id=tenant_id
+            )
+            return {
+                'tenant_id': tenant_id,
+                'status': 'failed',
+                'error': str(e)
+            }

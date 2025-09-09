@@ -26,6 +26,7 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 ## Core Services
 
 ### **Runtime Services**
+
 - **API Gateway**: Main entry point with authentication, rate limiting, and WebSocket support
 - **Orchestrator**: LangGraph-based workflow execution with resilient tool adapters
 - **Router Service**: Intelligent request routing with feature store and bandit policy
@@ -35,16 +36,19 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 - **Billing Service**: Usage tracking and billing engine
 
 ### **Control Plane**
+
 - **Feature Flags**: Per-tenant feature flag management
 - **Registries**: Agent and tool manifest management
 - **Configs**: Environment-specific configuration management
 
 ### **Data Plane**
+
 - **Migrations**: Database schema management with Alembic
 - **Events**: Event sourcing and audit logging
 - **Storages**: Multi-tenant data isolation with RLS
 
 ### **Observability**
+
 - **OpenTelemetry**: Distributed tracing and metrics
 - **Prometheus**: Metrics collection and alerting
 - **Grafana**: Visualization dashboards and SLO monitoring
@@ -62,11 +66,13 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 ## RACI (Responsibility Assignment)
 
 ### **Control Plane** (Platform Team)
+
 - **Feature Flags**: Runtime feature toggling and A/B testing
 - **Registries**: Agent/tool manifest management and versioning
 - **Configs**: Environment-specific configuration and secrets
 
 ### **Runtime** (Service Teams)
+
 - **API Gateway**: Authentication, rate limiting, request routing
 - **Orchestrator**: Workflow execution and tool coordination
 - **Router Service**: Intelligent routing and cost optimization
@@ -78,6 +84,7 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 ## Quick Start
 
 1. **Clone and setup**:
+
    ```bash
    git clone <repo-url>
    cd multi-ai-agent
@@ -86,6 +93,7 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
    ```
 
 2. **Start development environment**:
+
    ```bash
    make dev
    ```
