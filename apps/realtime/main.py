@@ -1,233 +1,242 @@
-"""Realtime service with WebSocket backpressure handling."""
+"""Realtime Service - WebSocket service with backpressure handling."""
 
 import asyncio
 import json
 import time
-from contextlib import asynccontextmanager
-from typing import Dict, Any, Optional, Set, List
-from uuid import UUID, uuid4
+import uuid
+from typing import Dict, Any, Optional
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.responses import JSONResponse
 import structlog
 import redis.asyncio as redis
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from opentelemetry import trace
 
-from libs.clients.database import get_db_session
-from libs.clients.auth import get_current_tenant
-from libs.clients.rate_limiter import RateLimiter
-from libs.clients.event_bus import EventBus, EventProducer
-from libs.utils.responses import success_response, error_response
-from .core.connection_manager import ConnectionManager
-from .core.backpressure_handler import BackpressureHandler
-from .core.message_processor import MessageProcessor
-
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
+from apps.realtime.core.connection_manager import ConnectionManager
+from apps.realtime.core.backpressure_handler import BackpressureHandler
+from libs.contracts.error import ErrorResponse, ServiceError
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer(__name__)
+
+app = FastAPI(title="Realtime Service", version="1.0.0")
+
+# Global instances
+connection_manager: Optional[ConnectionManager] = None
+backpressure_handler: Optional[BackpressureHandler] = None
+redis_client: Optional[redis.Redis] = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    # Startup
-    logger.info("Starting Realtime Service")
+@app.on_event("startup")
+async def startup_event():
+    """Initialize service on startup."""
+    global connection_manager, backpressure_handler, redis_client
     
     # Initialize Redis client
-    app.state.redis = redis.from_url("redis://localhost:6379")
+    redis_client = redis.Redis(host="localhost", port=6379, db=3)
+    await redis_client.ping()
     
-    # Initialize components
-    app.state.connection_manager = ConnectionManager(app.state.redis)
-    app.state.backpressure_handler = BackpressureHandler(app.state.redis)
-    app.state.message_processor = MessageProcessor()
-    app.state.rate_limiter = RateLimiter(app.state.redis)
-    app.state.event_bus = EventBus()
-    app.state.event_producer = EventProducer(app.state.event_bus)
+    # Initialize connection manager
+    connection_manager = ConnectionManager(redis_client)
     
-    # Start background tasks
-    app.state.cleanup_task = asyncio.create_task(
-        app.state.connection_manager.cleanup_stale_connections()
+    # Initialize backpressure handler
+    backpressure_handler = BackpressureHandler(
+        connection_manager=connection_manager,
+        max_queue_size=1000,
+        drop_policy="intermediate"
     )
     
-    yield
+    logger.info("Realtime service started")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    global redis_client
     
-    # Shutdown
-    logger.info("Shutting down Realtime Service")
-    app.state.cleanup_task.cancel()
-    await app.state.redis.close()
+    if redis_client:
+        await redis_client.close()
+    
+    logger.info("Realtime service stopped")
 
 
-def create_app() -> FastAPI:
-    """Create FastAPI application."""
-    app = FastAPI(
-        title="Realtime Service",
-        version="2.0.0",
-        description="WebSocket service with backpressure handling",
-        lifespan=lifespan
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket, tenant_id: str, user_id: Optional[str] = None):
+    """WebSocket endpoint for chat with backpressure handling."""
+    if not connection_manager or not backpressure_handler:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    
+    # Accept connection
+    await websocket.accept()
+    
+    # Generate session ID
+    session_id = str(uuid.uuid4())
+    
+    # Register connection
+    await connection_manager.register_connection(
+        websocket, tenant_id, user_id, session_id
     )
-    
-    # Add middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Configure in production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    return app
-
-
-app = create_app()
-
-
-# WebSocket endpoint
-@app.websocket("/ws/{tenant_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    tenant_id: UUID,
-    session_id: Optional[str] = None,
-    user_id: Optional[UUID] = None
-):
-    """WebSocket endpoint with backpressure handling."""
-    if not session_id:
-        session_id = str(uuid4())
-    
-    connection_id = f"{tenant_id}:{session_id}"
     
     try:
-        # Accept connection
-        await websocket.accept()
-        
-        # Register connection
-        await app.state.connection_manager.register_connection(
-            connection_id, websocket, tenant_id, session_id, user_id
-        )
-        
         # Send welcome message
         welcome_message = {
             "type": "welcome",
-            "connection_id": connection_id,
             "session_id": session_id,
-            "tenant_id": str(tenant_id),
+            "tenant_id": tenant_id,
+            "user_id": user_id,
             "timestamp": time.time()
         }
-        await app.state.connection_manager.send_message(connection_id, welcome_message)
+        await websocket.send_text(json.dumps(welcome_message))
         
-        logger.info("WebSocket connected", 
-                   connection_id=connection_id, 
-                   tenant_id=tenant_id)
-        
-        # Listen for messages
+        # Handle messages
         while True:
             try:
-                # Receive message with timeout
-                message_data = await asyncio.wait_for(
-                    websocket.receive_text(), timeout=30.0
-                )
-                
-                # Parse message
-                try:
-                    message = json.loads(message_data)
-                except json.JSONDecodeError:
-                    await app.state.connection_manager.send_error(
-                        connection_id, "Invalid JSON format"
-                    )
-                    continue
+                # Receive message
+                data = await websocket.receive_text()
+                message = json.loads(data)
                 
                 # Process message
-                await app.state.message_processor.process_message(
-                    connection_id, message, app.state
-                )
-                
-            except asyncio.TimeoutError:
-                # Send ping to keep connection alive
-                await app.state.connection_manager.send_ping(connection_id)
+                await _process_message(websocket, tenant_id, user_id, session_id, message)
                 
             except WebSocketDisconnect:
+                logger.info("WebSocket disconnected", tenant_id=tenant_id, user_id=user_id)
                 break
-                
-    except Exception as e:
-        logger.error("WebSocket error", 
-                    connection_id=connection_id, 
-                    error=str(e))
+            except json.JSONDecodeError:
+                error_message = {
+                    "type": "error",
+                    "message": "Invalid JSON format",
+                    "timestamp": time.time()
+                }
+                await websocket.send_text(json.dumps(error_message))
+            except Exception as e:
+                logger.error("WebSocket error", error=str(e), tenant_id=tenant_id)
+                error_message = {
+                    "type": "error",
+                    "message": "Internal server error",
+                    "timestamp": time.time()
+                }
+                await websocket.send_text(json.dumps(error_message))
+    
     finally:
-        # Clean up connection
-        await app.state.connection_manager.unregister_connection(connection_id)
-        logger.info("WebSocket disconnected", connection_id=connection_id)
+        # Unregister connection
+        await connection_manager.unregister_connection(websocket, tenant_id, user_id)
 
 
-# HTTP endpoints
+async def _process_message(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str],
+    session_id: str,
+    message: Dict[str, Any]
+):
+    """Process incoming WebSocket message."""
+    message_type = message.get("type", "unknown")
+    
+    if message_type == "ping":
+        # Handle ping
+        pong_message = {
+            "type": "pong",
+            "timestamp": time.time()
+        }
+        await websocket.send_text(json.dumps(pong_message))
+    
+    elif message_type == "chat":
+        # Handle chat message
+        await _handle_chat_message(websocket, tenant_id, user_id, session_id, message)
+    
+    elif message_type == "typing":
+        # Handle typing indicator
+        await _handle_typing_indicator(websocket, tenant_id, user_id, session_id, message)
+    
+    else:
+        # Unknown message type
+        error_message = {
+            "type": "error",
+            "message": f"Unknown message type: {message_type}",
+            "timestamp": time.time()
+        }
+        await websocket.send_text(json.dumps(error_message))
+
+
+async def _handle_chat_message(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str],
+    session_id: str,
+    message: Dict[str, Any]
+):
+    """Handle chat message with backpressure."""
+    if not backpressure_handler:
+        return
+    
+    # Create response message
+    response_message = {
+        "type": "response",
+        "content": f"Echo: {message.get('content', '')}",
+        "timestamp": time.time(),
+        "session_id": session_id
+    }
+    
+    # Send with backpressure handling
+    await backpressure_handler.send_message(
+        websocket, tenant_id, user_id, session_id, response_message
+    )
+
+
+async def _handle_typing_indicator(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str],
+    session_id: str,
+    message: Dict[str, Any]
+):
+    """Handle typing indicator."""
+    # Broadcast typing indicator to other connections in the same tenant
+    if connection_manager:
+        await connection_manager.broadcast_to_tenant(
+            tenant_id, {
+                "type": "typing",
+                "user_id": user_id,
+                "is_typing": message.get("is_typing", False),
+                "timestamp": time.time()
+            },
+            exclude_session=session_id
+        )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "realtime-service"}
+    if not connection_manager or not backpressure_handler:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    
+    # Get connection stats
+    stats = await connection_manager.get_connection_stats()
+    
+    return {
+        "status": "healthy",
+        "active_connections": stats["active_connections"],
+        "tenant_connections": stats["tenant_connections"],
+        "timestamp": time.time()
+    }
 
 
-@app.get("/api/v1/connections/{tenant_id}")
-async def get_connections(tenant_id: UUID):
-    """Get active connections for tenant."""
-    try:
-        connections = await app.state.connection_manager.get_tenant_connections(tenant_id)
-        return success_response(data=connections)
-        
-    except Exception as e:
-        logger.error("Failed to get connections", tenant_id=tenant_id, error=str(e))
-        return error_response("Failed to get connections")
-
-
-@app.post("/api/v1/broadcast/{tenant_id}")
-async def broadcast_message(
-    tenant_id: UUID,
-    message: Dict[str, Any],
-    exclude_connections: Optional[List[str]] = None
-):
-    """Broadcast message to all tenant connections."""
-    try:
-        await app.state.connection_manager.broadcast_to_tenant(
-            tenant_id, message, exclude_connections or []
-        )
-        return success_response(data={"status": "broadcasted"})
-        
-    except Exception as e:
-        logger.error("Failed to broadcast message", tenant_id=tenant_id, error=str(e))
-        return error_response("Failed to broadcast message")
-
-
-@app.get("/api/v1/metrics")
+@app.get("/metrics")
 async def get_metrics():
-    """Get realtime service metrics."""
-    try:
-        metrics = await app.state.connection_manager.get_metrics()
-        return success_response(data=metrics)
-        
-    except Exception as e:
-        logger.error("Failed to get metrics", error=str(e))
-        return error_response("Failed to get metrics")
+    """Get service metrics."""
+    if not connection_manager or not backpressure_handler:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    
+    # Get connection stats
+    connection_stats = await connection_manager.get_connection_stats()
+    
+    # Get backpressure stats
+    backpressure_stats = await backpressure_handler.get_stats()
+    
+    return {
+        "connections": connection_stats,
+        "backpressure": backpressure_stats,
+        "timestamp": time.time()
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "apps.realtime.main:app",
-        host="0.0.0.0",
-        port=8003,
-        reload=True
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8002)
