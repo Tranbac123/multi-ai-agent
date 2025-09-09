@@ -1,302 +1,187 @@
-"""Unit tests for contracts."""
+"""Unit tests for contract validation."""
 
 import pytest
-from uuid import uuid4
-from datetime import datetime
-
-from libs.contracts.agent import AgentSpec, AgentRun, AgentBudgets
+from pydantic import ValidationError
+from libs.contracts.agent import AgentSpec, MessageSpec, AgentRequest, AgentResponse
 from libs.contracts.tool import ToolSpec, ToolCall, ToolResult
-from libs.contracts.message import MessageSpec, MessageRole
-from libs.contracts.error import ErrorSpec, ErrorCode
-from libs.contracts.router import RouterDecisionRequest, RouterDecisionResponse, RouterTier
-from libs.contracts.billing import UsageCounter, BillingEvent
-from libs.contracts.tenant import Tenant, User, APIKey, Plan
+from libs.contracts.error import ErrorSpec, ServiceError, ErrorResponse
+from libs.contracts.router_io import RouterDecisionRequest, RouterDecisionResponse
 
 
 class TestAgentContracts:
-    """Test agent contracts."""
+    """Test agent contract validation."""
     
-    def test_agent_spec_creation(self):
-        """Test AgentSpec creation."""
-        budgets = AgentBudgets(
-            max_tokens=1000,
-            max_cost_usd=0.01,
-            wall_ms=5000
-        )
-        
+    def test_agent_spec_valid(self):
+        """Test valid agent spec."""
         spec = AgentSpec(
-            name="test-agent",
+            id="test-agent",
+            name="Test Agent",
+            description="Test agent for validation",
             version="1.0.0",
-            inputs_schema={"type": "object"},
-            outputs_schema={"type": "object"},
-            tools_allowed=["tool1", "tool2"],
-            budgets=budgets,
-            role="Test agent",
-            system_prompt="You are a test agent."
+            capabilities=["chat", "search"]
         )
-        
-        assert spec.name == "test-agent"
-        assert spec.version == "1.0.0"
-        assert spec.budgets.max_tokens == 1000
+        assert spec.id == "test-agent"
+        assert spec.name == "Test Agent"
+        assert spec.capabilities == ["chat", "search"]
     
-    def test_agent_run_creation(self):
-        """Test AgentRun creation."""
-        tenant_id = uuid4()
-        budgets = AgentBudgets(max_tokens=1000, max_cost_usd=0.01, wall_ms=5000)
-        spec = AgentSpec(
-            name="test-agent",
-            version="1.0.0",
-            inputs_schema={"type": "object"},
-            outputs_schema={"type": "object"},
-            tools_allowed=[],
-            budgets=budgets,
-            role="Test agent",
-            system_prompt="You are a test agent."
+    def test_agent_spec_invalid_missing_required(self):
+        """Test agent spec with missing required fields."""
+        with pytest.raises(ValidationError):
+            AgentSpec(
+                name="Test Agent",
+                description="Test agent"
+                # Missing id, version, capabilities
+            )
+    
+    def test_message_spec_valid(self):
+        """Test valid message spec."""
+        message = MessageSpec(
+            id="msg-123",
+            tenant_id="tenant-456",
+            content="Hello world",
+            timestamp=1234567890.0
         )
-        
-        run = AgentRun(
-            tenant_id=tenant_id,
-            workflow="test-workflow",
-            agent_spec=spec
+        assert message.id == "msg-123"
+        assert message.tenant_id == "tenant-456"
+        assert message.content == "Hello world"
+    
+    def test_agent_request_valid(self):
+        """Test valid agent request."""
+        message = MessageSpec(
+            id="msg-123",
+            tenant_id="tenant-456",
+            content="Hello world",
+            timestamp=1234567890.0
         )
-        
-        assert run.tenant_id == tenant_id
-        assert run.workflow == "test-workflow"
-        assert run.status == "pending"
+        request = AgentRequest(
+            message=message,
+            agent_id="test-agent"
+        )
+        assert request.agent_id == "test-agent"
+        assert request.message.id == "msg-123"
 
 
 class TestToolContracts:
-    """Test tool contracts."""
+    """Test tool contract validation."""
     
-    def test_tool_spec_creation(self):
-        """Test ToolSpec creation."""
+    def test_tool_spec_valid(self):
+        """Test valid tool spec."""
         spec = ToolSpec(
             id="test-tool",
             name="Test Tool",
-            description="A test tool",
-            request_schema={"type": "object"},
-            response_schema={"type": "object"},
-            error_schema={"type": "object"},
-            timeout_ms=5000,
-            idempotent=True,
-            has_compensation=True
+            description="Test tool for validation",
+            version="1.0.0",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            capabilities=["search", "update"]
         )
-        
         assert spec.id == "test-tool"
-        assert spec.timeout_ms == 5000
-        assert spec.idempotent is True
+        assert spec.input_schema == {"type": "object"}
     
-    def test_tool_call_creation(self):
-        """Test ToolCall creation."""
-        tenant_id = uuid4()
-        run_id = uuid4()
-        step_id = uuid4()
-        
+    def test_tool_call_valid(self):
+        """Test valid tool call."""
         call = ToolCall(
+            id="call-123",
             tool_id="test-tool",
-            tenant_id=tenant_id,
-            run_id=run_id,
-            step_id=step_id,
-            request_data={"input": "test"}
+            tenant_id="tenant-456",
+            input_data={"query": "test"}
         )
-        
+        assert call.id == "call-123"
         assert call.tool_id == "test-tool"
-        assert call.tenant_id == tenant_id
-        assert call.request_data == {"input": "test"}
-
-
-class TestMessageContracts:
-    """Test message contracts."""
-    
-    def test_message_spec_creation(self):
-        """Test MessageSpec creation."""
-        tenant_id = uuid4()
-        run_id = uuid4()
-        
-        message = MessageSpec(
-            run_id=run_id,
-            tenant_id=tenant_id,
-            role=MessageRole.USER,
-            payload={"text": "Hello"}
-        )
-        
-        assert message.run_id == run_id
-        assert message.tenant_id == tenant_id
-        assert message.role == MessageRole.USER
+        assert call.input_data == {"query": "test"}
 
 
 class TestErrorContracts:
-    """Test error contracts."""
+    """Test error contract validation."""
     
-    def test_error_spec_creation(self):
-        """Test ErrorSpec creation."""
+    def test_error_spec_valid(self):
+        """Test valid error spec."""
         error = ErrorSpec(
-            code=ErrorCode.TIMEOUT,
-            message="Request timeout",
-            retriable=True,
-            retry_after_ms=5000
+            error_type="validation_error",
+            error_code="INVALID_INPUT",
+            message="Invalid input provided",
+            status_code=400
         )
-        
-        assert error.code == ErrorCode.TIMEOUT
-        assert error.retriable is True
-        assert error.retry_after_ms == 5000
+        assert error.error_type == "validation_error"
+        assert error.status_code == 400
+    
+    def test_service_error_valid(self):
+        """Test valid service error."""
+        error = ServiceError(
+            error_id="error-123",
+            error_type="validation_error",
+            error_code="INVALID_REQUEST",
+            message="Request validation failed",
+            timestamp=1234567890.0,
+            service="api-gateway"
+        )
+        assert error.error_id == "error-123"
+        assert error.service == "api-gateway"
 
 
 class TestRouterContracts:
-    """Test router contracts."""
+    """Test router contract validation."""
     
-    def test_router_decision_request_creation(self):
-        """Test RouterDecisionRequest creation."""
-        tenant_id = uuid4()
-        task_id = uuid4()
-        
+    def test_router_request_valid(self):
+        """Test valid router request."""
         request = RouterDecisionRequest(
-            tenant_id=tenant_id,
-            task_id=task_id,
-            requirement="Test requirement",
-            text_features={
-                "token_count": 100,
-                "json_schema_complexity": 0.5,
-                "domain_flags": {"finance": True},
-                "novelty_score": 0.3,
-                "historical_failure_rate": 0.1,
-                "reasoning_keywords": ["analyze"],
-                "entity_count": 5,
-                "format_strictness": 0.7
-            },
-            history_stats={
-                "total_runs": 100,
-                "success_rate": 0.9,
-                "avg_latency_ms": 500.0,
-                "avg_cost_usd": 0.01,
-                "tier_distribution": {"SLM_A": 50, "SLM_B": 30, "LLM": 20}
-            }
+            message="Hello world",
+            tenant_id="tenant-456"
         )
-        
-        assert request.tenant_id == tenant_id
-        assert request.task_id == task_id
-        assert request.requirement == "Test requirement"
+        assert request.message == "Hello world"
+        assert request.tenant_id == "tenant-456"
     
-    def test_router_decision_response_creation(self):
-        """Test RouterDecisionResponse creation."""
-        request_id = uuid4()
-        
+    def test_router_response_valid(self):
+        """Test valid router response."""
         response = RouterDecisionResponse(
-            request_id=request_id,
-            tier=RouterTier.SLM_B,
-            confidence=0.8,
-            expected_cost_usd=0.005,
-            expected_latency_ms=300,
-            reasons=["Medium complexity detected"]
+            agent_id="test-agent",
+            tier="A",
+            confidence=0.95,
+            reasoning="High confidence match",
+            cost_estimate=0.01,
+            latency_estimate_ms=100
         )
-        
-        assert response.request_id == request_id
-        assert response.tier == RouterTier.SLM_B
-        assert response.confidence == 0.8
+        assert response.agent_id == "test-agent"
+        assert response.tier == "A"
+        assert response.confidence == 0.95
 
 
-class TestBillingContracts:
-    """Test billing contracts."""
+class TestContractValidation:
+    """Test contract validation edge cases."""
     
-    def test_usage_counter_creation(self):
-        """Test UsageCounter creation."""
-        tenant_id = uuid4()
-        counter = UsageCounter(
-            tenant_id=tenant_id,
-            day=datetime.now().date(),
-            tokens_in=1000,
-            tokens_out=500,
-            tool_calls=10,
-            ws_minutes=60,
-            storage_mb=100,
-            cost_usd=0.05
-        )
-        
-        assert counter.tenant_id == tenant_id
-        assert counter.tokens_in == 1000
-        assert counter.cost_usd == 0.05
+    def test_invalid_payload_rejection(self):
+        """Test that invalid payloads are rejected."""
+        # Test with completely invalid data
+        with pytest.raises(ValidationError):
+            AgentSpec(
+                id=123,  # Should be string
+                name=None,  # Should not be None
+                description="Test",
+                version="1.0.0",
+                capabilities="not_a_list"  # Should be list
+            )
     
-    def test_billing_event_creation(self):
-        """Test BillingEvent creation."""
-        tenant_id = uuid4()
-        event = BillingEvent(
-            tenant_id=tenant_id,
-            event_type="tokens",
-            quantity=100,
-            unit_cost_usd=0.0001,
-            total_cost_usd=0.01
+    def test_missing_optional_fields(self):
+        """Test that missing optional fields are handled correctly."""
+        message = MessageSpec(
+            id="msg-123",
+            tenant_id="tenant-456",
+            content="Hello world",
+            timestamp=1234567890.0
+            # user_id and session_id are optional
         )
-        
-        assert event.tenant_id == tenant_id
-        assert event.event_type == "tokens"
-        assert event.quantity == 100
-
-
-class TestTenantContracts:
-    """Test tenant contracts."""
+        assert message.user_id is None
+        assert message.session_id is None
     
-    def test_tenant_creation(self):
-        """Test Tenant creation."""
-        tenant_id = uuid4()
-        plan_id = uuid4()
-        
-        tenant = Tenant(
-            tenant_id=tenant_id,
-            name="Test Tenant",
-            plan_id=plan_id,
-            status="active",
-            data_region="us-east-1"
+    def test_default_values(self):
+        """Test that default values are applied correctly."""
+        spec = AgentSpec(
+            id="test-agent",
+            name="Test Agent",
+            description="Test agent",
+            version="1.0.0",
+            capabilities=["chat"]
+            # config and metadata should default to empty dict
         )
-        
-        assert tenant.tenant_id == tenant_id
-        assert tenant.name == "Test Tenant"
-        assert tenant.status == "active"
-    
-    def test_user_creation(self):
-        """Test User creation."""
-        user_id = uuid4()
-        tenant_id = uuid4()
-        
-        user = User(
-            user_id=user_id,
-            tenant_id=tenant_id,
-            email="test@example.com",
-            role="user"
-        )
-        
-        assert user.user_id == user_id
-        assert user.tenant_id == tenant_id
-        assert user.email == "test@example.com"
-    
-    def test_api_key_creation(self):
-        """Test APIKey creation."""
-        key_id = uuid4()
-        tenant_id = uuid4()
-        
-        api_key = APIKey(
-            key_id=key_id,
-            tenant_id=tenant_id,
-            key_hash="hashed_key",
-            scopes=["read", "write"],
-            rate_limit=1000
-        )
-        
-        assert api_key.key_id == key_id
-        assert api_key.tenant_id == tenant_id
-        assert api_key.scopes == ["read", "write"]
-    
-    def test_plan_creation(self):
-        """Test Plan creation."""
-        plan_id = uuid4()
-        
-        plan = Plan(
-            plan_id=plan_id,
-            name="Test Plan",
-            price_usd=29.99,
-            quotas={"tokens_per_day": 100000},
-            features={"analytics": True}
-        )
-        
-        assert plan.plan_id == plan_id
-        assert plan.name == "Test Plan"
-        assert plan.price_usd == 29.99
+        assert spec.config == {}
+        assert spec.metadata == {}
