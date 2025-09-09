@@ -1,0 +1,49 @@
+"""Dockerfile for API Gateway service."""
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY libs/ libs/
+COPY apps/api-gateway/ apps/api-gateway/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    sqlalchemy[asyncio]==2.0.23 \
+    asyncpg==0.29.0 \
+    redis==5.0.1 \
+    nats-py==2.6.0 \
+    structlog==23.2.0 \
+    opentelemetry-api==1.21.0 \
+    opentelemetry-sdk==1.21.0 \
+    opentelemetry-instrumentation-fastapi==0.42b0 \
+    opentelemetry-instrumentation-sqlalchemy==0.42b0 \
+    opentelemetry-instrumentation-httpx==0.42b0 \
+    opentelemetry-instrumentation-redis==0.42b0 \
+    opentelemetry-exporter-otlp==1.21.0 \
+    pydantic==2.5.0 \
+    pydantic-settings==2.1.0 \
+    python-jose[cryptography]==3.3.0 \
+    passlib[bcrypt]==1.7.4
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/healthz || exit 1
+
+# Run the application
+CMD ["python", "-m", "apps.api-gateway.main"]

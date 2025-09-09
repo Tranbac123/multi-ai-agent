@@ -1,0 +1,177 @@
+name: "common"
+version: "1.0.0"
+description: "Base workflow configuration with common patterns"
+
+workflow:
+  name: "common_workflow"
+  version: "1.0.0"
+  description: "Common workflow patterns"
+
+  # Global settings
+  settings:
+    max_iterations: 10
+    timeout_seconds: 300
+    retry_attempts: 3
+    default_temperature: 0.7
+    default_max_tokens: 1000
+
+  # Common steps
+  steps:
+    - id: "welcome"
+      type: "message"
+      name: "Welcome Message"
+      config:
+        message: "Hello! How can I help you today?"
+        message_type: "text"
+
+    - id: "classify_intent"
+      type: "classifier"
+      name: "Intent Classification"
+      config:
+        model: "gpt-4"
+        temperature: 0.1
+        max_tokens: 100
+        classes:
+          - "faq"
+          - "order"
+          - "support"
+          - "billing"
+          - "technical"
+
+    - id: "extract_entities"
+      type: "extractor"
+      name: "Entity Extraction"
+      config:
+        model: "gpt-4"
+        temperature: 0.1
+        max_tokens: 200
+        entities:
+          - "order_id"
+          - "product_name"
+          - "email"
+          - "phone"
+          - "amount"
+
+    - id: "validate_input"
+      type: "validator"
+      name: "Input Validation"
+      config:
+        schema:
+          type: "object"
+          properties:
+            message:
+              type: "string"
+              minLength: 1
+              maxLength: 1000
+            intent:
+              type: "string"
+              enum: ["faq", "order", "support", "billing", "technical"]
+          required: ["message", "intent"]
+
+    - id: "generate_response"
+      type: "generator"
+      name: "Response Generation"
+      config:
+        model: "gpt-4"
+        temperature: 0.7
+        max_tokens: 500
+        system_prompt: |
+          You are a helpful AI assistant. Provide accurate, helpful, and concise responses.
+          Be polite and professional in all interactions.
+
+    - id: "log_interaction"
+      type: "logger"
+      name: "Interaction Logging"
+      config:
+        log_level: "info"
+        include_metadata: true
+        include_timing: true
+
+  # Common transitions
+  transitions:
+    - from: "welcome"
+      to: "classify_intent"
+      condition: "always"
+
+    - from: "classify_intent"
+      to: "extract_entities"
+      condition: "intent_classified"
+
+    - from: "extract_entities"
+      to: "validate_input"
+      condition: "entities_extracted"
+
+    - from: "validate_input"
+      to: "generate_response"
+      condition: "input_valid"
+
+    - from: "validate_input"
+      to: "welcome"
+      condition: "input_invalid"
+
+    - from: "generate_response"
+      to: "log_interaction"
+      condition: "response_generated"
+
+    - from: "log_interaction"
+      to: "end"
+      condition: "always"
+
+  # Common tools
+  tools:
+    - name: "knowledge_base"
+      type: "search"
+      config:
+        index: "documents"
+        max_results: 5
+        similarity_threshold: 0.7
+
+    - name: "database"
+      type: "query"
+      config:
+        connection_string: "${DATABASE_URL}"
+        timeout: 30
+
+    - name: "external_api"
+      type: "http"
+      config:
+        base_url: "${EXTERNAL_API_URL}"
+        timeout: 60
+        retry_attempts: 3
+
+  # Common error handling
+  error_handling:
+    - error_type: "validation_error"
+      action: "retry"
+      max_retries: 2
+      backoff_seconds: 1
+
+    - error_type: "api_error"
+      action: "fallback"
+      fallback_message: "I'm sorry, I'm having trouble processing your request. Please try again later."
+
+    - error_type: "timeout"
+      action: "fallback"
+      fallback_message: "I'm sorry, the request is taking longer than expected. Please try again."
+
+    - error_type: "rate_limit"
+      action: "wait"
+      wait_seconds: 60
+      retry_after: true
+
+  # Common metrics
+  metrics:
+    - name: "response_time"
+      type: "histogram"
+      description: "Response generation time"
+      labels: ["intent", "success"]
+
+    - name: "intent_accuracy"
+      type: "gauge"
+      description: "Intent classification accuracy"
+      labels: ["model"]
+
+    - name: "tool_usage"
+      type: "counter"
+      description: "Tool usage count"
+      labels: ["tool_name", "success"]

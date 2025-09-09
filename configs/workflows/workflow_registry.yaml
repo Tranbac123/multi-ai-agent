@@ -1,0 +1,387 @@
+name: "workflow_registry"
+version: "1.0.0"
+description: "Central registry for all agent workflows in the multi-tenant AIaaS platform"
+category: "system"
+priority: "high"
+
+# Registry metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["registry", "workflows", "system", "configuration"]
+
+# Workflow registry configuration
+registry:
+  # Main workflows
+  workflows:
+    - name: "customer_support_workflow"
+      file: "customer_support_workflow.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Main customer support workflow for handling inquiries, orders, and lead capture"
+      category: "customer_service"
+      priority: "high"
+      tags: ["customer_support", "multi_agent", "conversational"]
+      dependencies: []
+      triggers:
+        - "customer_message"
+        - "webhook"
+        - "api_call"
+      endpoints:
+        - "/api/v1/workflows/customer_support"
+        - "/api/v1/chat/process"
+
+    - name: "faq_handling"
+      file: "faq_handling.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "FAQ handling workflow for answering common customer questions"
+      category: "customer_service"
+      priority: "medium"
+      tags: ["faq", "knowledge_base", "self_service"]
+      dependencies: []
+      triggers:
+        - "faq_request"
+        - "knowledge_base_query"
+      endpoints:
+        - "/api/v1/workflows/faq"
+
+    - name: "order_management"
+      file: "order_management.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Order management workflow for handling order-related inquiries and operations"
+      category: "e_commerce"
+      priority: "high"
+      tags: ["order", "e_commerce", "payment", "inventory"]
+      dependencies: []
+      triggers:
+        - "order_inquiry"
+        - "order_operation"
+      endpoints:
+        - "/api/v1/workflows/order_management"
+
+    - name: "create_order"
+      file: "create_order.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Create order workflow for processing new customer orders"
+      category: "e_commerce"
+      priority: "high"
+      tags: ["order", "e_commerce", "payment", "inventory"]
+      dependencies: ["order_management"]
+      triggers:
+        - "create_order_request"
+        - "product_purchase"
+      endpoints:
+        - "/api/v1/workflows/create_order"
+
+    - name: "track_order"
+      file: "track_order.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Order tracking workflow for providing order status and tracking information"
+      category: "e_commerce"
+      priority: "medium"
+      tags: ["order", "tracking", "shipping", "status"]
+      dependencies: ["order_management"]
+      triggers:
+        - "order_tracking_request"
+        - "status_inquiry"
+      endpoints:
+        - "/api/v1/workflows/track_order"
+
+    - name: "lead_capture"
+      file: "lead_capture.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Lead capture workflow for collecting and processing customer leads"
+      category: "sales"
+      priority: "medium"
+      tags: ["lead", "sales", "crm", "conversion"]
+      dependencies: []
+      triggers:
+        - "lead_inquiry"
+        - "sales_contact"
+      endpoints:
+        - "/api/v1/workflows/lead_capture"
+
+    - name: "complaint_handling"
+      file: "complaint_handling.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Complaint handling workflow for managing customer complaints and issues"
+      category: "customer_service"
+      priority: "high"
+      tags: ["complaint", "customer_service", "escalation", "resolution"]
+      dependencies: []
+      triggers:
+        - "complaint_report"
+        - "issue_escalation"
+      endpoints:
+        - "/api/v1/workflows/complaint_handling"
+
+    - name: "technical_support"
+      file: "technical_support.yaml"
+      status: "active"
+      version: "1.0.0"
+      description: "Technical support workflow for handling technical issues and troubleshooting"
+      category: "technical_support"
+      priority: "high"
+      tags: ["technical", "support", "troubleshooting", "escalation"]
+      dependencies: []
+      triggers:
+        - "technical_issue"
+        - "troubleshooting_request"
+      endpoints:
+        - "/api/v1/workflows/technical_support"
+
+  # Workflow categories
+  categories:
+    - name: "customer_service"
+      description: "Customer service related workflows"
+      workflows:
+        ["customer_support_workflow", "faq_handling", "complaint_handling"]
+      priority: "high"
+      color: "#3B82F6"
+
+    - name: "e_commerce"
+      description: "E-commerce related workflows"
+      workflows: ["order_management", "create_order", "track_order"]
+      priority: "high"
+      color: "#10B981"
+
+    - name: "sales"
+      description: "Sales and lead generation workflows"
+      workflows: ["lead_capture"]
+      priority: "medium"
+      color: "#F59E0B"
+
+    - name: "technical_support"
+      description: "Technical support workflows"
+      workflows: ["technical_support"]
+      priority: "high"
+      color: "#EF4444"
+
+    - name: "system"
+      description: "System and infrastructure workflows"
+      workflows: ["workflow_registry"]
+      priority: "low"
+      color: "#6B7280"
+
+  # Workflow statuses
+  statuses:
+    - name: "active"
+      description: "Workflow is active and available for use"
+      color: "#10B981"
+      icon: "check-circle"
+
+    - name: "inactive"
+      description: "Workflow is inactive and not available for use"
+      color: "#6B7280"
+      icon: "pause-circle"
+
+    - name: "deprecated"
+      description: "Workflow is deprecated and will be removed"
+      color: "#F59E0B"
+      icon: "exclamation-triangle"
+
+    - name: "development"
+      description: "Workflow is in development and not ready for production"
+      color: "#3B82F6"
+      icon: "code"
+
+  # Workflow priorities
+  priorities:
+    - name: "critical"
+      description: "Critical workflows that must always be available"
+      level: 1
+      color: "#EF4444"
+
+    - name: "high"
+      description: "High priority workflows"
+      level: 2
+      color: "#F59E0B"
+
+    - name: "medium"
+      description: "Medium priority workflows"
+      level: 3
+      color: "#3B82F6"
+
+    - name: "low"
+      description: "Low priority workflows"
+      level: 4
+      color: "#6B7280"
+
+  # Workflow triggers
+  triggers:
+    - name: "customer_message"
+      description: "Triggered by customer messages"
+      type: "message"
+      category: "customer_input"
+
+    - name: "webhook"
+      description: "Triggered by webhook calls"
+      type: "webhook"
+      category: "external"
+
+    - name: "api_call"
+      description: "Triggered by API calls"
+      type: "api"
+      category: "external"
+
+    - name: "faq_request"
+      description: "Triggered by FAQ requests"
+      type: "message"
+      category: "customer_input"
+
+    - name: "knowledge_base_query"
+      description: "Triggered by knowledge base queries"
+      type: "query"
+      category: "customer_input"
+
+    - name: "order_inquiry"
+      description: "Triggered by order inquiries"
+      type: "message"
+      category: "customer_input"
+
+    - name: "order_operation"
+      description: "Triggered by order operations"
+      type: "operation"
+      category: "customer_input"
+
+    - name: "create_order_request"
+      description: "Triggered by create order requests"
+      type: "request"
+      category: "customer_input"
+
+    - name: "product_purchase"
+      description: "Triggered by product purchase attempts"
+      type: "purchase"
+      category: "customer_input"
+
+    - name: "order_tracking_request"
+      description: "Triggered by order tracking requests"
+      type: "request"
+      category: "customer_input"
+
+    - name: "status_inquiry"
+      description: "Triggered by status inquiries"
+      type: "inquiry"
+      category: "customer_input"
+
+    - name: "lead_inquiry"
+      description: "Triggered by lead inquiries"
+      type: "inquiry"
+      category: "customer_input"
+
+    - name: "sales_contact"
+      description: "Triggered by sales contacts"
+      type: "contact"
+      category: "customer_input"
+
+    - name: "complaint_report"
+      description: "Triggered by complaint reports"
+      type: "report"
+      category: "customer_input"
+
+    - name: "issue_escalation"
+      description: "Triggered by issue escalations"
+      type: "escalation"
+      category: "internal"
+
+    - name: "technical_issue"
+      description: "Triggered by technical issues"
+      type: "issue"
+      category: "customer_input"
+
+    - name: "troubleshooting_request"
+      description: "Triggered by troubleshooting requests"
+      type: "request"
+      category: "customer_input"
+
+  # Workflow dependencies
+  dependencies:
+    - name: "order_management"
+      description: "Order management workflow"
+      workflows: ["create_order", "track_order"]
+      type: "parent"
+
+    - name: "customer_support_workflow"
+      description: "Main customer support workflow"
+      workflows:
+        [
+          "faq_handling",
+          "order_management",
+          "lead_capture",
+          "complaint_handling",
+          "technical_support",
+        ]
+      type: "parent"
+
+  # Workflow monitoring
+  monitoring:
+    metrics:
+      - name: "workflow_execution_count"
+        type: "counter"
+        description: "Number of workflow executions"
+        labels: ["workflow_name", "status", "tenant_id"]
+
+      - name: "workflow_execution_duration"
+        type: "histogram"
+        description: "Duration of workflow executions"
+        labels: ["workflow_name", "status", "tenant_id"]
+
+      - name: "workflow_error_count"
+        type: "counter"
+        description: "Number of workflow errors"
+        labels: ["workflow_name", "error_type", "tenant_id"]
+
+      - name: "workflow_success_rate"
+        type: "gauge"
+        description: "Success rate of workflows"
+        labels: ["workflow_name", "tenant_id"]
+
+    alerts:
+      - name: "workflow_high_error_rate"
+        condition: "workflow_error_count / workflow_execution_count > 0.1"
+        severity: "warning"
+        description: "Workflow error rate is too high"
+
+      - name: "workflow_low_success_rate"
+        condition: "workflow_success_rate < 0.8"
+        severity: "warning"
+        description: "Workflow success rate is too low"
+
+      - name: "workflow_high_duration"
+        condition: "workflow_execution_duration > 300"
+        severity: "info"
+        description: "Workflow execution duration is high"
+
+  # Workflow configuration
+  configuration:
+    default_timeout: 300
+    default_retries: 3
+    default_retry_delay: 5
+    max_concurrent_executions: 100
+    rate_limit_per_minute: 1000
+    circuit_breaker_threshold: 10
+    circuit_breaker_timeout: 60
+
+  # Workflow security
+  security:
+    authentication_required: true
+    authorization_required: true
+    rate_limiting_enabled: true
+    input_validation_enabled: true
+    output_sanitization_enabled: true
+    audit_logging_enabled: true
+
+  # Workflow deployment
+  deployment:
+    auto_deploy: false
+    deployment_strategy: "rolling"
+    health_check_enabled: true
+    rollback_enabled: true
+    version_control_enabled: true

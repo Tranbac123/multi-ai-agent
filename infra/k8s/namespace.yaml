@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aiaas
+  labels:
+    name: aiaas
+    environment: production

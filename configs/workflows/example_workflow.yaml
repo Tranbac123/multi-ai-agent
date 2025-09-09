@@ -1,0 +1,140 @@
+name: "example_workflow"
+version: "1.0.0"
+description: "Example workflow demonstrating basic workflow structure and functionality"
+category: "system"
+priority: "low"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["example", "demo", "tutorial"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 60
+  max_retries: 2
+  retry_delay_seconds: 3
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 30
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for example workflow"
+      next_node: "process_input"
+
+  - name: "process_input"
+    type: "agent"
+    config:
+      agent_type: "processor"
+      model: "gpt-4o-mini"
+      temperature: 0.5
+      max_tokens: 200
+      prompt_template: |
+        Process the input message:
+        Message: {message}
+
+        Analyze the message and extract key information.
+      next_node: "check_condition"
+
+  - name: "check_condition"
+    type: "condition"
+    config:
+      description: "Check if processing was successful"
+      conditions:
+        - condition: "context.success == true"
+          next_node: "generate_response"
+        - condition: "true"
+          next_node: "handle_error"
+
+  - name: "generate_response"
+    type: "agent"
+    config:
+      agent_type: "responder"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Generate a response based on the processed input:
+        Input: {message}
+        Processed Info: {context.processed_info}
+
+        Provide a helpful and relevant response.
+      next_node: "end"
+
+  - name: "handle_error"
+    type: "agent"
+    config:
+      agent_type: "error_handler"
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 150
+      prompt_template: |
+        Handle the processing error:
+        Error: {context.error}
+
+        Provide an appropriate error message and suggest next steps.
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of example workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "process_input"
+    condition: null
+
+  - from: "process_input"
+    to: "check_condition"
+    condition: null
+
+  - from: "check_condition"
+    to: "generate_response"
+    condition: "context.success == true"
+
+  - from: "check_condition"
+    to: "handle_error"
+    condition: "true"
+
+  - from: "generate_response"
+    to: "end"
+    condition: null
+
+  - from: "handle_error"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "timeout"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "handle_error"
+
+  - error_type: "agent_error"
+    action: "fallback"
+    fallback_node: "handle_error"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "example_workflow_duration"
+      type: "histogram"
+      labels: ["success"]
+
+    - name: "example_workflow_success_rate"
+      type: "counter"
+      labels: ["status"]
+
+  alerts:
+    - name: "example_workflow_high_failure_rate"
+      condition: "example_workflow_success_rate < 0.8"
+      severity: "warning"

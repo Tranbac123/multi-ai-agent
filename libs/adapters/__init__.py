@@ -1,0 +1,1 @@
+"""Resilient adapters with circuit breaker, retry, and timeout patterns."""

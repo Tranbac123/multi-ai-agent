@@ -1,0 +1,232 @@
+name: "faq_handling"
+version: "1.0.0"
+description: "FAQ handling workflow for answering common customer questions"
+category: "customer_service"
+priority: "medium"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["faq", "knowledge_base", "self_service"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 60
+  max_retries: 2
+  retry_delay_seconds: 3
+  circuit_breaker:
+    failure_threshold: 10
+    recovery_timeout: 30
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for FAQ handling"
+      next_node: "search_knowledge_base"
+
+  - name: "search_knowledge_base"
+    type: "tool"
+    config:
+      tool_name: "search_knowledge_base"
+      parameters:
+        query: "context.message"
+        limit: 5
+        threshold: 0.7
+      next_node: "evaluate_results"
+
+  - name: "evaluate_results"
+    type: "condition"
+    config:
+      description: "Evaluate search results and determine next action"
+      conditions:
+        - condition: "context.search_results and len(context.search_results) > 0"
+          next_node: "check_confidence"
+        - condition: "true"
+          next_node: "generate_general_response"
+
+  - name: "check_confidence"
+    type: "condition"
+    config:
+      description: "Check if best result meets confidence threshold"
+      conditions:
+        - condition: "context.best_result.confidence >= 0.8"
+          next_node: "use_knowledge_base_answer"
+        - condition: "context.best_result.confidence >= 0.5"
+          next_node: "enhance_with_llm"
+        - condition: "true"
+          next_node: "generate_general_response"
+
+  - name: "use_knowledge_base_answer"
+    type: "agent"
+    config:
+      agent_type: "response_formatter"
+      model: "gpt-4o-mini"
+      temperature: 0.3
+      max_tokens: 200
+      prompt_template: |
+        Format the knowledge base answer for the customer:
+
+        Question: {message}
+        Knowledge Base Answer: {best_result.answer}
+        Confidence: {best_result.confidence}
+
+        Make the response natural and helpful while maintaining accuracy.
+      next_node: "end"
+
+  - name: "enhance_with_llm"
+    type: "agent"
+    config:
+      agent_type: "response_enhancer"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 300
+      prompt_template: |
+        Enhance the knowledge base answer with additional context:
+
+        Customer Question: {message}
+        Knowledge Base Context: {search_results}
+
+        Provide a comprehensive answer that:
+        1. Directly addresses the customer's question
+        2. Uses the knowledge base information as foundation
+        3. Adds helpful context and examples
+        4. Maintains accuracy and professionalism
+      next_node: "end"
+
+  - name: "generate_general_response"
+    type: "agent"
+    config:
+      agent_type: "general_responder"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 250
+      prompt_template: |
+        Provide a helpful response when no specific knowledge base match is found:
+
+        Customer Question: {message}
+
+        Guidelines:
+        - Acknowledge the question
+        - Provide general guidance if possible
+        - Suggest contacting support for specific details
+        - Be helpful and professional
+      next_node: "suggest_escalation"
+
+  - name: "suggest_escalation"
+    type: "condition"
+    config:
+      description: "Check if escalation should be suggested"
+      conditions:
+        - condition: "context.question_complexity == 'high'"
+          next_node: "suggest_human_support"
+        - condition: "true"
+          next_node: "end"
+
+  - name: "suggest_human_support"
+    type: "agent"
+    config:
+      agent_type: "escalation_handler"
+      model: "gpt-4o-mini"
+      temperature: 0.3
+      max_tokens: 150
+      prompt_template: |
+        Add escalation suggestion to the response:
+
+        Current Response: {context.current_response}
+
+        Add a professional note suggesting human support for complex questions.
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of FAQ handling workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "search_knowledge_base"
+    condition: null
+
+  - from: "search_knowledge_base"
+    to: "evaluate_results"
+    condition: null
+
+  - from: "evaluate_results"
+    to: "check_confidence"
+    condition: "context.search_results and len(context.search_results) > 0"
+
+  - from: "evaluate_results"
+    to: "generate_general_response"
+    condition: "true"
+
+  - from: "check_confidence"
+    to: "use_knowledge_base_answer"
+    condition: "context.best_result.confidence >= 0.8"
+
+  - from: "check_confidence"
+    to: "enhance_with_llm"
+    condition: "context.best_result.confidence >= 0.5"
+
+  - from: "check_confidence"
+    to: "generate_general_response"
+    condition: "true"
+
+  - from: "use_knowledge_base_answer"
+    to: "end"
+    condition: null
+
+  - from: "enhance_with_llm"
+    to: "end"
+    condition: null
+
+  - from: "generate_general_response"
+    to: "suggest_escalation"
+    condition: null
+
+  - from: "suggest_escalation"
+    to: "suggest_human_support"
+    condition: "context.question_complexity == 'high'"
+
+  - from: "suggest_escalation"
+    to: "end"
+    condition: "true"
+
+  - from: "suggest_human_support"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "knowledge_base_error"
+    action: "fallback"
+    fallback_node: "generate_general_response"
+
+  - error_type: "llm_error"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "use_knowledge_base_answer"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "faq_response_time"
+      type: "histogram"
+      labels: ["confidence_level"]
+
+    - name: "knowledge_base_hit_rate"
+      type: "counter"
+      labels: ["confidence_threshold"]
+
+    - name: "escalation_suggestions"
+      type: "counter"
+      labels: ["reason"]
+
+  alerts:
+    - name: "low_knowledge_base_hit_rate"
+      condition: "knowledge_base_hit_rate < 0.6"
+      severity: "warning"

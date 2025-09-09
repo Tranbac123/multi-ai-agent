@@ -1,0 +1,402 @@
+name: "create_order"
+version: "1.0.0"
+description: "Create order workflow for processing new customer orders"
+category: "e_commerce"
+priority: "high"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["order", "e_commerce", "payment", "inventory"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 90
+  max_retries: 3
+  retry_delay_seconds: 5
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for create order workflow"
+      next_node: "extract_product_info"
+
+  - name: "extract_product_info"
+    type: "agent"
+    config:
+      agent_type: "product_extractor"
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 200
+      prompt_template: |
+        Extract product information from the customer's message:
+        Message: {message}
+
+        Extract:
+        - product_name: Name or keywords for the product
+        - size: Size if mentioned (S, M, L, XL, etc.)
+        - color: Color if mentioned
+        - quantity: Quantity if mentioned (default 1)
+        - special_requirements: Any special requests
+
+        Return as JSON format.
+      next_node: "validate_product_info"
+
+  - name: "validate_product_info"
+    type: "condition"
+    config:
+      description: "Validate extracted product information"
+      conditions:
+        - condition: "context.product_name and context.product_name != ''"
+          next_node: "search_products"
+        - condition: "true"
+          next_node: "ask_for_product_details"
+
+  - name: "ask_for_product_details"
+    type: "agent"
+    config:
+      agent_type: "clarification_agent"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Ask for missing product information:
+
+        Customer Message: {message}
+        Missing Information: {missing_fields}
+
+        Ask specific questions to get the required product details.
+      next_node: "end"
+
+  - name: "search_products"
+    type: "tool"
+    config:
+      tool_name: "search_products"
+      parameters:
+        query: "context.product_name"
+        filters:
+          size: "context.size"
+          color: "context.color"
+        limit: 10
+      next_node: "evaluate_search_results"
+
+  - name: "evaluate_search_results"
+    type: "condition"
+    config:
+      description: "Evaluate product search results"
+      conditions:
+        - condition: "context.products and len(context.products) == 0"
+          next_node: "no_products_found"
+        - condition: "context.products and len(context.products) == 1"
+          next_node: "confirm_single_product"
+        - condition: "context.products and len(context.products) > 1"
+          next_node: "show_multiple_products"
+        - condition: "true"
+          next_node: "no_products_found"
+
+  - name: "no_products_found"
+    type: "agent"
+    config:
+      agent_type: "no_results_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Handle case when no products are found:
+
+        Customer Request: {message}
+        Search Query: {context.product_name}
+
+        Provide helpful suggestions and alternatives.
+      next_node: "end"
+
+  - name: "show_multiple_products"
+    type: "agent"
+    config:
+      agent_type: "product_selector"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 300
+      prompt_template: |
+        Show multiple products and ask for selection:
+
+        Customer Request: {message}
+        Products Found: {context.products}
+
+        Present the products in a clear, numbered list and ask which one they want.
+      next_node: "end"
+
+  - name: "confirm_single_product"
+    type: "agent"
+    config:
+      agent_type: "product_confirmer"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 250
+      prompt_template: |
+        Confirm the single product found:
+
+        Customer Request: {message}
+        Product: {context.products[0]}
+
+        Confirm the product details and ask if they want to proceed with the order.
+      next_node: "check_inventory"
+
+  - name: "check_inventory"
+    type: "tool"
+    config:
+      tool_name: "check_inventory"
+      parameters:
+        product_id: "context.selected_product.id"
+        quantity: "context.quantity"
+      next_node: "evaluate_inventory"
+
+  - name: "evaluate_inventory"
+    type: "condition"
+    config:
+      description: "Evaluate inventory availability"
+      conditions:
+        - condition: "context.inventory_available == true"
+          next_node: "calculate_pricing"
+        - condition: "context.inventory_available == false"
+          next_node: "handle_out_of_stock"
+        - condition: "true"
+          next_node: "handle_inventory_error"
+
+  - name: "handle_out_of_stock"
+    type: "agent"
+    config:
+      agent_type: "out_of_stock_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Handle out of stock situation:
+
+        Product: {context.selected_product}
+        Requested Quantity: {context.quantity}
+        Available Quantity: {context.available_quantity}
+
+        Inform customer about stock status and suggest alternatives.
+      next_node: "end"
+
+  - name: "handle_inventory_error"
+    type: "agent"
+    config:
+      agent_type: "error_handler"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 150
+      prompt_template: |
+        Handle inventory check error:
+
+        Product: {context.selected_product}
+        Error: {context.inventory_error}
+
+        Apologize and suggest contacting support.
+      next_node: "end"
+
+  - name: "calculate_pricing"
+    type: "tool"
+    config:
+      tool_name: "calculate_pricing"
+      parameters:
+        product_id: "context.selected_product.id"
+        quantity: "context.quantity"
+        customer_id: "context.customer_id"
+      next_node: "create_order_draft"
+
+  - name: "create_order_draft"
+    type: "tool"
+    config:
+      tool_name: "create_order_draft"
+      parameters:
+        customer_id: "context.customer_id"
+        items:
+          - product_id: "context.selected_product.id"
+            quantity: "context.quantity"
+            unit_price: "context.unit_price"
+        total_amount: "context.total_amount"
+        status: "draft"
+      next_node: "generate_payment_link"
+
+  - name: "generate_payment_link"
+    type: "tool"
+    config:
+      tool_name: "generate_payment_link"
+      parameters:
+        order_id: "context.order_id"
+        amount: "context.total_amount"
+        customer_id: "context.customer_id"
+      next_node: "send_order_confirmation"
+
+  - name: "send_order_confirmation"
+    type: "agent"
+    config:
+      agent_type: "order_confirmer"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Send order confirmation to customer:
+
+        Order Details:
+        - Product: {context.selected_product.name}
+        - Quantity: {context.quantity}
+        - Total: ${context.total_amount}
+        - Order ID: {context.order_id}
+        - Payment Link: {context.payment_link}
+
+        Provide a professional confirmation message with next steps.
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of create order workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "extract_product_info"
+    condition: null
+
+  - from: "extract_product_info"
+    to: "validate_product_info"
+    condition: null
+
+  - from: "validate_product_info"
+    to: "search_products"
+    condition: "context.product_name and context.product_name != ''"
+
+  - from: "validate_product_info"
+    to: "ask_for_product_details"
+    condition: "true"
+
+  - from: "ask_for_product_details"
+    to: "end"
+    condition: null
+
+  - from: "search_products"
+    to: "evaluate_search_results"
+    condition: null
+
+  - from: "evaluate_search_results"
+    to: "no_products_found"
+    condition: "context.products and len(context.products) == 0"
+
+  - from: "evaluate_search_results"
+    to: "confirm_single_product"
+    condition: "context.products and len(context.products) == 1"
+
+  - from: "evaluate_search_results"
+    to: "show_multiple_products"
+    condition: "context.products and len(context.products) > 1"
+
+  - from: "evaluate_search_results"
+    to: "no_products_found"
+    condition: "true"
+
+  - from: "no_products_found"
+    to: "end"
+    condition: null
+
+  - from: "show_multiple_products"
+    to: "end"
+    condition: null
+
+  - from: "confirm_single_product"
+    to: "check_inventory"
+    condition: null
+
+  - from: "check_inventory"
+    to: "evaluate_inventory"
+    condition: null
+
+  - from: "evaluate_inventory"
+    to: "calculate_pricing"
+    condition: "context.inventory_available == true"
+
+  - from: "evaluate_inventory"
+    to: "handle_out_of_stock"
+    condition: "context.inventory_available == false"
+
+  - from: "evaluate_inventory"
+    to: "handle_inventory_error"
+    condition: "true"
+
+  - from: "handle_out_of_stock"
+    to: "end"
+    condition: null
+
+  - from: "handle_inventory_error"
+    to: "end"
+    condition: null
+
+  - from: "calculate_pricing"
+    to: "create_order_draft"
+    condition: null
+
+  - from: "create_order_draft"
+    to: "generate_payment_link"
+    condition: null
+
+  - from: "generate_payment_link"
+    to: "send_order_confirmation"
+    condition: null
+
+  - from: "send_order_confirmation"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "product_search_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "no_products_found"
+
+  - error_type: "inventory_error"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "handle_inventory_error"
+
+  - error_type: "pricing_error"
+    action: "escalate"
+    fallback_node: "escalate_to_human"
+
+  - error_type: "order_creation_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "escalate_to_human"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "order_creation_duration"
+      type: "histogram"
+      labels: ["success"]
+
+    - name: "order_creation_success_rate"
+      type: "counter"
+      labels: ["step"]
+
+    - name: "inventory_check_failures"
+      type: "counter"
+      labels: ["error_type"]
+
+  alerts:
+    - name: "high_order_creation_failure"
+      condition: "order_creation_success_rate < 0.9"
+      severity: "warning"
+
+    - name: "inventory_system_down"
+      condition: "inventory_check_failures > 10"
+      severity: "critical"

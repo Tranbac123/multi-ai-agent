@@ -1,0 +1,260 @@
+name: "order_management"
+version: "1.0.0"
+description: "Order management workflow for handling order-related inquiries and operations"
+category: "e_commerce"
+priority: "high"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["order", "e_commerce", "payment", "inventory"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 120
+  max_retries: 3
+  retry_delay_seconds: 5
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for order management"
+      next_node: "classify_order_intent"
+
+  - name: "classify_order_intent"
+    type: "agent"
+    config:
+      agent_type: "order_classifier"
+      model: "gpt-4o-mini"
+      temperature: 0.1
+      max_tokens: 100
+      prompt_template: |
+        Classify the order-related intent from the customer's message:
+        Message: {message}
+
+        Categories:
+        - create_order: Customer wants to place a new order
+        - track_order: Customer wants to track existing order
+        - modify_order: Customer wants to modify existing order
+        - cancel_order: Customer wants to cancel existing order
+        - return_order: Customer wants to return/exchange order
+        - payment_issue: Payment-related problems
+        - inventory_check: Check product availability
+
+        Respond with only the category name.
+      next_node: "route_order_intent"
+
+  - name: "route_order_intent"
+    type: "condition"
+    config:
+      description: "Route to appropriate order sub-workflow"
+      conditions:
+        - condition: "context.intent == 'create_order'"
+          next_node: "create_order_workflow"
+        - condition: "context.intent == 'track_order'"
+          next_node: "track_order_workflow"
+        - condition: "context.intent == 'modify_order'"
+          next_node: "modify_order_workflow"
+        - condition: "context.intent == 'cancel_order'"
+          next_node: "cancel_order_workflow"
+        - condition: "context.intent == 'return_order'"
+          next_node: "return_order_workflow"
+        - condition: "context.intent == 'payment_issue'"
+          next_node: "payment_issue_workflow"
+        - condition: "context.intent == 'inventory_check'"
+          next_node: "inventory_check_workflow"
+        - condition: "true"
+          next_node: "general_order_help"
+
+  - name: "create_order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "create_order"
+      timeout_seconds: 90
+      next_node: "end"
+
+  - name: "track_order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "track_order"
+      timeout_seconds: 60
+      next_node: "end"
+
+  - name: "modify_order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "modify_order"
+      timeout_seconds: 90
+      next_node: "end"
+
+  - name: "cancel_order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "cancel_order"
+      timeout_seconds: 60
+      next_node: "end"
+
+  - name: "return_order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "return_order"
+      timeout_seconds: 90
+      next_node: "end"
+
+  - name: "payment_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "payment_issue"
+      timeout_seconds: 120
+      next_node: "end"
+
+  - name: "inventory_check_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "inventory_check"
+      timeout_seconds: 60
+      next_node: "end"
+
+  - name: "general_order_help"
+    type: "agent"
+    config:
+      agent_type: "order_helper"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Provide general help for order-related questions:
+
+        Customer Message: {message}
+
+        Guidelines:
+        - Be helpful and informative
+        - Suggest specific actions they can take
+        - Provide relevant order information
+        - Offer to connect with support if needed
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of order management workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "classify_order_intent"
+    condition: null
+
+  - from: "classify_order_intent"
+    to: "route_order_intent"
+    condition: null
+
+  - from: "route_order_intent"
+    to: "create_order_workflow"
+    condition: "context.intent == 'create_order'"
+
+  - from: "route_order_intent"
+    to: "track_order_workflow"
+    condition: "context.intent == 'track_order'"
+
+  - from: "route_order_intent"
+    to: "modify_order_workflow"
+    condition: "context.intent == 'modify_order'"
+
+  - from: "route_order_intent"
+    to: "cancel_order_workflow"
+    condition: "context.intent == 'cancel_order'"
+
+  - from: "route_order_intent"
+    to: "return_order_workflow"
+    condition: "context.intent == 'return_order'"
+
+  - from: "route_order_intent"
+    to: "payment_issue_workflow"
+    condition: "context.intent == 'payment_issue'"
+
+  - from: "route_order_intent"
+    to: "inventory_check_workflow"
+    condition: "context.intent == 'inventory_check'"
+
+  - from: "route_order_intent"
+    to: "general_order_help"
+    condition: "true"
+
+  - from: "create_order_workflow"
+    to: "end"
+    condition: null
+
+  - from: "track_order_workflow"
+    to: "end"
+    condition: null
+
+  - from: "modify_order_workflow"
+    to: "end"
+    condition: null
+
+  - from: "cancel_order_workflow"
+    to: "end"
+    condition: null
+
+  - from: "return_order_workflow"
+    to: "end"
+    condition: null
+
+  - from: "payment_issue_workflow"
+    to: "end"
+    condition: null
+
+  - from: "inventory_check_workflow"
+    to: "end"
+    condition: null
+
+  - from: "general_order_help"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "order_system_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "general_order_help"
+
+  - error_type: "payment_system_error"
+    action: "escalate"
+    fallback_node: "escalate_to_human"
+
+  - error_type: "inventory_error"
+    action: "fallback"
+    fallback_node: "general_order_help"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "order_workflow_duration"
+      type: "histogram"
+      labels: ["intent", "success"]
+
+    - name: "order_success_rate"
+      type: "counter"
+      labels: ["intent"]
+
+    - name: "payment_issue_rate"
+      type: "counter"
+      labels: ["error_type"]
+
+  alerts:
+    - name: "high_order_failure_rate"
+      condition: "order_success_rate < 0.85"
+      severity: "warning"
+
+    - name: "payment_system_down"
+      condition: "payment_issue_rate > 0.5"
+      severity: "critical"

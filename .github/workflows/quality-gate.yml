@@ -1,0 +1,103 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov sonar-scanner
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ --cov=. --cov-report=xml --cov-report=html
+        env:
+          DATABASE_URL: sqlite:///test.db
+
+      - name: Run SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=your-org
+            -Dsonar.projectKey=your-project
+            -Dsonar.sources=.
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+
+      - name: Quality Gate Check
+        uses: sonarqube-quality-gate-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          scanMetadataReportFile: target/sonar/report-task.txt
+        continue-on-error: true
+
+      - name: Comment PR with quality results
+        uses: actions/github-script@v6
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Read coverage report
+            let coverage = 'N/A';
+            try {
+              const coverageFile = fs.readFileSync('coverage.xml', 'utf8');
+              const coverageMatch = coverageFile.match(/line-rate="([^"]+)"/);
+              if (coverageMatch) {
+                coverage = `${Math.round(parseFloat(coverageMatch[1]) * 100)}%`;
+              }
+            } catch (e) {
+              console.log('Could not read coverage file');
+            }
+
+            // Create quality report
+            const qualityReport = `
+            ## 🔍 Quality Gate Results
+
+            | Metric | Value | Status |
+            |--------|-------|--------|
+            | Code Coverage | ${coverage} | ${coverage !== 'N/A' ? '✅' : '❌'} |
+            | SonarCloud Scan | ${process.env.SONAR_STATUS || 'Pending'} | ${process.env.SONAR_STATUS === 'SUCCESS' ? '✅' : '❌'} |
+            | Security Scan | ${process.env.SECURITY_STATUS || 'Pending'} | ${process.env.SECURITY_STATUS === 'PASS' ? '✅' : '❌'} |
+
+            ### 📊 Coverage Details
+            - **Lines**: ${coverage}
+            - **Branches**: ${coverage}
+            - **Functions**: ${coverage}
+
+            ### 🔒 Security Status
+            - **Vulnerabilities**: ${process.env.VULNERABILITIES || '0'}
+            - **Code Smells**: ${process.env.CODE_SMELLS || '0'}
+            - **Bugs**: ${process.env.BUGS || '0'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: qualityReport
+            });

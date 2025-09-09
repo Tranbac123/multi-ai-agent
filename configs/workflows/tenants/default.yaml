@@ -1,0 +1,172 @@
+name: "default"
+version: "1.0.0"
+description: "Default tenant configuration with stricter validation"
+
+extends: "base/common.yaml"
+
+# Tenant-specific overrides
+mutations:
+  - type: "insert_after"
+    target: "steps.validate_input"
+    step:
+      id: "security_check"
+      type: "validator"
+      name: "Security Validation"
+      config:
+        checks:
+          - type: "rate_limit"
+            max_requests: 100
+            window_seconds: 3600
+          - type: "content_filter"
+            blocked_patterns:
+              - "malicious_pattern_1"
+              - "malicious_pattern_2"
+          - type: "pii_detection"
+            action: "redact"
+            fields: ["email", "phone", "ssn"]
+
+  - type: "replace"
+    target: "steps.generate_response"
+    step:
+      id: "generate_response"
+      type: "generator"
+      name: "Response Generation"
+      config:
+        model: "gpt-4"
+        temperature: 0.5
+        max_tokens: 300
+        system_prompt: |
+          You are a helpful AI assistant for our enterprise platform. 
+          Provide accurate, helpful, and concise responses.
+          Be polite and professional in all interactions.
+          Always verify information before providing responses.
+        safety_checks:
+          - type: "content_moderation"
+            enabled: true
+          - type: "fact_checking"
+            enabled: true
+          - type: "bias_detection"
+            enabled: true
+
+# Tenant-specific patches
+patch:
+  settings:
+    max_iterations: 5
+    timeout_seconds: 180
+    retry_attempts: 2
+    default_temperature: 0.5
+    default_max_tokens: 500
+
+  error_handling:
+    - error_type: "rate_limit_exceeded"
+      action: "custom_response"
+      response: "You have exceeded the rate limit. Please wait before making another request."
+      status_code: 429
+
+    - error_type: "content_violation"
+      action: "custom_response"
+      response: "I'm sorry, I cannot process that request. Please rephrase your question."
+      status_code: 400
+
+    - error_type: "pii_detected"
+      action: "custom_response"
+      response: "I'm sorry, I cannot process requests containing personal information. Please remove any personal details and try again."
+      status_code: 400
+
+  tools:
+    - name: "knowledge_base"
+      type: "search"
+      config:
+        index: "documents"
+        max_results: 3
+        similarity_threshold: 0.8
+        filters:
+          - field: "tenant_id"
+            value: "${TENANT_ID}"
+          - field: "access_level"
+            value: "public"
+
+    - name: "database"
+      type: "query"
+      config:
+        connection_string: "${DATABASE_URL}"
+        timeout: 15
+        max_connections: 5
+        query_timeout: 10
+
+  metrics:
+    - name: "tenant_usage"
+      type: "counter"
+      description: "Tenant usage count"
+      labels: ["tenant_id", "endpoint", "success"]
+
+    - name: "security_violations"
+      type: "counter"
+      description: "Security violation count"
+      labels: ["tenant_id", "violation_type", "severity"]
+
+    - name: "content_moderation"
+      type: "counter"
+      description: "Content moderation actions"
+      labels: ["tenant_id", "action", "reason"]
+
+# Tenant-specific feature flags
+feature_flags:
+  - name: "advanced_ai_features"
+    enabled: false
+    description: "Enable advanced AI features for this tenant"
+
+  - name: "real_time_processing"
+    enabled: true
+    description: "Enable real-time processing for this tenant"
+
+  - name: "custom_branding"
+    enabled: false
+    description: "Enable custom branding for this tenant"
+
+  - name: "api_access"
+    enabled: true
+    description: "Enable API access for this tenant"
+
+# Tenant-specific quotas
+quotas:
+  max_requests_per_hour: 1000
+  max_requests_per_day: 10000
+  max_tokens_per_request: 2000
+  max_concurrent_requests: 10
+  max_storage_mb: 1000
+
+# Tenant-specific security settings
+security:
+  require_authentication: true
+  require_authorization: true
+  allowed_origins:
+    - "https://tenant.example.com"
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+  content_filtering:
+    enabled: true
+    strict_mode: true
+  pii_protection:
+    enabled: true
+    auto_redact: true
+    audit_logging: true
+
+# Tenant-specific monitoring
+monitoring:
+  alerting:
+    enabled: true
+    channels:
+      - type: "email"
+        address: "admin@tenant.example.com"
+      - type: "webhook"
+        url: "https://tenant.example.com/webhooks/alerts"
+  metrics:
+    retention_days: 30
+    aggregation_interval: "1m"
+  logging:
+    level: "info"
+    include_pii: false
+    audit_events: true

@@ -1,0 +1,337 @@
+name: "order"
+version: "1.0.0"
+description: "Order management workflow with payment saga"
+
+extends: "base/common.yaml"
+
+workflow:
+  name: "order_workflow"
+  version: "1.0.0"
+  description: "Order management and processing workflow"
+
+  # Override settings for order workflow
+  settings:
+    max_iterations: 15
+    timeout_seconds: 600
+    retry_attempts: 5
+    default_temperature: 0.5
+    default_max_tokens: 2000
+
+  # Additional steps for order workflow
+  steps:
+    - id: "welcome"
+      type: "message"
+      name: "Order Welcome"
+      config:
+        message: "Welcome to our order management system! I can help you with placing orders, checking status, and managing your purchases."
+        message_type: "text"
+
+    - id: "classify_intent"
+      type: "classifier"
+      name: "Order Intent Classification"
+      config:
+        model: "gpt-4"
+        temperature: 0.1
+        max_tokens: 100
+        classes:
+          - "place_order"
+          - "check_status"
+          - "cancel_order"
+          - "modify_order"
+          - "return_item"
+          - "track_shipment"
+          - "billing_inquiry"
+
+    - id: "extract_order_entities"
+      type: "extractor"
+      name: "Order Entity Extraction"
+      config:
+        model: "gpt-4"
+        temperature: 0.1
+        max_tokens: 300
+        entities:
+          - "order_id"
+          - "product_name"
+          - "quantity"
+          - "price"
+          - "shipping_address"
+          - "payment_method"
+          - "customer_email"
+          - "phone_number"
+
+    - id: "validate_order_data"
+      type: "validator"
+      name: "Order Data Validation"
+      config:
+        schema:
+          type: "object"
+          properties:
+            order_id:
+              type: "string"
+              pattern: "^ORD-[0-9]{8}$"
+            product_name:
+              type: "string"
+              minLength: 1
+              maxLength: 100
+            quantity:
+              type: "integer"
+              minimum: 1
+              maximum: 100
+            price:
+              type: "number"
+              minimum: 0.01
+            shipping_address:
+              type: "object"
+              properties:
+                street: { type: "string" }
+                city: { type: "string" }
+                state: { type: "string" }
+                zip: { type: "string" }
+                country: { type: "string" }
+              required: ["street", "city", "state", "zip", "country"]
+            customer_email:
+              type: "string"
+              format: "email"
+          required: ["product_name", "quantity", "price"]
+
+    - id: "check_inventory"
+      type: "tool_call"
+      name: "Inventory Check"
+      config:
+        tool: "inventory_tool"
+        action: "check_availability"
+        parameters:
+          product_name: "${extract_order_entities.product_name}"
+          quantity: "${extract_order_entities.quantity}"
+
+    - id: "calculate_pricing"
+      type: "tool_call"
+      name: "Pricing Calculation"
+      config:
+        tool: "pricing_tool"
+        action: "calculate_total"
+        parameters:
+          product_name: "${extract_order_entities.product_name}"
+          quantity: "${extract_order_entities.quantity}"
+          shipping_address: "${extract_order_entities.shipping_address}"
+
+    - id: "process_payment"
+      type: "saga"
+      name: "Payment Processing Saga"
+      config:
+        saga_id: "payment_saga"
+        steps:
+          - id: "authorize_payment"
+            tool: "payment_tool"
+            action: "authorize"
+            parameters:
+              amount: "${calculate_pricing.total_amount}"
+              payment_method: "${extract_order_entities.payment_method}"
+          - id: "capture_payment"
+            tool: "payment_tool"
+            action: "capture"
+            parameters:
+              authorization_id: "${authorize_payment.authorization_id}"
+        compensation:
+          - id: "void_payment"
+            tool: "payment_tool"
+            action: "void"
+            parameters:
+              authorization_id: "${authorize_payment.authorization_id}"
+
+    - id: "create_order"
+      type: "tool_call"
+      name: "Order Creation"
+      config:
+        tool: "order_tool"
+        action: "create_order"
+        parameters:
+          product_name: "${extract_order_entities.product_name}"
+          quantity: "${extract_order_entities.quantity}"
+          total_amount: "${calculate_pricing.total_amount}"
+          customer_email: "${extract_order_entities.customer_email}"
+          shipping_address: "${extract_order_entities.shipping_address}"
+          payment_id: "${process_payment.payment_id}"
+
+    - id: "send_confirmation"
+      type: "tool_call"
+      name: "Confirmation Email"
+      config:
+        tool: "email_tool"
+        action: "send_order_confirmation"
+        parameters:
+          order_id: "${create_order.order_id}"
+          customer_email: "${extract_order_entities.customer_email}"
+          order_details: "${create_order.order_details}"
+
+    - id: "generate_response"
+      type: "generator"
+      name: "Order Response Generation"
+      config:
+        model: "gpt-4"
+        temperature: 0.7
+        max_tokens: 500
+        system_prompt: |
+          You are an order management assistant. Provide clear, helpful responses about order status, 
+          processing, and next steps. Be specific about order numbers, timelines, and any required actions.
+        context_variables:
+          - "order_id"
+          - "order_status"
+          - "estimated_delivery"
+          - "tracking_number"
+
+    - id: "log_order_interaction"
+      type: "logger"
+      name: "Order Interaction Logging"
+      config:
+        log_level: "info"
+        include_metadata: true
+        include_timing: true
+        custom_fields:
+          - "order_id"
+          - "intent"
+          - "product_name"
+          - "total_amount"
+
+  # Order-specific transitions
+  transitions:
+    - from: "welcome"
+      to: "classify_intent"
+      condition: "always"
+
+    - from: "classify_intent"
+      to: "extract_order_entities"
+      condition: "intent_classified"
+
+    - from: "extract_order_entities"
+      to: "validate_order_data"
+      condition: "entities_extracted"
+
+    - from: "validate_order_data"
+      to: "check_inventory"
+      condition: "input_valid AND intent == 'place_order'"
+
+    - from: "validate_order_data"
+      to: "generate_response"
+      condition: "input_valid AND intent != 'place_order'"
+
+    - from: "check_inventory"
+      to: "calculate_pricing"
+      condition: "inventory_available"
+
+    - from: "check_inventory"
+      to: "generate_response"
+      condition: "inventory_unavailable"
+
+    - from: "calculate_pricing"
+      to: "process_payment"
+      condition: "pricing_calculated"
+
+    - from: "process_payment"
+      to: "create_order"
+      condition: "payment_successful"
+
+    - from: "process_payment"
+      to: "generate_response"
+      condition: "payment_failed"
+
+    - from: "create_order"
+      to: "send_confirmation"
+      condition: "order_created"
+
+    - from: "send_confirmation"
+      to: "generate_response"
+      condition: "confirmation_sent"
+
+    - from: "generate_response"
+      to: "log_order_interaction"
+      condition: "response_generated"
+
+    - from: "log_order_interaction"
+      to: "end"
+      condition: "always"
+
+  # Order-specific tools
+  tools:
+    - name: "inventory_tool"
+      type: "database"
+      config:
+        connection_string: "${DATABASE_URL}"
+        table: "inventory"
+        timeout: 30
+
+    - name: "pricing_tool"
+      type: "service"
+      config:
+        service_url: "${PRICING_SERVICE_URL}"
+        timeout: 60
+        retry_attempts: 3
+
+    - name: "payment_tool"
+      type: "service"
+      config:
+        service_url: "${PAYMENT_SERVICE_URL}"
+        timeout: 120
+        retry_attempts: 5
+        circuit_breaker:
+          failure_threshold: 5
+          recovery_timeout: 60
+
+    - name: "order_tool"
+      type: "database"
+      config:
+        connection_string: "${DATABASE_URL}"
+        table: "orders"
+        timeout: 30
+
+    - name: "email_tool"
+      type: "service"
+      config:
+        service_url: "${EMAIL_SERVICE_URL}"
+        timeout: 30
+        retry_attempts: 3
+
+  # Order-specific error handling
+  error_handling:
+    - error_type: "inventory_unavailable"
+      action: "custom_response"
+      response: "I'm sorry, the requested product is currently out of stock. Would you like to be notified when it becomes available?"
+
+    - error_type: "payment_declined"
+      action: "custom_response"
+      response: "I'm sorry, your payment was declined. Please check your payment information and try again."
+
+    - error_type: "shipping_address_invalid"
+      action: "retry"
+      max_retries: 2
+      backoff_seconds: 1
+      prompt: "Please provide a valid shipping address with complete details."
+
+    - error_type: "order_creation_failed"
+      action: "compensate"
+      compensation_steps:
+        - "void_payment"
+        - "restore_inventory"
+      fallback_message: "I'm sorry, there was an error creating your order. Your payment has been voided and no charges were made."
+
+  # Order-specific metrics
+  metrics:
+    - name: "order_processing_time"
+      type: "histogram"
+      description: "Order processing time"
+      labels: ["intent", "success"]
+
+    - name: "payment_success_rate"
+      type: "gauge"
+      description: "Payment success rate"
+      labels: ["payment_method"]
+
+    - name: "inventory_availability"
+      type: "gauge"
+      description: "Inventory availability rate"
+      labels: ["product_category"]
+
+    - name: "order_creation_rate"
+      type: "counter"
+      description: "Order creation count"
+      labels: ["product_name", "success"]

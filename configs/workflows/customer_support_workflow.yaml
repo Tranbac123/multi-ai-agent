@@ -1,0 +1,281 @@
+name: "customer_support_workflow"
+version: "1.0.0"
+description: "Main customer support workflow for handling inquiries, orders, and lead capture"
+category: "customer_service"
+priority: "high"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["customer_support", "multi_agent", "conversational"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 300
+  max_retries: 3
+  retry_delay_seconds: 5
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60
+  rate_limiting:
+    requests_per_minute: 100
+    burst_size: 20
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for customer support workflow"
+      next_node: "classify_intent"
+
+  - name: "classify_intent"
+    type: "agent"
+    config:
+      agent_type: "classifier"
+      model: "gpt-4o-mini"
+      temperature: 0.1
+      max_tokens: 100
+      prompt_template: |
+        Classify the customer's intent from their message:
+        Message: {message}
+
+        Categories:
+        - faq: General questions about products/services
+        - order: Order-related inquiries (create, modify, track)
+        - lead: Lead capture and sales inquiries
+        - complaint: Complaints or issues
+        - support: Technical support requests
+
+        Respond with only the category name.
+      next_node: "route_by_intent"
+
+  - name: "route_by_intent"
+    type: "condition"
+    config:
+      description: "Route to appropriate sub-workflow based on intent"
+      conditions:
+        - condition: "context.intent == 'faq'"
+          next_node: "faq_workflow"
+        - condition: "context.intent == 'order'"
+          next_node: "order_workflow"
+        - condition: "context.intent == 'lead'"
+          next_node: "lead_workflow"
+        - condition: "context.intent == 'complaint'"
+          next_node: "complaint_workflow"
+        - condition: "context.intent == 'support'"
+          next_node: "support_workflow"
+        - condition: "true"
+          next_node: "fallback_workflow"
+
+  - name: "faq_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "faq_handling"
+      timeout_seconds: 60
+      next_node: "generate_response"
+
+  - name: "order_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "order_management"
+      timeout_seconds: 120
+      next_node: "generate_response"
+
+  - name: "lead_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "lead_capture"
+      timeout_seconds: 90
+      next_node: "generate_response"
+
+  - name: "complaint_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "complaint_handling"
+      timeout_seconds: 180
+      next_node: "escalate_check"
+
+  - name: "support_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "technical_support"
+      timeout_seconds: 150
+      next_node: "escalate_check"
+
+  - name: "fallback_workflow"
+    type: "agent"
+    config:
+      agent_type: "general"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        You are a helpful customer service agent. The customer's message was: {message}
+
+        Provide a helpful response and ask clarifying questions to better understand their needs.
+      next_node: "generate_response"
+
+  - name: "escalate_check"
+    type: "condition"
+    config:
+      description: "Check if escalation is needed"
+      conditions:
+        - condition: "context.escalation_required == true"
+          next_node: "escalate_to_human"
+        - condition: "true"
+          next_node: "generate_response"
+
+  - name: "escalate_to_human"
+    type: "tool"
+    config:
+      tool_name: "escalate_to_human"
+      parameters:
+        priority: "context.priority"
+        category: "context.intent"
+        customer_id: "context.customer_id"
+        message: "context.message"
+      next_node: "generate_response"
+
+  - name: "generate_response"
+    type: "agent"
+    config:
+      agent_type: "response_generator"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Generate a professional, helpful response to the customer based on the workflow results:
+
+        Customer Message: {message}
+        Intent: {intent}
+        Workflow Results: {workflow_results}
+        Context: {context}
+
+        Guidelines:
+        - Be empathetic and professional
+        - Provide clear next steps
+        - Include relevant information
+        - Maintain brand voice
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of customer support workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "classify_intent"
+    condition: null
+
+  - from: "classify_intent"
+    to: "route_by_intent"
+    condition: null
+
+  - from: "route_by_intent"
+    to: "faq_workflow"
+    condition: "context.intent == 'faq'"
+
+  - from: "route_by_intent"
+    to: "order_workflow"
+    condition: "context.intent == 'order'"
+
+  - from: "route_by_intent"
+    to: "lead_workflow"
+    condition: "context.intent == 'lead'"
+
+  - from: "route_by_intent"
+    to: "complaint_workflow"
+    condition: "context.intent == 'complaint'"
+
+  - from: "route_by_intent"
+    to: "support_workflow"
+    condition: "context.intent == 'support'"
+
+  - from: "route_by_intent"
+    to: "fallback_workflow"
+    condition: "true"
+
+  - from: "faq_workflow"
+    to: "generate_response"
+    condition: null
+
+  - from: "order_workflow"
+    to: "generate_response"
+    condition: null
+
+  - from: "lead_workflow"
+    to: "generate_response"
+    condition: null
+
+  - from: "complaint_workflow"
+    to: "escalate_check"
+    condition: null
+
+  - from: "support_workflow"
+    to: "escalate_check"
+    condition: null
+
+  - from: "escalate_check"
+    to: "escalate_to_human"
+    condition: "context.escalation_required == true"
+
+  - from: "escalate_check"
+    to: "generate_response"
+    condition: "true"
+
+  - from: "escalate_to_human"
+    to: "generate_response"
+    condition: null
+
+  - from: "fallback_workflow"
+    to: "generate_response"
+    condition: null
+
+  - from: "generate_response"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "timeout"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "fallback_workflow"
+
+  - error_type: "tool_failure"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "escalate_to_human"
+
+  - error_type: "agent_failure"
+    action: "fallback"
+    fallback_node: "fallback_workflow"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "workflow_duration"
+      type: "histogram"
+      labels: ["intent", "success"]
+
+    - name: "workflow_success_rate"
+      type: "counter"
+      labels: ["intent"]
+
+    - name: "escalation_rate"
+      type: "counter"
+      labels: ["intent"]
+
+  alerts:
+    - name: "high_failure_rate"
+      condition: "workflow_success_rate < 0.8"
+      severity: "warning"
+
+    - name: "high_escalation_rate"
+      condition: "escalation_rate > 0.3"
+      severity: "info"

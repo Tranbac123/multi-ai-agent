@@ -1,0 +1,347 @@
+name: "complaint_handling"
+version: "1.0.0"
+description: "Complaint handling workflow for managing customer complaints and issues"
+category: "customer_service"
+priority: "high"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["complaint", "customer_service", "escalation", "resolution"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 180
+  max_retries: 2
+  retry_delay_seconds: 5
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for complaint handling workflow"
+      next_node: "analyze_complaint"
+
+  - name: "analyze_complaint"
+    type: "agent"
+    config:
+      agent_type: "complaint_analyzer"
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 300
+      prompt_template: |
+        Analyze the customer complaint:
+        Message: {message}
+
+        Extract:
+        - complaint_type: Type of complaint (product, service, billing, delivery, etc.)
+        - severity: Severity level (low, medium, high, critical)
+        - urgency: Urgency level (low, medium, high, urgent)
+        - affected_products: Products or services mentioned
+        - customer_emotion: Emotional state (angry, frustrated, disappointed, etc.)
+        - resolution_expectation: What the customer expects
+        - previous_interactions: Any mention of previous contact
+
+        Return as JSON format.
+      next_node: "classify_complaint"
+
+  - name: "classify_complaint"
+    type: "condition"
+    config:
+      description: "Classify complaint and determine handling approach"
+      conditions:
+        - condition: "context.severity == 'critical' or context.urgency == 'urgent'"
+          next_node: "escalate_immediately"
+        - condition: "context.complaint_type == 'billing'"
+          next_node: "billing_complaint_workflow"
+        - condition: "context.complaint_type == 'product'"
+          next_node: "product_complaint_workflow"
+        - condition: "context.complaint_type == 'service'"
+          next_node: "service_complaint_workflow"
+        - condition: "context.complaint_type == 'delivery'"
+          next_node: "delivery_complaint_workflow"
+        - condition: "true"
+          next_node: "general_complaint_workflow"
+
+  - name: "escalate_immediately"
+    type: "tool"
+    config:
+      tool_name: "escalate_to_manager"
+      parameters:
+        priority: "critical"
+        complaint_type: "context.complaint_type"
+        severity: "context.severity"
+        customer_id: "context.customer_id"
+        message: "context.message"
+        analysis: "context.analysis"
+      next_node: "send_escalation_confirmation"
+
+  - name: "send_escalation_confirmation"
+    type: "agent"
+    config:
+      agent_type: "escalation_confirmer"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 200
+      prompt_template: |
+        Send escalation confirmation to customer:
+
+        Customer: {context.customer_name}
+        Complaint: {context.complaint_type}
+        Severity: {context.severity}
+
+        Acknowledge the seriousness of their concern and confirm immediate escalation to management.
+      next_node: "end"
+
+  - name: "billing_complaint_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "billing_complaint"
+      timeout_seconds: 120
+      next_node: "evaluate_resolution"
+
+  - name: "product_complaint_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "product_complaint"
+      timeout_seconds: 150
+      next_node: "evaluate_resolution"
+
+  - name: "service_complaint_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "service_complaint"
+      timeout_seconds: 120
+      next_node: "evaluate_resolution"
+
+  - name: "delivery_complaint_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "delivery_complaint"
+      timeout_seconds: 120
+      next_node: "evaluate_resolution"
+
+  - name: "general_complaint_workflow"
+    type: "agent"
+    config:
+      agent_type: "general_complaint_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Handle general complaint:
+
+        Customer Message: {message}
+        Analysis: {context.analysis}
+
+        Provide empathetic response and suggest appropriate resolution steps.
+      next_node: "evaluate_resolution"
+
+  - name: "evaluate_resolution"
+    type: "condition"
+    config:
+      description: "Evaluate if resolution is satisfactory"
+      conditions:
+        - condition: "context.resolution_provided == true and context.customer_satisfied == true"
+          next_node: "send_resolution_confirmation"
+        - condition: "context.resolution_provided == true and context.customer_satisfied == false"
+          next_node: "offer_alternative_resolution"
+        - condition: "context.resolution_provided == false"
+          next_node: "escalate_to_specialist"
+
+  - name: "send_resolution_confirmation"
+    type: "agent"
+    config:
+      agent_type: "resolution_confirmer"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 250
+      prompt_template: |
+        Send resolution confirmation:
+
+        Customer: {context.customer_name}
+        Resolution: {context.resolution}
+        Follow-up: {context.follow_up}
+
+        Confirm resolution and provide next steps.
+      next_node: "schedule_follow_up"
+
+  - name: "offer_alternative_resolution"
+    type: "agent"
+    config:
+      agent_type: "alternative_resolution"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Offer alternative resolution:
+
+        Original Resolution: {context.resolution}
+        Customer Feedback: {context.customer_feedback}
+
+        Offer alternative solutions and ask for preference.
+      next_node: "end"
+
+  - name: "escalate_to_specialist"
+    type: "tool"
+    config:
+      tool_name: "escalate_to_specialist"
+      parameters:
+        complaint_type: "context.complaint_type"
+        severity: "context.severity"
+        customer_id: "context.customer_id"
+        message: "context.message"
+        analysis: "context.analysis"
+      next_node: "send_escalation_confirmation"
+
+  - name: "schedule_follow_up"
+    type: "tool"
+    config:
+      tool_name: "schedule_follow_up"
+      parameters:
+        customer_id: "context.customer_id"
+        complaint_id: "context.complaint_id"
+        follow_up_date: "context.follow_up_date"
+        follow_up_type: "resolution_check"
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of complaint handling workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "analyze_complaint"
+    condition: null
+
+  - from: "analyze_complaint"
+    to: "classify_complaint"
+    condition: null
+
+  - from: "classify_complaint"
+    to: "escalate_immediately"
+    condition: "context.severity == 'critical' or context.urgency == 'urgent'"
+
+  - from: "classify_complaint"
+    to: "billing_complaint_workflow"
+    condition: "context.complaint_type == 'billing'"
+
+  - from: "classify_complaint"
+    to: "product_complaint_workflow"
+    condition: "context.complaint_type == 'product'"
+
+  - from: "classify_complaint"
+    to: "service_complaint_workflow"
+    condition: "context.complaint_type == 'service'"
+
+  - from: "classify_complaint"
+    to: "delivery_complaint_workflow"
+    condition: "context.complaint_type == 'delivery'"
+
+  - from: "classify_complaint"
+    to: "general_complaint_workflow"
+    condition: "true"
+
+  - from: "escalate_immediately"
+    to: "send_escalation_confirmation"
+    condition: null
+
+  - from: "send_escalation_confirmation"
+    to: "end"
+    condition: null
+
+  - from: "billing_complaint_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "product_complaint_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "service_complaint_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "delivery_complaint_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "general_complaint_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "evaluate_resolution"
+    to: "send_resolution_confirmation"
+    condition: "context.resolution_provided == true and context.customer_satisfied == true"
+
+  - from: "evaluate_resolution"
+    to: "offer_alternative_resolution"
+    condition: "context.resolution_provided == true and context.customer_satisfied == false"
+
+  - from: "evaluate_resolution"
+    to: "escalate_to_specialist"
+    condition: "context.resolution_provided == false"
+
+  - from: "send_resolution_confirmation"
+    to: "schedule_follow_up"
+    condition: null
+
+  - from: "offer_alternative_resolution"
+    to: "end"
+    condition: null
+
+  - from: "escalate_to_specialist"
+    to: "send_escalation_confirmation"
+    condition: null
+
+  - from: "schedule_follow_up"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "escalation_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "escalate_to_human"
+
+  - error_type: "resolution_error"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "escalate_to_specialist"
+
+  - error_type: "follow_up_error"
+    action: "log_and_continue"
+    fallback_node: "end"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "complaint_resolution_time"
+      type: "histogram"
+      labels: ["complaint_type", "severity"]
+
+    - name: "escalation_rate"
+      type: "counter"
+      labels: ["complaint_type"]
+
+    - name: "customer_satisfaction"
+      type: "counter"
+      labels: ["resolution_type"]
+
+  alerts:
+    - name: "high_escalation_rate"
+      condition: "escalation_rate > 0.4"
+      severity: "warning"
+
+    - name: "low_satisfaction_rate"
+      condition: "customer_satisfaction < 0.7"
+      severity: "warning"

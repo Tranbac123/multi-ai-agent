@@ -1,0 +1,368 @@
+name: "technical_support"
+version: "1.0.0"
+description: "Technical support workflow for handling technical issues and troubleshooting"
+category: "technical_support"
+priority: "high"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["technical", "support", "troubleshooting", "escalation"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 150
+  max_retries: 3
+  retry_delay_seconds: 5
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for technical support workflow"
+      next_node: "analyze_technical_issue"
+
+  - name: "analyze_technical_issue"
+    type: "agent"
+    config:
+      agent_type: "technical_analyzer"
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 400
+      prompt_template: |
+        Analyze the technical support request:
+        Message: {message}
+
+        Extract:
+        - issue_type: Type of technical issue (login, performance, feature, bug, integration, etc.)
+        - severity: Severity level (low, medium, high, critical)
+        - urgency: Urgency level (low, medium, high, urgent)
+        - affected_system: System or component affected
+        - error_codes: Any error codes mentioned
+        - steps_reproduced: Steps to reproduce the issue
+        - expected_behavior: What the customer expected
+        - actual_behavior: What actually happened
+        - environment: Customer's environment (browser, OS, device, etc.)
+        - user_type: Type of user (admin, end-user, developer, etc.)
+
+        Return as JSON format.
+      next_node: "classify_technical_issue"
+
+  - name: "classify_technical_issue"
+    type: "condition"
+    config:
+      description: "Classify technical issue and determine handling approach"
+      conditions:
+        - condition: "context.severity == 'critical' or context.urgency == 'urgent'"
+          next_node: "escalate_immediately"
+        - condition: "context.issue_type == 'login'"
+          next_node: "login_issue_workflow"
+        - condition: "context.issue_type == 'performance'"
+          next_node: "performance_issue_workflow"
+        - condition: "context.issue_type == 'feature'"
+          next_node: "feature_issue_workflow"
+        - condition: "context.issue_type == 'bug'"
+          next_node: "bug_issue_workflow"
+        - condition: "context.issue_type == 'integration'"
+          next_node: "integration_issue_workflow"
+        - condition: "true"
+          next_node: "general_technical_workflow"
+
+  - name: "escalate_immediately"
+    type: "tool"
+    config:
+      tool_name: "escalate_to_technical_lead"
+      parameters:
+        priority: "critical"
+        issue_type: "context.issue_type"
+        severity: "context.severity"
+        customer_id: "context.customer_id"
+        message: "context.message"
+        analysis: "context.analysis"
+      next_node: "send_escalation_confirmation"
+
+  - name: "send_escalation_confirmation"
+    type: "agent"
+    config:
+      agent_type: "escalation_confirmer"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 200
+      prompt_template: |
+        Send escalation confirmation to customer:
+
+        Customer: {context.customer_name}
+        Issue: {context.issue_type}
+        Severity: {context.severity}
+
+        Acknowledge the technical issue and confirm immediate escalation to our technical team.
+      next_node: "end"
+
+  - name: "login_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "login_troubleshooting"
+      timeout_seconds: 90
+      next_node: "evaluate_resolution"
+
+  - name: "performance_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "performance_troubleshooting"
+      timeout_seconds: 120
+      next_node: "evaluate_resolution"
+
+  - name: "feature_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "feature_troubleshooting"
+      timeout_seconds: 90
+      next_node: "evaluate_resolution"
+
+  - name: "bug_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "bug_troubleshooting"
+      timeout_seconds: 120
+      next_node: "evaluate_resolution"
+
+  - name: "integration_issue_workflow"
+    type: "sub_workflow"
+    config:
+      workflow_name: "integration_troubleshooting"
+      timeout_seconds: 150
+      next_node: "evaluate_resolution"
+
+  - name: "general_technical_workflow"
+    type: "agent"
+    config:
+      agent_type: "general_technical_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 400
+      prompt_template: |
+        Handle general technical issue:
+
+        Customer Message: {message}
+        Analysis: {context.analysis}
+
+        Provide technical guidance and troubleshooting steps.
+      next_node: "evaluate_resolution"
+
+  - name: "evaluate_resolution"
+    type: "condition"
+    config:
+      description: "Evaluate if technical resolution is satisfactory"
+      conditions:
+        - condition: "context.resolution_provided == true and context.customer_satisfied == true"
+          next_node: "send_resolution_confirmation"
+        - condition: "context.resolution_provided == true and context.customer_satisfied == false"
+          next_node: "offer_alternative_solution"
+        - condition: "context.resolution_provided == false"
+          next_node: "escalate_to_specialist"
+
+  - name: "send_resolution_confirmation"
+    type: "agent"
+    config:
+      agent_type: "resolution_confirmer"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 300
+      prompt_template: |
+        Send technical resolution confirmation:
+
+        Customer: {context.customer_name}
+        Issue: {context.issue_type}
+        Resolution: {context.resolution}
+        Follow-up: {context.follow_up}
+
+        Confirm resolution and provide next steps.
+      next_node: "schedule_follow_up"
+
+  - name: "offer_alternative_solution"
+    type: "agent"
+    config:
+      agent_type: "alternative_solution"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 350
+      prompt_template: |
+        Offer alternative technical solution:
+
+        Original Resolution: {context.resolution}
+        Customer Feedback: {context.customer_feedback}
+
+        Offer alternative solutions and ask for preference.
+      next_node: "end"
+
+  - name: "escalate_to_specialist"
+    type: "tool"
+    config:
+      tool_name: "escalate_to_technical_specialist"
+      parameters:
+        issue_type: "context.issue_type"
+        severity: "context.severity"
+        customer_id: "context.customer_id"
+        message: "context.message"
+        analysis: "context.analysis"
+      next_node: "send_escalation_confirmation"
+
+  - name: "schedule_follow_up"
+    type: "tool"
+    config:
+      tool_name: "schedule_technical_follow_up"
+      parameters:
+        customer_id: "context.customer_id"
+        issue_id: "context.issue_id"
+        follow_up_date: "context.follow_up_date"
+        follow_up_type: "technical_check"
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of technical support workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "analyze_technical_issue"
+    condition: null
+
+  - from: "analyze_technical_issue"
+    to: "classify_technical_issue"
+    condition: null
+
+  - from: "classify_technical_issue"
+    to: "escalate_immediately"
+    condition: "context.severity == 'critical' or context.urgency == 'urgent'"
+
+  - from: "classify_technical_issue"
+    to: "login_issue_workflow"
+    condition: "context.issue_type == 'login'"
+
+  - from: "classify_technical_issue"
+    to: "performance_issue_workflow"
+    condition: "context.issue_type == 'performance'"
+
+  - from: "classify_technical_issue"
+    to: "feature_issue_workflow"
+    condition: "context.issue_type == 'feature'"
+
+  - from: "classify_technical_issue"
+    to: "bug_issue_workflow"
+    condition: "context.issue_type == 'bug'"
+
+  - from: "classify_technical_issue"
+    to: "integration_issue_workflow"
+    condition: "context.issue_type == 'integration'"
+
+  - from: "classify_technical_issue"
+    to: "general_technical_workflow"
+    condition: "true"
+
+  - from: "escalate_immediately"
+    to: "send_escalation_confirmation"
+    condition: null
+
+  - from: "send_escalation_confirmation"
+    to: "end"
+    condition: null
+
+  - from: "login_issue_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "performance_issue_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "feature_issue_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "bug_issue_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "integration_issue_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "general_technical_workflow"
+    to: "evaluate_resolution"
+    condition: null
+
+  - from: "evaluate_resolution"
+    to: "send_resolution_confirmation"
+    condition: "context.resolution_provided == true and context.customer_satisfied == true"
+
+  - from: "evaluate_resolution"
+    to: "offer_alternative_solution"
+    condition: "context.resolution_provided == true and context.customer_satisfied == false"
+
+  - from: "evaluate_resolution"
+    to: "escalate_to_specialist"
+    condition: "context.resolution_provided == false"
+
+  - from: "send_resolution_confirmation"
+    to: "schedule_follow_up"
+    condition: null
+
+  - from: "offer_alternative_solution"
+    to: "end"
+    condition: null
+
+  - from: "escalate_to_specialist"
+    to: "send_escalation_confirmation"
+    condition: null
+
+  - from: "schedule_follow_up"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "escalation_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "escalate_to_human"
+
+  - error_type: "resolution_error"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "escalate_to_specialist"
+
+  - error_type: "follow_up_error"
+    action: "log_and_continue"
+    fallback_node: "end"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "technical_resolution_time"
+      type: "histogram"
+      labels: ["issue_type", "severity"]
+
+    - name: "escalation_rate"
+      type: "counter"
+      labels: ["issue_type"]
+
+    - name: "technical_satisfaction"
+      type: "counter"
+      labels: ["resolution_type"]
+
+  alerts:
+    - name: "high_technical_escalation_rate"
+      condition: "escalation_rate > 0.5"
+      severity: "warning"
+
+    - name: "low_technical_satisfaction"
+      condition: "technical_satisfaction < 0.8"
+      severity: "warning"

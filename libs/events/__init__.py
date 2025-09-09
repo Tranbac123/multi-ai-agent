@@ -1,0 +1,1 @@
+"""Event system with NATS and DLQ handling."""

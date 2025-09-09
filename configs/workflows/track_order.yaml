@@ -1,0 +1,332 @@
+name: "track_order"
+version: "1.0.0"
+description: "Order tracking workflow for providing order status and tracking information"
+category: "e_commerce"
+priority: "medium"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["order", "tracking", "shipping", "status"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 60
+  max_retries: 2
+  retry_delay_seconds: 3
+  circuit_breaker:
+    failure_threshold: 10
+    recovery_timeout: 30
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for order tracking workflow"
+      next_node: "extract_order_info"
+
+  - name: "extract_order_info"
+    type: "agent"
+    config:
+      agent_type: "order_extractor"
+      model: "gpt-4o-mini"
+      temperature: 0.3
+      max_tokens: 150
+      prompt_template: |
+        Extract order information from the customer's message:
+        Message: {message}
+
+        Extract:
+        - order_id: Order ID or number
+        - tracking_number: Tracking number
+        - email: Customer email
+        - phone: Customer phone number
+
+        Return as JSON format.
+      next_node: "validate_order_info"
+
+  - name: "validate_order_info"
+    type: "condition"
+    config:
+      description: "Validate extracted order information"
+      conditions:
+        - condition: "context.order_id or context.tracking_number"
+          next_node: "search_order"
+        - condition: "context.email or context.phone"
+          next_node: "search_by_customer"
+        - condition: "true"
+          next_node: "ask_for_order_info"
+
+  - name: "ask_for_order_info"
+    type: "agent"
+    config:
+      agent_type: "info_collector"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Ask for order information:
+
+        Customer Message: {message}
+
+        Ask for order ID, tracking number, or customer details to help locate their order.
+      next_node: "end"
+
+  - name: "search_order"
+    type: "tool"
+    config:
+      tool_name: "search_order"
+      parameters:
+        order_id: "context.order_id"
+        tracking_number: "context.tracking_number"
+      next_node: "evaluate_search_results"
+
+  - name: "search_by_customer"
+    type: "tool"
+    config:
+      tool_name: "search_orders_by_customer"
+      parameters:
+        email: "context.email"
+        phone: "context.phone"
+      next_node: "evaluate_customer_search"
+
+  - name: "evaluate_search_results"
+    type: "condition"
+    config:
+      description: "Evaluate order search results"
+      conditions:
+        - condition: "context.order_found == true"
+          next_node: "get_order_details"
+        - condition: "context.order_found == false"
+          next_node: "order_not_found"
+        - condition: "true"
+          next_node: "search_error"
+
+  - name: "evaluate_customer_search"
+    type: "condition"
+    config:
+      description: "Evaluate customer search results"
+      conditions:
+        - condition: "context.orders_found and len(context.orders_found) > 0"
+          next_node: "show_customer_orders"
+        - condition: "context.orders_found and len(context.orders_found) == 0"
+          next_node: "no_orders_found"
+        - condition: "true"
+          next_node: "search_error"
+
+  - name: "get_order_details"
+    type: "tool"
+    config:
+      tool_name: "get_order_details"
+      parameters:
+        order_id: "context.order_id"
+      next_node: "format_order_status"
+
+  - name: "show_customer_orders"
+    type: "agent"
+    config:
+      agent_type: "order_lister"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 300
+      prompt_template: |
+        Show customer's orders:
+
+        Customer: {context.customer_name}
+        Orders: {context.orders_found}
+
+        Present the orders in a clear, numbered list and ask which one they want to track.
+      next_node: "end"
+
+  - name: "order_not_found"
+    type: "agent"
+    config:
+      agent_type: "not_found_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Handle order not found:
+
+        Order ID: {context.order_id}
+        Tracking Number: {context.tracking_number}
+
+        Inform customer that the order was not found and suggest next steps.
+      next_node: "end"
+
+  - name: "no_orders_found"
+    type: "agent"
+    config:
+      agent_type: "no_orders_handler"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Handle no orders found:
+
+        Customer: {context.customer_name}
+        Email: {context.email}
+
+        Inform customer that no orders were found and suggest contacting support.
+      next_node: "end"
+
+  - name: "search_error"
+    type: "agent"
+    config:
+      agent_type: "error_handler"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 150
+      prompt_template: |
+        Handle search error:
+
+        Error: {context.search_error}
+
+        Apologize for the technical issue and suggest contacting support.
+      next_node: "end"
+
+  - name: "format_order_status"
+    type: "agent"
+    config:
+      agent_type: "status_formatter"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 400
+      prompt_template: |
+        Format order status information:
+
+        Order Details: {context.order_details}
+
+        Present the order status in a clear, customer-friendly format including:
+        - Order summary
+        - Current status
+        - Tracking information
+        - Estimated delivery
+        - Next steps
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of order tracking workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "extract_order_info"
+    condition: null
+
+  - from: "extract_order_info"
+    to: "validate_order_info"
+    condition: null
+
+  - from: "validate_order_info"
+    to: "search_order"
+    condition: "context.order_id or context.tracking_number"
+
+  - from: "validate_order_info"
+    to: "search_by_customer"
+    condition: "context.email or context.phone"
+
+  - from: "validate_order_info"
+    to: "ask_for_order_info"
+    condition: "true"
+
+  - from: "ask_for_order_info"
+    to: "end"
+    condition: null
+
+  - from: "search_order"
+    to: "evaluate_search_results"
+    condition: null
+
+  - from: "search_by_customer"
+    to: "evaluate_customer_search"
+    condition: null
+
+  - from: "evaluate_search_results"
+    to: "get_order_details"
+    condition: "context.order_found == true"
+
+  - from: "evaluate_search_results"
+    to: "order_not_found"
+    condition: "context.order_found == false"
+
+  - from: "evaluate_search_results"
+    to: "search_error"
+    condition: "true"
+
+  - from: "evaluate_customer_search"
+    to: "show_customer_orders"
+    condition: "context.orders_found and len(context.orders_found) > 0"
+
+  - from: "evaluate_customer_search"
+    to: "no_orders_found"
+    condition: "context.orders_found and len(context.orders_found) == 0"
+
+  - from: "evaluate_customer_search"
+    to: "search_error"
+    condition: "true"
+
+  - from: "get_order_details"
+    to: "format_order_status"
+    condition: null
+
+  - from: "show_customer_orders"
+    to: "end"
+    condition: null
+
+  - from: "order_not_found"
+    to: "end"
+    condition: null
+
+  - from: "no_orders_found"
+    to: "end"
+    condition: null
+
+  - from: "search_error"
+    to: "end"
+    condition: null
+
+  - from: "format_order_status"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "order_system_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "search_error"
+
+  - error_type: "tracking_system_error"
+    action: "retry"
+    max_retries: 1
+    fallback_node: "search_error"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "order_tracking_duration"
+      type: "histogram"
+      labels: ["success"]
+
+    - name: "order_found_rate"
+      type: "counter"
+      labels: ["search_type"]
+
+    - name: "tracking_system_errors"
+      type: "counter"
+      labels: ["error_type"]
+
+  alerts:
+    - name: "low_order_found_rate"
+      condition: "order_found_rate < 0.8"
+      severity: "warning"
+
+    - name: "high_tracking_errors"
+      condition: "tracking_system_errors > 5"
+      severity: "warning"

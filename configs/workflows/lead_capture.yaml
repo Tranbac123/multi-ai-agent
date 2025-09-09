@@ -1,0 +1,278 @@
+name: "lead_capture"
+version: "1.0.0"
+description: "Lead capture workflow for collecting and processing customer leads"
+category: "sales"
+priority: "medium"
+
+# Workflow metadata
+metadata:
+  author: "AI Platform Team"
+  created_at: "2024-01-15"
+  last_updated: "2024-01-15"
+  tags: ["lead", "sales", "crm", "conversion"]
+
+# Workflow configuration
+config:
+  timeout_seconds: 90
+  max_retries: 2
+  retry_delay_seconds: 3
+  circuit_breaker:
+    failure_threshold: 10
+    recovery_timeout: 30
+
+# Workflow nodes
+nodes:
+  - name: "start"
+    type: "start"
+    config:
+      description: "Entry point for lead capture workflow"
+      next_node: "extract_customer_info"
+
+  - name: "extract_customer_info"
+    type: "agent"
+    config:
+      agent_type: "info_extractor"
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 200
+      prompt_template: |
+        Extract customer information from the message:
+        Message: {message}
+
+        Extract:
+        - name: Customer's name
+        - email: Email address
+        - phone: Phone number
+        - company: Company name (if mentioned)
+        - interest: What they're interested in
+        - urgency: How urgent their need is (low, medium, high)
+
+        Return as JSON format.
+      next_node: "validate_customer_info"
+
+  - name: "validate_customer_info"
+    type: "condition"
+    config:
+      description: "Validate extracted customer information"
+      conditions:
+        - condition: "context.name and context.email"
+          next_node: "check_duplicate_lead"
+        - condition: "true"
+          next_node: "collect_missing_info"
+
+  - name: "collect_missing_info"
+    type: "agent"
+    config:
+      agent_type: "info_collector"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 200
+      prompt_template: |
+        Collect missing customer information:
+
+        Customer Message: {message}
+        Missing Fields: {missing_fields}
+        Collected Info: {collected_info}
+
+        Ask for the missing information in a natural, conversational way.
+      next_node: "end"
+
+  - name: "check_duplicate_lead"
+    type: "tool"
+    config:
+      tool_name: "check_duplicate_lead"
+      parameters:
+        email: "context.email"
+        phone: "context.phone"
+      next_node: "evaluate_duplicate"
+
+  - name: "evaluate_duplicate"
+    type: "condition"
+    config:
+      description: "Evaluate if lead is duplicate"
+      conditions:
+        - condition: "context.is_duplicate == true"
+          next_node: "handle_duplicate_lead"
+        - condition: "true"
+          next_node: "qualify_lead"
+
+  - name: "handle_duplicate_lead"
+    type: "agent"
+    config:
+      agent_type: "duplicate_handler"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 200
+      prompt_template: |
+        Handle duplicate lead:
+
+        Customer: {context.name}
+        Email: {context.email}
+        Previous Lead: {context.existing_lead}
+
+        Acknowledge they've contacted us before and provide appropriate next steps.
+      next_node: "end"
+
+  - name: "qualify_lead"
+    type: "agent"
+    config:
+      agent_type: "lead_qualifier"
+      model: "gpt-4o"
+      temperature: 0.5
+      max_tokens: 300
+      prompt_template: |
+        Qualify the lead based on available information:
+
+        Customer Info: {context}
+
+        Assess:
+        - Lead quality (A, B, C)
+        - Likelihood to convert (high, medium, low)
+        - Recommended next action
+        - Priority level
+
+        Return qualification assessment.
+      next_node: "create_lead"
+
+  - name: "create_lead"
+    type: "tool"
+    config:
+      tool_name: "create_lead"
+      parameters:
+        name: "context.name"
+        email: "context.email"
+        phone: "context.phone"
+        company: "context.company"
+        interest: "context.interest"
+        urgency: "context.urgency"
+        quality: "context.lead_quality"
+        source: "context.source"
+        status: "new"
+      next_node: "send_confirmation"
+
+  - name: "send_confirmation"
+    type: "agent"
+    config:
+      agent_type: "confirmation_sender"
+      model: "gpt-4o"
+      temperature: 0.7
+      max_tokens: 250
+      prompt_template: |
+        Send lead confirmation to customer:
+
+        Customer: {context.name}
+        Lead ID: {context.lead_id}
+        Interest: {context.interest}
+
+        Send a professional confirmation message with next steps and timeline.
+      next_node: "notify_sales_team"
+
+  - name: "notify_sales_team"
+    type: "tool"
+    config:
+      tool_name: "notify_sales_team"
+      parameters:
+        lead_id: "context.lead_id"
+        customer_name: "context.name"
+        urgency: "context.urgency"
+        quality: "context.lead_quality"
+        interest: "context.interest"
+      next_node: "end"
+
+  - name: "end"
+    type: "end"
+    config:
+      description: "End of lead capture workflow"
+
+# Workflow edges
+edges:
+  - from: "start"
+    to: "extract_customer_info"
+    condition: null
+
+  - from: "extract_customer_info"
+    to: "validate_customer_info"
+    condition: null
+
+  - from: "validate_customer_info"
+    to: "check_duplicate_lead"
+    condition: "context.name and context.email"
+
+  - from: "validate_customer_info"
+    to: "collect_missing_info"
+    condition: "true"
+
+  - from: "collect_missing_info"
+    to: "end"
+    condition: null
+
+  - from: "check_duplicate_lead"
+    to: "evaluate_duplicate"
+    condition: null
+
+  - from: "evaluate_duplicate"
+    to: "handle_duplicate_lead"
+    condition: "context.is_duplicate == true"
+
+  - from: "evaluate_duplicate"
+    to: "qualify_lead"
+    condition: "true"
+
+  - from: "handle_duplicate_lead"
+    to: "end"
+    condition: null
+
+  - from: "qualify_lead"
+    to: "create_lead"
+    condition: null
+
+  - from: "create_lead"
+    to: "send_confirmation"
+    condition: null
+
+  - from: "send_confirmation"
+    to: "notify_sales_team"
+    condition: null
+
+  - from: "notify_sales_team"
+    to: "end"
+    condition: null
+
+# Error handling
+error_handling:
+  - error_type: "crm_error"
+    action: "retry"
+    max_retries: 2
+    fallback_node: "escalate_to_human"
+
+  - error_type: "duplicate_check_error"
+    action: "fallback"
+    fallback_node: "qualify_lead"
+
+  - error_type: "notification_error"
+    action: "log_and_continue"
+    fallback_node: "end"
+
+# Monitoring and metrics
+monitoring:
+  metrics:
+    - name: "lead_capture_duration"
+      type: "histogram"
+      labels: ["success"]
+
+    - name: "lead_quality_distribution"
+      type: "counter"
+      labels: ["quality_grade"]
+
+    - name: "duplicate_lead_rate"
+      type: "counter"
+      labels: ["source"]
+
+  alerts:
+    - name: "high_duplicate_rate"
+      condition: "duplicate_lead_rate > 0.3"
+      severity: "info"
+
+    - name: "low_lead_quality"
+      condition: "lead_quality_distribution{quality_grade='A'} < 0.4"
+      severity: "warning"
