@@ -1,7 +1,7 @@
 {
   "dashboard": {
     "id": null,
-    "title": "Router v2 Analytics",
+    "title": "Multi-AI-Agent Comprehensive Analytics",
     "tags": [
       "ai-agent",
       "analytics",
@@ -9,6 +9,95 @@
     ],
     "timezone": "browser",
     "panels": [
+      {
+        "id": 9,
+        "title": "Overview Metrics",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(total_requests[5m]))",
+            "legendFormat": "Total Requests/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(successful_requests[5m]))",
+            "legendFormat": "Successful Requests/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(failed_requests[5m]))",
+            "legendFormat": "Failed Requests/sec",
+            "refId": "C"
+          },
+          {
+            "expr": "sum(rate(total_cost[5m]))",
+            "legendFormat": "Total Cost/sec",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "SLO Compliance",
+        "type": "gauge",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "latency_slo_compliance",
+            "legendFormat": "Latency SLO",
+            "refId": "A"
+          },
+          {
+            "expr": "availability_slo_compliance",
+            "legendFormat": "Availability SLO",
+            "refId": "B"
+          },
+          {
+            "expr": "cost_slo_compliance",
+            "legendFormat": "Cost SLO",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.8
+                },
+                {
+                  "color": "green",
+                  "value": 0.95
+                }
+              ]
+            }
+          }
+        }
+      },
       {
         "id": 1,
         "title": "Router Decision Latency",
@@ -124,6 +213,84 @@
         }
       },
       {
+        "id": 6,
+        "title": "WebSocket Active Connections",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "ws_active_connections",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1000
+                },
+                {
+                  "color": "red",
+                  "value": 2000
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "WebSocket Backpressure Drops",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "rate(ws_backpressure_drops[5m])",
+            "legendFormat": "Drops/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 50
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
         "id": 4,
         "title": "Expected vs Actual Cost",
         "type": "timeseries",
@@ -202,75 +369,106 @@
         }
       },
       {
-        "id": 11,
-        "title": "Router Throughput",
+        "id": 17,
+        "title": "Cost Breakdown by Tier",
         "type": "timeseries",
         "gridPos": {
           "h": 8,
           "w": 12,
           "x": 12,
-          "y": 8
+          "y": 32
         },
         "targets": [
           {
-            "expr": "rate(router_requests_total[5m])",
-            "legendFormat": "Requests/sec",
+            "expr": "rate(tier_a_cost[5m])",
+            "legendFormat": "Tier A Cost",
             "refId": "A"
+          },
+          {
+            "expr": "rate(tier_b_cost[5m])",
+            "legendFormat": "Tier B Cost",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(tier_c_cost[5m])",
+            "legendFormat": "Tier C Cost",
+            "refId": "C"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "unit": "reqps"
+            "unit": "currencyUSD"
           }
         }
       },
       {
-        "id": 12,
-        "title": "Router Success Rate",
+        "id": 18,
+        "title": "System Error Rate",
         "type": "timeseries",
         "gridPos": {
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 16
+          "y": 40
         },
         "targets": [
           {
-            "expr": "rate(successful_requests[5m]) / rate(total_requests[5m])",
-            "legendFormat": "Success Rate",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percentunit",
-            "min": 0,
-            "max": 1
-          }
-        }
-      },
-      {
-        "id": 13,
-        "title": "Router Error Rate",
-        "type": "timeseries",
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 12,
-          "y": 16
-        },
-        "targets": [
-          {
-            "expr": "rate(failed_requests[5m]) / rate(total_requests[5m])",
+            "expr": "rate(system_errors_total[5m])",
             "legendFormat": "Error Rate",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 19,
+        "title": "System Uptime",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 40
+        },
+        "targets": [
+          {
+            "expr": "system_uptime",
+            "legendFormat": "Uptime",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
             "unit": "percentunit",
             "min": 0,
             "max": 1
+          }
+        }
+      },
+      {
+        "id": 20,
+        "title": "Circuit Breaker Status",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 48
+        },
+        "targets": [
+          {
+            "expr": "circuit_breaker_state",
+            "legendFormat": "Circuit Breaker State",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
           }
         }
       }

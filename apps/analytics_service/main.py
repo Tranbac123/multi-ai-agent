@@ -1,300 +1,331 @@
-"""Analytics service for CQRS read-only analytics."""
+"""Analytics service with CQRS read-only API and Grafana dashboards."""
 
 import asyncio
 import time
 from typing import Dict, Any, Optional
+from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.responses import JSONResponse
 import structlog
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, Depends, Query
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-import uvicorn
+from contextlib import asynccontextmanager
 
-from apps.analytics_service.core.analytics_engine import AnalyticsEngine, KPIMetrics
-from apps.analytics_service.core.dashboard_generator import DashboardGenerator
-
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
+from .core.analytics_engine import AnalyticsEngine, DataSource, TenantAnalytics
+from .core.dashboard_generator import GrafanaDashboardGenerator
 
 logger = structlog.get_logger(__name__)
 
-# Pydantic models
-class KPIMetricsResponse(BaseModel):
-    """Response model for KPI metrics."""
-    tenant_id: str = Field(..., description="Tenant ID")
-    time_window: str = Field(..., description="Time window")
-    success_rate: float = Field(..., description="Success rate (0.0 to 1.0)")
-    p50_latency: float = Field(..., description="P50 latency in milliseconds")
-    p95_latency: float = Field(..., description="P95 latency in milliseconds")
-    tokens_in: int = Field(..., description="Total tokens in")
-    tokens_out: int = Field(..., description="Total tokens out")
-    cost_per_run: float = Field(..., description="Average cost per run")
-    tier_distribution: Dict[str, int] = Field(..., description="Tier distribution")
-    router_misroute_rate: float = Field(..., description="Router misroute rate")
-    expected_vs_actual_cost: float = Field(..., description="Expected vs actual cost ratio")
-    expected_vs_actual_latency: float = Field(..., description="Expected vs actual latency ratio")
-    timestamp: str = Field(..., description="Timestamp")
+# Global variables
+redis_client: Optional[redis.Redis] = None
+analytics_engine: Optional[AnalyticsEngine] = None
+dashboard_generator: Optional[GrafanaDashboardGenerator] = None
 
 
-class DashboardResponse(BaseModel):
-    """Response model for dashboard."""
-    dashboard: Dict[str, Any] = Field(..., description="Grafana dashboard JSON")
-    filepath: str = Field(..., description="File path where dashboard was saved")
-
-
-# Global instances
-analytics_engine: AnalyticsEngine = None
-dashboard_generator: DashboardGenerator = None
-redis_client: redis.Redis = None
-
-# FastAPI app
-app = FastAPI(
-    title="Analytics Service",
-    description="CQRS read-only analytics service for KPIs and dashboards",
-    version="1.0.0"
-)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-async def get_analytics_engine() -> AnalyticsEngine:
-    """Get analytics engine instance."""
-    if analytics_engine is None:
-        raise HTTPException(status_code=503, detail="Analytics engine not initialized")
-    return analytics_engine
-
-
-async def get_dashboard_generator() -> DashboardGenerator:
-    """Get dashboard generator instance."""
-    if dashboard_generator is None:
-        raise HTTPException(status_code=503, detail="Dashboard generator not initialized")
-    return dashboard_generator
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup."""
-    global analytics_engine, dashboard_generator, redis_client
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    global redis_client, analytics_engine, dashboard_generator
     
-    try:
-        # Initialize Redis client
-        redis_client = redis.Redis(
-            host="localhost",
-            port=6379,
-            db=0,
-            decode_responses=False,
-            socket_connect_timeout=5,
-            socket_timeout=5,
-            retry_on_timeout=True
-        )
-        
-        # Test Redis connection
-        await redis_client.ping()
-        logger.info("Redis connection established")
-        
-        # Initialize analytics engine
-        analytics_engine = AnalyticsEngine(redis_client)
-        logger.info("Analytics engine initialized")
-        
-        # Initialize dashboard generator
-        dashboard_generator = DashboardGenerator()
-        logger.info("Dashboard generator initialized")
-        
-    except Exception as e:
-        logger.error("Failed to initialize services", error=str(e))
-        raise
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    global redis_client
+    # Initialize Redis connection
+    redis_client = redis.Redis(
+        host="localhost",
+        port=6379,
+        db=0,
+        decode_responses=False
+    )
     
+    # Initialize analytics engine with warehouse support
+    warehouse_config = {
+        "host": "localhost",
+        "port": 9000,
+        "project_id": "ai-agent-analytics"
+    }
+    
+    analytics_engine = AnalyticsEngine(
+        redis_client=redis_client,
+        data_source=DataSource.CLICKHOUSE,  # Use ClickHouse for analytics
+        warehouse_config=warehouse_config
+    )
+    
+    # Initialize dashboard generator
+    dashboard_generator = GrafanaDashboardGenerator()
+    
+    # Generate dashboards
+    dashboard_generator.generate_all_dashboards("observability/dashboards")
+    
+    logger.info("Analytics service started with warehouse support")
+    
+    yield
+    
+    # Cleanup
     if redis_client:
         await redis_client.close()
-        logger.info("Redis connection closed")
+    
+    logger.info("Analytics service shutdown")
+
+
+app = FastAPI(
+    title="Analytics Service",
+    description="CQRS read-only analytics service with warehouse support",
+    version="2.0.0",
+    lifespan=lifespan
+)
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    return {"status": "healthy", "service": "analytics"}
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint."""
     try:
         # Check Redis connection
-        if redis_client:
-            await redis_client.ping()
-        
-        return {
-            "status": "healthy",
-            "timestamp": time.time(),
-            "service": "analytics-service"
-        }
+        await redis_client.ping()
+        return {"status": "ready", "service": "analytics"}
     except Exception as e:
-        logger.error("Health check failed", error=str(e))
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        logger.error("Readiness check failed", error=str(e))
+        raise HTTPException(status_code=503, detail="Service not ready")
 
 
-@app.get("/kpi/{tenant_id}", response_model=KPIMetricsResponse)
+@app.get("/analytics/kpi/{tenant_id}")
 async def get_kpi_metrics(
     tenant_id: str,
-    time_window: str = Query("1h", description="Time window (1h, 24h, 7d, 30d)"),
-    engine: AnalyticsEngine = Depends(get_analytics_engine)
-) -> KPIMetricsResponse:
+    time_window: str = Query("1h", description="Time window: 1h, 24h, 7d, 30d")
+):
     """Get KPI metrics for tenant."""
     try:
-        # Validate time window
-        valid_windows = ["1h", "24h", "7d", "30d"]
-        if time_window not in valid_windows:
-            raise HTTPException(status_code=400, detail=f"Invalid time window. Must be one of: {valid_windows}")
+        if not analytics_engine:
+            raise HTTPException(status_code=503, detail="Service not ready")
         
-        # Get metrics
-        metrics: KPIMetrics = await engine.get_kpi_metrics(tenant_id, time_window)
+        metrics = await analytics_engine.get_kpi_metrics(tenant_id, time_window)
         
-        # Convert to response model
-        response = KPIMetricsResponse(
-            tenant_id=metrics.tenant_id,
-            time_window=metrics.time_window,
-            success_rate=metrics.success_rate,
-            p50_latency=metrics.p50_latency,
-            p95_latency=metrics.p95_latency,
-            tokens_in=metrics.tokens_in,
-            tokens_out=metrics.tokens_out,
-            cost_per_run=metrics.cost_per_run,
-            tier_distribution=metrics.tier_distribution,
-            router_misroute_rate=metrics.router_misroute_rate,
-            expected_vs_actual_cost=metrics.expected_vs_actual_cost,
-            expected_vs_actual_latency=metrics.expected_vs_actual_latency,
-            timestamp=metrics.timestamp.isoformat()
-        )
+        return JSONResponse(content={
+            "tenant_id": tenant_id,
+            "time_window": time_window,
+            "metrics": {
+                "success_rate": metrics.success_rate,
+                "p50_latency": metrics.p50_latency,
+                "p95_latency": metrics.p95_latency,
+                "p99_latency": metrics.p99_latency,
+                "tokens_in": metrics.tokens_in,
+                "tokens_out": metrics.tokens_out,
+                "cost_per_run": metrics.cost_per_run,
+                "total_cost": metrics.total_cost,
+                "tier_distribution": metrics.tier_distribution,
+                "router_misroute_rate": metrics.router_misroute_rate,
+                "expected_vs_actual_cost": metrics.expected_vs_actual_cost,
+                "expected_vs_actual_latency": metrics.expected_vs_actual_latency,
+                "total_requests": metrics.total_requests,
+                "successful_requests": metrics.successful_requests,
+                "failed_requests": metrics.failed_requests,
+                "avg_tokens_per_request": metrics.avg_tokens_per_request,
+                "cost_efficiency": metrics.cost_efficiency,
+                "latency_efficiency": metrics.latency_efficiency,
+                "data_source": metrics.data_source,
+                "timestamp": metrics.timestamp.isoformat()
+            }
+        })
         
-        logger.info(
-            "KPI metrics retrieved",
-            tenant_id=tenant_id,
-            time_window=time_window,
-            success_rate=metrics.success_rate,
-            p50_latency=metrics.p50_latency
-        )
-        
-        return response
-        
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error("Failed to get KPI metrics", error=str(e), tenant_id=tenant_id)
-        raise HTTPException(status_code=500, detail=f"Failed to get KPI metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get KPI metrics")
 
 
-@app.get("/dashboard/{tenant_id}", response_model=DashboardResponse)
-async def get_dashboard(
+@app.get("/analytics/comprehensive/{tenant_id}")
+async def get_comprehensive_analytics(
     tenant_id: str,
-    generator: DashboardGenerator = Depends(get_dashboard_generator)
-) -> DashboardResponse:
-    """Generate Grafana dashboard for tenant."""
+    time_window: str = Query("1h", description="Time window: 1h, 24h, 7d, 30d")
+):
+    """Get comprehensive analytics for tenant."""
     try:
-        # Generate dashboard
-        dashboard = generator.generate_router_dashboard(tenant_id)
+        if not analytics_engine:
+            raise HTTPException(status_code=503, detail="Service not ready")
         
-        if not dashboard:
-            raise HTTPException(status_code=500, detail="Failed to generate dashboard")
+        analytics = await analytics_engine.get_comprehensive_analytics(tenant_id, time_window)
         
-        # Save dashboard to file
-        filepath = f"observability/dashboards/router_analytics_{tenant_id}.json"
-        generator.save_dashboard_json(dashboard, filepath)
+        return JSONResponse(content={
+            "tenant_id": tenant_id,
+            "time_window": time_window,
+            "kpi_metrics": {
+                "success_rate": analytics.kpi_metrics.success_rate,
+                "p50_latency": analytics.kpi_metrics.p50_latency,
+                "p95_latency": analytics.kpi_metrics.p95_latency,
+                "p99_latency": analytics.kpi_metrics.p99_latency,
+                "tokens_in": analytics.kpi_metrics.tokens_in,
+                "tokens_out": analytics.kpi_metrics.tokens_out,
+                "cost_per_run": analytics.kpi_metrics.cost_per_run,
+                "total_cost": analytics.kpi_metrics.total_cost,
+                "tier_distribution": analytics.kpi_metrics.tier_distribution,
+                "router_misroute_rate": analytics.kpi_metrics.router_misroute_rate,
+                "expected_vs_actual_cost": analytics.kpi_metrics.expected_vs_actual_cost,
+                "expected_vs_actual_latency": analytics.kpi_metrics.expected_vs_actual_latency,
+                "total_requests": analytics.kpi_metrics.total_requests,
+                "successful_requests": analytics.kpi_metrics.successful_requests,
+                "failed_requests": analytics.kpi_metrics.failed_requests,
+                "avg_tokens_per_request": analytics.kpi_metrics.avg_tokens_per_request,
+                "cost_efficiency": analytics.kpi_metrics.cost_efficiency,
+                "latency_efficiency": analytics.kpi_metrics.latency_efficiency,
+                "data_source": analytics.kpi_metrics.data_source,
+                "timestamp": analytics.kpi_metrics.timestamp.isoformat()
+            },
+            "usage_trends": analytics.usage_trends,
+            "performance_insights": analytics.performance_insights,
+            "cost_analysis": analytics.cost_analysis,
+            "reliability_metrics": analytics.reliability_metrics,
+            "data_source": analytics.data_source,
+            "generated_at": analytics.generated_at.isoformat()
+        })
         
-        response = DashboardResponse(
-            dashboard=dashboard,
-            filepath=filepath
-        )
-        
-        logger.info(
-            "Dashboard generated",
-            tenant_id=tenant_id,
-            filepath=filepath
-        )
-        
-        return response
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error("Failed to generate dashboard", error=str(e), tenant_id=tenant_id)
-        raise HTTPException(status_code=500, detail=f"Failed to generate dashboard: {str(e)}")
+        logger.error("Failed to get comprehensive analytics", error=str(e), tenant_id=tenant_id)
+        raise HTTPException(status_code=500, detail="Failed to get comprehensive analytics")
 
 
-@app.get("/dashboards")
-async def list_dashboards():
-    """List available dashboards."""
+@app.get("/analytics/tenants")
+async def list_tenants():
+    """List all tenants with analytics data."""
     try:
-        import os
+        if not redis_client:
+            raise HTTPException(status_code=503, detail="Service not ready")
         
-        dashboard_dir = "observability/dashboards"
-        dashboards = []
+        # Get all tenant keys from Redis
+        pattern = "kpi_metrics:*"
+        keys = await redis_client.keys(pattern)
         
-        if os.path.exists(dashboard_dir):
-            for filename in os.listdir(dashboard_dir):
-                if filename.endswith('.json'):
-                    dashboards.append({
-                        "name": filename,
-                        "path": f"{dashboard_dir}/{filename}",
-                        "type": "router_analytics"
-                    })
+        tenants = []
+        for key in keys:
+            # Extract tenant_id from key format: kpi_metrics:tenant_id:time_window
+            key_parts = key.decode().split(":")
+            if len(key_parts) >= 3:
+                tenant_id = key_parts[1]
+                if tenant_id not in tenants:
+                    tenants.append(tenant_id)
         
-        return {
-            "dashboards": dashboards,
-            "count": len(dashboards)
-        }
+        return JSONResponse(content={
+            "tenants": tenants,
+            "total_count": len(tenants)
+        })
+        
+    except Exception as e:
+        logger.error("Failed to list tenants", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to list tenants")
+
+
+@app.get("/analytics/dashboards")
+async def list_dashboards():
+    """List available Grafana dashboards."""
+    try:
+        if not dashboard_generator:
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        return JSONResponse(content={
+            "dashboards": [
+                {
+                    "name": "Router Analytics",
+                    "description": "Router v2 performance and decision metrics",
+                    "file": "router_analytics.json"
+                },
+                {
+                    "name": "Realtime Analytics", 
+                    "description": "WebSocket service and backpressure metrics",
+                    "file": "realtime_analytics.json"
+                },
+                {
+                    "name": "Comprehensive Analytics",
+                    "description": "Complete system overview and SLO compliance",
+                    "file": "comprehensive_analytics.json"
+                }
+            ],
+            "location": "observability/dashboards/"
+        })
         
     except Exception as e:
         logger.error("Failed to list dashboards", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to list dashboards: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list dashboards")
 
 
-@app.get("/metrics")
-async def get_metrics():
-    """Get Prometheus metrics."""
+@app.get("/analytics/dashboards/{dashboard_name}")
+async def get_dashboard(dashboard_name: str):
+    """Get specific Grafana dashboard JSON."""
     try:
-        # Basic metrics for now
-        metrics = {
-            "analytics_requests_total": 0,
-            "analytics_cache_hits": 0,
-            "analytics_cache_misses": 0,
-            "dashboard_generations_total": 0
+        if not dashboard_generator:
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        dashboard_map = {
+            "router": dashboard_generator.generate_router_analytics_dashboard(),
+            "realtime": dashboard_generator.generate_realtime_analytics_dashboard(),
+            "comprehensive": dashboard_generator.generate_comprehensive_analytics_dashboard()
         }
         
-        return metrics
+        if dashboard_name not in dashboard_map:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
+        
+        return JSONResponse(content=dashboard_map[dashboard_name])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get dashboard", error=str(e), dashboard_name=dashboard_name)
+        raise HTTPException(status_code=500, detail="Failed to get dashboard")
+
+
+@app.get("/analytics/metrics/prometheus")
+async def get_prometheus_metrics():
+    """Get metrics in Prometheus format."""
+    try:
+        if not analytics_engine:
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        # This would return actual Prometheus metrics in production
+        # For now, return a sample format
+        prometheus_metrics = """# HELP analytics_requests_total Total number of analytics requests
+# TYPE analytics_requests_total counter
+analytics_requests_total{service="analytics"} 1000
+
+# HELP analytics_cache_hits_total Total number of cache hits
+# TYPE analytics_cache_hits_total counter
+analytics_cache_hits_total{service="analytics"} 750
+
+# HELP analytics_warehouse_queries_total Total number of warehouse queries
+# TYPE analytics_warehouse_queries_total counter
+analytics_warehouse_queries_total{service="analytics",source="clickhouse"} 250
+"""
+        
+        return prometheus_metrics
         
     except Exception as e:
-        logger.error("Failed to get metrics", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
+        logger.error("Failed to get Prometheus metrics", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get Prometheus metrics")
+
+
+@app.post("/analytics/refresh/{tenant_id}")
+async def refresh_analytics(tenant_id: str):
+    """Refresh analytics data for tenant (clear cache)."""
+    try:
+        if not analytics_engine:
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        # Clear cache for tenant
+        pattern = f"kpi_metrics:{tenant_id}:*"
+        keys = await redis_client.keys(pattern)
+        
+        if keys:
+            await redis_client.delete(*keys)
+        
+        logger.info("Analytics cache cleared", tenant_id=tenant_id)
+        
+        return JSONResponse(content={
+            "message": f"Analytics cache cleared for tenant {tenant_id}",
+            "cleared_keys": len(keys)
+        })
+        
+    except Exception as e:
+        logger.error("Failed to refresh analytics", error=str(e), tenant_id=tenant_id)
+        raise HTTPException(status_code=500, detail="Failed to refresh analytics")
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8005,
-        reload=True,
-        log_level="info"
-    )
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8004)

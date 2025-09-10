@@ -1,86 +1,392 @@
-"""Dashboard generator for Grafana dashboards."""
+"""Grafana dashboard generator for analytics service."""
 
 import json
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-import structlog
-
-logger = structlog.get_logger(__name__)
+from datetime import datetime, timedelta
 
 
 @dataclass
 class DashboardPanel:
-    """Dashboard panel configuration."""
+    """Grafana dashboard panel configuration."""
     title: str
     type: str
     targets: List[Dict[str, Any]]
-    gridPos: Dict[str, int]
+    grid_pos: Dict[str, int]
     options: Optional[Dict[str, Any]] = None
 
 
-class DashboardGenerator:
-    """Dashboard generator for Grafana dashboards."""
+class GrafanaDashboardGenerator:
+    """Generator for Grafana dashboards from analytics data."""
     
     def __init__(self):
-        self.panel_id_counter = 1
-    
-    def generate_router_dashboard(self, tenant_id: str) -> Dict[str, Any]:
-        """Generate router analytics dashboard."""
-        try:
-            dashboard = {
-                "dashboard": {
-                    "id": None,
-                    "title": f"Router Analytics - {tenant_id}",
-                    "tags": ["router", "analytics", tenant_id],
-                    "timezone": "browser",
-                    "panels": [],
-                    "time": {
-                        "from": "now-1h",
-                        "to": "now"
-                    },
-                    "refresh": "30s",
-                    "schemaVersion": 27,
-                    "version": 0,
-                    "links": []
-                }
+        self.base_dashboard = {
+            "dashboard": {
+                "id": None,
+                "title": "Multi-AI-Agent Analytics",
+                "tags": ["ai-agent", "analytics", "monitoring"],
+                "timezone": "browser",
+                "panels": [],
+                "time": {
+                    "from": "now-1h",
+                    "to": "now"
+                },
+                "refresh": "30s",
+                "schemaVersion": 30,
+                "version": 1,
+                "links": []
             }
-            
-            # Add panels
-            panels = [
-                self._create_success_rate_panel(),
-                self._create_latency_panel(),
-                self._create_tier_distribution_panel(),
-                self._create_token_metrics_panel(),
-                self._create_cost_metrics_panel(),
-                self._create_misroute_rate_panel(),
-                self._create_expected_vs_actual_panel()
-            ]
-            
-            dashboard["dashboard"]["panels"] = panels
-            
-            return dashboard
-            
-        except Exception as e:
-            logger.error("Failed to generate router dashboard", error=str(e))
-            return {}
+        }
     
-    def _create_success_rate_panel(self) -> Dict[str, Any]:
-        """Create success rate panel."""
+    def generate_router_analytics_dashboard(self) -> Dict[str, Any]:
+        """Generate router analytics dashboard."""
+        dashboard = self.base_dashboard.copy()
+        dashboard["dashboard"]["title"] = "Router v2 Analytics"
+        dashboard["dashboard"]["panels"] = [
+            self._create_router_decision_latency_panel(),
+            self._create_router_misroute_rate_panel(),
+            self._create_tier_distribution_panel(),
+            self._create_expected_vs_actual_cost_panel(),
+            self._create_expected_vs_actual_latency_panel(),
+            self._create_router_throughput_panel(),
+            self._create_router_success_rate_panel(),
+            self._create_router_error_rate_panel()
+        ]
+        return dashboard
+    
+    def generate_realtime_analytics_dashboard(self) -> Dict[str, Any]:
+        """Generate realtime analytics dashboard."""
+        dashboard = self.base_dashboard.copy()
+        dashboard["dashboard"]["title"] = "Realtime Service Analytics"
+        dashboard["dashboard"]["panels"] = [
+            self._create_ws_active_connections_panel(),
+            self._create_ws_backpressure_drops_panel(),
+            self._create_ws_send_errors_panel(),
+            self._create_ws_message_throughput_panel(),
+            self._create_ws_queue_size_panel(),
+            self._create_ws_connection_health_panel()
+        ]
+        return dashboard
+    
+    def generate_comprehensive_analytics_dashboard(self) -> Dict[str, Any]:
+        """Generate comprehensive analytics dashboard."""
+        dashboard = self.base_dashboard.copy()
+        dashboard["dashboard"]["title"] = "Multi-AI-Agent Comprehensive Analytics"
+        dashboard["dashboard"]["panels"] = [
+            # Overview panels
+            self._create_overview_metrics_panel(),
+            self._create_slo_compliance_panel(),
+            
+            # Router panels
+            self._create_router_decision_latency_panel(),
+            self._create_router_misroute_rate_panel(),
+            self._create_tier_distribution_panel(),
+            
+            # Realtime panels
+            self._create_ws_active_connections_panel(),
+            self._create_ws_backpressure_drops_panel(),
+            
+            # Cost and performance panels
+            self._create_expected_vs_actual_cost_panel(),
+            self._create_expected_vs_actual_latency_panel(),
+            self._create_cost_breakdown_panel(),
+            
+            # Reliability panels
+            self._create_error_rate_panel(),
+            self._create_uptime_panel(),
+            self._create_circuit_breaker_panel()
+        ]
+        return dashboard
+    
+    def _create_router_decision_latency_panel(self) -> Dict[str, Any]:
+        """Create router decision latency panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Success Rate",
+            "id": 1,
+            "title": "Router Decision Latency",
             "type": "stat",
             "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
             "targets": [
                 {
-                    "expr": "router_success_rate{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Success Rate",
+                    "expr": "histogram_quantile(0.50, rate(router_decision_latency_ms_bucket[5m]))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "histogram_quantile(0.95, rate(router_decision_latency_ms_bucket[5m]))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "histogram_quantile(0.99, rate(router_decision_latency_ms_bucket[5m]))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 50},
+                            {"color": "red", "value": 100}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_router_misroute_rate_panel(self) -> Dict[str, Any]:
+        """Create router misroute rate panel."""
+        return {
+            "id": 2,
+            "title": "Router Misroute Rate",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+            "targets": [
+                {
+                    "expr": "rate(router_misroute_rate[5m])",
+                    "legendFormat": "Misroute Rate",
                     "refId": "A"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "unit": "percent",
+                    "unit": "percentunit",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 0.05},
+                            {"color": "red", "value": 0.1}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_tier_distribution_panel(self) -> Dict[str, Any]:
+        """Create tier distribution panel."""
+        return {
+            "id": 3,
+            "title": "Tier Distribution",
+            "type": "piechart",
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+            "targets": [
+                {
+                    "expr": "sum by (tier) (rate(tier_distribution[5m]))",
+                    "legendFormat": "{{tier}}",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "pieType": "pie",
+                "displayLabels": ["name", "value", "percent"]
+            }
+        }
+    
+    def _create_expected_vs_actual_cost_panel(self) -> Dict[str, Any]:
+        """Create expected vs actual cost panel."""
+        return {
+            "id": 4,
+            "title": "Expected vs Actual Cost",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+                {
+                    "expr": "rate(expected_vs_actual_cost[5m])",
+                    "legendFormat": "Cost Ratio",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 1.1},
+                            {"color": "red", "value": 1.2}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_expected_vs_actual_latency_panel(self) -> Dict[str, Any]:
+        """Create expected vs actual latency panel."""
+        return {
+            "id": 5,
+            "title": "Expected vs Actual Latency",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+                {
+                    "expr": "rate(expected_vs_actual_latency[5m])",
+                    "legendFormat": "Latency Ratio",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 1.1},
+                            {"color": "red", "value": 1.2}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_ws_active_connections_panel(self) -> Dict[str, Any]:
+        """Create WebSocket active connections panel."""
+        return {
+            "id": 6,
+            "title": "WebSocket Active Connections",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16},
+            "targets": [
+                {
+                    "expr": "ws_active_connections",
+                    "legendFormat": "Active Connections",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 1000},
+                            {"color": "red", "value": 2000}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_ws_backpressure_drops_panel(self) -> Dict[str, Any]:
+        """Create WebSocket backpressure drops panel."""
+        return {
+            "id": 7,
+            "title": "WebSocket Backpressure Drops",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 16},
+            "targets": [
+                {
+                    "expr": "rate(ws_backpressure_drops[5m])",
+                    "legendFormat": "Drops/sec",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 10},
+                            {"color": "red", "value": 50}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_ws_send_errors_panel(self) -> Dict[str, Any]:
+        """Create WebSocket send errors panel."""
+        return {
+            "id": 8,
+            "title": "WebSocket Send Errors",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16},
+            "targets": [
+                {
+                    "expr": "rate(ws_send_errors[5m])",
+                    "legendFormat": "Errors/sec",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {"color": "green", "value": None},
+                            {"color": "yellow", "value": 5},
+                            {"color": "red", "value": 20}
+                        ]
+                    }
+                }
+            }
+        }
+    
+    def _create_overview_metrics_panel(self) -> Dict[str, Any]:
+        """Create overview metrics panel."""
+        return {
+            "id": 9,
+            "title": "Overview Metrics",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+            "targets": [
+                {
+                    "expr": "sum(rate(total_requests[5m]))",
+                    "legendFormat": "Total Requests/sec",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(successful_requests[5m]))",
+                    "legendFormat": "Successful Requests/sec",
+                    "refId": "B"
+                },
+                {
+                    "expr": "sum(rate(failed_requests[5m]))",
+                    "legendFormat": "Failed Requests/sec",
+                    "refId": "C"
+                },
+                {
+                    "expr": "sum(rate(total_cost[5m]))",
+                    "legendFormat": "Total Cost/sec",
+                    "refId": "D"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                }
+            }
+        }
+    
+    def _create_slo_compliance_panel(self) -> Dict[str, Any]:
+        """Create SLO compliance panel."""
+        return {
+            "id": 10,
+            "title": "SLO Compliance",
+            "type": "gauge",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+                {
+                    "expr": "latency_slo_compliance",
+                    "legendFormat": "Latency SLO",
+                    "refId": "A"
+                },
+                {
+                    "expr": "availability_slo_compliance",
+                    "legendFormat": "Availability SLO",
+                    "refId": "B"
+                },
+                {
+                    "expr": "cost_slo_compliance",
+                    "legendFormat": "Cost SLO",
+                    "refId": "C"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percentunit",
                     "min": 0,
                     "max": 1,
                     "thresholds": {
@@ -94,177 +400,258 @@ class DashboardGenerator:
             }
         }
     
-    def _create_latency_panel(self) -> Dict[str, Any]:
-        """Create latency panel."""
+    def _create_router_throughput_panel(self) -> Dict[str, Any]:
+        """Create router throughput panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Latency Percentiles",
-            "type": "graph",
-            "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0},
+            "id": 11,
+            "title": "Router Throughput",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
             "targets": [
                 {
-                    "expr": "histogram_quantile(0.50, router_latency_histogram{tenant_id=\"$tenant_id\"})",
-                    "legendFormat": "P50",
+                    "expr": "rate(router_requests_total[5m])",
+                    "legendFormat": "Requests/sec",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "reqps"
+                }
+            }
+        }
+    
+    def _create_router_success_rate_panel(self) -> Dict[str, Any]:
+        """Create router success rate panel."""
+        return {
+            "id": 12,
+            "title": "Router Success Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+                {
+                    "expr": "rate(successful_requests[5m]) / rate(total_requests[5m])",
+                    "legendFormat": "Success Rate",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percentunit",
+                    "min": 0,
+                    "max": 1
+                }
+            }
+        }
+    
+    def _create_router_error_rate_panel(self) -> Dict[str, Any]:
+        """Create router error rate panel."""
+        return {
+            "id": 13,
+            "title": "Router Error Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+                {
+                    "expr": "rate(failed_requests[5m]) / rate(total_requests[5m])",
+                    "legendFormat": "Error Rate",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percentunit",
+                    "min": 0,
+                    "max": 1
+                }
+            }
+        }
+    
+    def _create_ws_message_throughput_panel(self) -> Dict[str, Any]:
+        """Create WebSocket message throughput panel."""
+        return {
+            "id": 14,
+            "title": "WebSocket Message Throughput",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+            "targets": [
+                {
+                    "expr": "rate(ws_messages_sent[5m])",
+                    "legendFormat": "Messages/sec",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                }
+            }
+        }
+    
+    def _create_ws_queue_size_panel(self) -> Dict[str, Any]:
+        """Create WebSocket queue size panel."""
+        return {
+            "id": 15,
+            "title": "WebSocket Queue Size",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+            "targets": [
+                {
+                    "expr": "ws_queue_size",
+                    "legendFormat": "Queue Size",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                }
+            }
+        }
+    
+    def _create_ws_connection_health_panel(self) -> Dict[str, Any]:
+        """Create WebSocket connection health panel."""
+        return {
+            "id": 16,
+            "title": "WebSocket Connection Health",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+            "targets": [
+                {
+                    "expr": "ws_connections_healthy",
+                    "legendFormat": "Healthy Connections",
                     "refId": "A"
                 },
                 {
-                    "expr": "histogram_quantile(0.95, router_latency_histogram{tenant_id=\"$tenant_id\"})",
-                    "legendFormat": "P95",
+                    "expr": "ws_connections_unhealthy",
+                    "legendFormat": "Unhealthy Connections",
                     "refId": "B"
                 }
             ],
-            "yAxes": [
-                {
-                    "label": "Latency (ms)",
-                    "min": 0
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
                 }
-            ]
+            }
         }
     
-    def _create_tier_distribution_panel(self) -> Dict[str, Any]:
-        """Create tier distribution panel."""
+    def _create_cost_breakdown_panel(self) -> Dict[str, Any]:
+        """Create cost breakdown panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Tier Distribution",
-            "type": "piechart",
-            "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+            "id": 17,
+            "title": "Cost Breakdown by Tier",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
             "targets": [
                 {
-                    "expr": "router_tier_distribution{tenant_id=\"$tenant_id\", tier=\"A\"}",
-                    "legendFormat": "Tier A",
+                    "expr": "rate(tier_a_cost[5m])",
+                    "legendFormat": "Tier A Cost",
                     "refId": "A"
                 },
                 {
-                    "expr": "router_tier_distribution{tenant_id=\"$tenant_id\", tier=\"B\"}",
-                    "legendFormat": "Tier B",
+                    "expr": "rate(tier_b_cost[5m])",
+                    "legendFormat": "Tier B Cost",
                     "refId": "B"
                 },
                 {
-                    "expr": "router_tier_distribution{tenant_id=\"$tenant_id\", tier=\"C\"}",
-                    "legendFormat": "Tier C",
+                    "expr": "rate(tier_c_cost[5m])",
+                    "legendFormat": "Tier C Cost",
                     "refId": "C"
                 }
-            ]
-        }
-    
-    def _create_token_metrics_panel(self) -> Dict[str, Any]:
-        """Create token metrics panel."""
-        return {
-            "id": self._get_next_panel_id(),
-            "title": "Token Usage",
-            "type": "graph",
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-            "targets": [
-                {
-                    "expr": "router_tokens_in{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Tokens In",
-                    "refId": "A"
-                },
-                {
-                    "expr": "router_tokens_out{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Tokens Out",
-                    "refId": "B"
-                }
             ],
-            "yAxes": [
-                {
-                    "label": "Tokens",
-                    "min": 0
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyUSD"
                 }
-            ]
+            }
         }
     
-    def _create_cost_metrics_panel(self) -> Dict[str, Any]:
-        """Create cost metrics panel."""
+    def _create_error_rate_panel(self) -> Dict[str, Any]:
+        """Create error rate panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Cost per Run",
-            "type": "stat",
-            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+            "id": 18,
+            "title": "System Error Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
             "targets": [
                 {
-                    "expr": "router_cost_per_run{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Cost per Run",
+                    "expr": "rate(system_errors_total[5m])",
+                    "legendFormat": "Error Rate",
                     "refId": "A"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "unit": "currencyUSD",
-                    "min": 0
+                    "unit": "short"
                 }
             }
         }
     
-    def _create_misroute_rate_panel(self) -> Dict[str, Any]:
-        """Create misroute rate panel."""
+    def _create_uptime_panel(self) -> Dict[str, Any]:
+        """Create uptime panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Router Misroute Rate",
+            "id": 19,
+            "title": "System Uptime",
             "type": "stat",
-            "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
             "targets": [
                 {
-                    "expr": "router_misroute_rate{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Misroute Rate",
+                    "expr": "system_uptime",
+                    "legendFormat": "Uptime",
                     "refId": "A"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "unit": "percent",
+                    "unit": "percentunit",
                     "min": 0,
-                    "max": 1,
-                    "thresholds": {
-                        "steps": [
-                            {"color": "green", "value": 0},
-                            {"color": "yellow", "value": 0.05},
-                            {"color": "red", "value": 0.1}
-                        ]
-                    }
+                    "max": 1
                 }
             }
         }
     
-    def _create_expected_vs_actual_panel(self) -> Dict[str, Any]:
-        """Create expected vs actual metrics panel."""
+    def _create_circuit_breaker_panel(self) -> Dict[str, Any]:
+        """Create circuit breaker panel."""
         return {
-            "id": self._get_next_panel_id(),
-            "title": "Expected vs Actual",
-            "type": "graph",
-            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "id": 20,
+            "title": "Circuit Breaker Status",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 48},
             "targets": [
                 {
-                    "expr": "router_expected_vs_actual_cost{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Cost Ratio",
+                    "expr": "circuit_breaker_state",
+                    "legendFormat": "Circuit Breaker State",
                     "refId": "A"
-                },
-                {
-                    "expr": "router_expected_vs_actual_latency{tenant_id=\"$tenant_id\"}",
-                    "legendFormat": "Latency Ratio",
-                    "refId": "B"
                 }
             ],
-            "yAxes": [
-                {
-                    "label": "Ratio",
-                    "min": 0,
-                    "max": 2
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
                 }
-            ]
+            }
         }
     
-    def _get_next_panel_id(self) -> int:
-        """Get next panel ID."""
-        panel_id = self.panel_id_counter
-        self.panel_id_counter += 1
-        return panel_id
+    def save_dashboard_to_file(self, dashboard: Dict[str, Any], filename: str) -> None:
+        """Save dashboard to JSON file."""
+        with open(filename, 'w') as f:
+            json.dump(dashboard, f, indent=2)
     
-    def save_dashboard_json(self, dashboard: Dict[str, Any], filepath: str) -> None:
-        """Save dashboard as JSON file."""
-        try:
-            with open(filepath, 'w') as f:
-                json.dump(dashboard, f, indent=2)
-            logger.info("Dashboard saved", filepath=filepath)
-        except Exception as e:
-            logger.error("Failed to save dashboard", error=str(e), filepath=filepath)
+    def generate_all_dashboards(self, output_dir: str = "observability/dashboards") -> None:
+        """Generate all dashboards and save to files."""
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate and save dashboards
+        router_dashboard = self.generate_router_analytics_dashboard()
+        self.save_dashboard_to_file(router_dashboard, f"{output_dir}/router_analytics.json")
+        
+        realtime_dashboard = self.generate_realtime_analytics_dashboard()
+        self.save_dashboard_to_file(realtime_dashboard, f"{output_dir}/realtime_analytics.json")
+        
+        comprehensive_dashboard = self.generate_comprehensive_analytics_dashboard()
+        self.save_dashboard_to_file(comprehensive_dashboard, f"{output_dir}/comprehensive_analytics.json")
+        
+        print(f"Generated dashboards in {output_dir}/")
+        print("- router_analytics.json")
+        print("- realtime_analytics.json") 
+        print("- comprehensive_analytics.json")
