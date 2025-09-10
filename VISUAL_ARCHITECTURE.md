@@ -178,6 +178,15 @@ multi-ai-agent/
 │  ✅ Event Store │  │  ✅ E2E Tests   │  │  ✅ CI/CD       │  │  ✅ Guides      │
 │  ✅ Sourcing    │  │  ✅ Evaluation  │  │  ✅ Production  │  │  ✅ API Docs    │
 └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
+
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   CI/CD PIPELINE│  │   AUTOSCALING   │  │   BILLING       │  │   EVALUATION    │
+│                 │  │                 │  │                 │  │                 │
+│  ✅ GitHub      │  │  ✅ KEDA        │  │  ✅ Usage       │  │  ✅ Episode     │
+│  ✅ Actions     │  │  ✅ HPA         │  │     Tracking    │  │     Replay      │
+│  ✅ Multi-Job   │  │  ✅ Health      │  │  ✅ Invoicing   │  │  ✅ Metrics     │
+│  ✅ Security    │  │     Checks      │  │  ✅ Limits      │  │  ✅ Testing     │
+└─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
 ## 🚀 **Deployment Architecture**
@@ -206,6 +215,35 @@ multi-ai-agent/
                     │  Grafana        │    │  Rate Limiting  │
                     │  OpenTelemetry  │    │  Input Validation│
                     │  Structured Logs│    │  Audit Logging  │
+                    └─────────────────┘    └─────────────────┘
+```
+
+## 🔄 **CI/CD Pipeline Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              GITHUB ACTIONS CI/CD                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   CODE QUALITY  │    │   TESTING       │    │   BUILD &       │    │   DEPLOYMENT    │
+│                 │    │                 │    │   SECURITY      │    │                 │
+│  Format Check   │    │  Unit Tests     │    │  Docker Build   │    │  Staging        │
+│  Lint Check     │    │  Integration    │    │  Multi-Service  │    │  Production     │
+│  Type Check     │    │  E2E Tests      │    │  Trivy Scan     │    │  Health Checks  │
+│  Security Scan  │    │  Performance    │    │  CodeQL         │    │  Notifications  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │                       │
+         └───────────────────────┼───────────────────────┼───────────────────────┘
+                                 │                       │
+                                 ▼                       ▼
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │   BRANCH        │    │   ENVIRONMENTS  │
+                    │   STRATEGY      │    │                 │
+                    │                 │    │  main → Prod    │
+                    │  main → Prod    │    │  develop → Stag │
+                    │  develop → Stag │    │  PR → Full CI   │
+                    │  PR → Full CI   │    │                 │
                     └─────────────────┘    └─────────────────┘
 ```
 

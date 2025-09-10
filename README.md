@@ -100,23 +100,84 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 
 3. **Access services**:
    - API Gateway: http://localhost:8000
+   - Realtime Service: http://localhost:8001
+   - Router Service: http://localhost:8002
+   - Orchestrator: http://localhost:8003
+   - Analytics Service: http://localhost:8004
+   - Billing Service: http://localhost:8005
    - Web Dashboard: http://localhost:5173
    - API Docs: http://localhost:8000/docs
    - WebSocket: ws://localhost:8000/ws/chat
    - Grafana: http://localhost:3000
    - Prometheus: http://localhost:9090
+   - Jaeger: http://localhost:16686
 
 ## Development
 
+### **Available Commands**
+
 ```bash
+# Development
 make dev          # Start development environment
-make test         # Run test suite
-make e2e          # Run end-to-end tests
+make dev-stop     # Stop development environment
+make dev-logs     # Show development logs
+make dev-setup    # Setup development environment
+
+# Testing
+make test         # Run all tests
+make test-unit    # Run unit tests only
+make test-integration # Run integration tests only
+make test-e2e     # Run end-to-end tests
 make eval         # Run evaluation suite
-make security     # Run security scans
-make format       # Format code
-make lint         # Lint code
-make type-check   # Type checking
+make eval-episodes # Run episode replay evaluation
+make eval-metrics # Run evaluation metrics
+
+# Security
+make security     # Run all security checks
+make security-bandit # Run Bandit security linter
+make security-safety # Run Safety dependency check
+make security-semgrep # Run Semgrep security scan
+
+# Code Quality
+make format       # Format code with Black and isort
+make lint         # Lint code with Ruff
+make type-check   # Type checking with MyPy
+make all          # Run all quality checks
+make ci           # Run CI pipeline
+
+# Build & Deploy
+make build        # Build Docker images
+make build-dev    # Build development Docker images
+make deploy       # Deploy to production
+make deploy-staging # Deploy to staging
+
+# Database
+make db-migrate   # Run database migrations
+make db-rollback  # Rollback database migrations
+make db-reset     # Reset database
+
+# Monitoring
+make monitor      # Start monitoring stack
+make monitor-stop # Stop monitoring stack
+make health       # Check service health
+
+# Performance
+make perf-test    # Run performance tests
+make perf-load    # Run load tests
+
+# Cleanup
+make clean        # Clean up Docker resources
+make clean-logs   # Clean up log files
+make clean-cache  # Clean up cache files
+
+# Documentation
+make docs         # Generate documentation
+make docs-serve   # Serve documentation locally
+
+# Backup & Updates
+make backup       # Backup database and configuration
+make update-deps  # Update dependencies
+make update-docker # Update Docker images
 ```
 
 ## API Endpoints
@@ -128,6 +189,25 @@ make type-check   # Type checking
 - **Billing**: `/api/v1/billing/*` - Usage and billing
 - **Ingestion**: `/api/v1/ingestion/*` - Document processing
 
+## CI/CD Pipeline
+
+The platform includes a comprehensive GitHub Actions CI/CD pipeline with:
+
+### **Pipeline Jobs**
+- **Quality Checks**: Format, lint, type checking, security scanning
+- **Unit Tests**: Test coverage with pytest and codecov
+- **Integration Tests**: Service integration with database dependencies
+- **End-to-End Tests**: Full stack testing with Docker Compose
+- **Performance Tests**: Load testing with Locust
+- **Docker Build**: Multi-service container builds with caching
+- **Deployment**: Automated staging and production deployments
+- **Security Scan**: Trivy vulnerability scanning and CodeQL analysis
+
+### **Branch Strategy**
+- `main`: Production deployments
+- `develop`: Staging deployments
+- Pull requests: Full CI pipeline validation
+
 ## Environment Variables
 
 See `.env.example` for required configuration including:
@@ -135,5 +215,6 @@ See `.env.example` for required configuration including:
 - Database URLs (PostgreSQL, Redis, NATS)
 - OpenAI API key
 - JWT secrets and encryption keys
-- Monitoring endpoints (Prometheus, Grafana)
+- Monitoring endpoints (Prometheus, Grafana, Jaeger)
 - Feature flag configuration
+- Docker registry credentials
