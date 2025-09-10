@@ -15,13 +15,13 @@ import redis.asyncio as redis
 import nats
 from hypothesis import given, strategies as st
 
-from apps.api_gateway.main import app as api_gateway_app
+from apps.api-gateway.main import app as api_gateway_app
 from apps.orchestrator.main import app as orchestrator_app
 from apps.router_service.main import app as router_app
 from apps.analytics_service.main import app as analytics_app
-from apps.billing_service.main import app as billing_app
-from apps.realtime_service.main import app as realtime_app
-from apps.ingestion_service.main import app as ingestion_app
+from apps.billing-service.main import app as billing_app
+from apps.realtime.main import app as realtime_app
+from apps.ingestion.main import app as ingestion_app
 
 
 # Test modes
