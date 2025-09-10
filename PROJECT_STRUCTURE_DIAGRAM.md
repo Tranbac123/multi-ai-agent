@@ -9,22 +9,29 @@ multi-ai-agent/
 │   │   ├── 📄 main.py               # FastAPI application entry point
 │   │   ├── 📄 websocket.py          # WebSocket support
 │   │   └── 📁 middleware/           # Middleware components
+│   │       ├── 📄 quota_enforcement.py # Quota enforcement middleware
+│   │       └── 📄 rate_limiting.py  # Rate limiting middleware
 │   ├── 📁 orchestrator/             # LangGraph Orchestrator Service
 │   │   ├── 📄 main.py               # Orchestrator service entry point
 │   │   └── 📁 core/                 # Core orchestrator components
 │   │       ├── 📄 tools.py          # Agent tools
-│   │       └── 📄 resilient_tools.py # Resilient tool adapters
+│   │       ├── 📄 resilient_tools.py # Resilient tool adapters
+│   │       └── 📄 saga_orchestrator.py # Saga pattern orchestrator
 │   ├── 📁 router-service/           # Router v2 with Feature Store
 │   │   ├── 📄 main.py               # Router service entry point
 │   │   └── 📁 core/                 # Core routing components
 │   │       ├── 📄 feature_store.py  # Feature store
 │   │       ├── 📄 bandit_policy.py  # Multi-armed bandit policy
-│   │       └── 📄 llm_judge.py      # LLM judge
+│   │       ├── 📄 llm_judge.py      # LLM judge
+│   │       ├── 📄 calibrated_classifier.py # Calibrated classifier
+│   │       ├── 📄 early_exit.py     # Early-exit logic
+│   │       └── 📄 canary_deployment.py # Canary deployment manager
 │   ├── 📁 realtime/                 # Realtime Service
 │   │   ├── 📄 main.py               # Realtime service entry point
 │   │   └── 📁 core/                 # Core realtime components
 │   │       ├── 📄 connection_manager.py # WebSocket connection manager
-│   │       └── 📄 backpressure_handler.py # Backpressure handling
+│   │       ├── 📄 backpressure_handler.py # Backpressure handling
+│   │       └── 📄 session_manager.py # Redis session management
 │   ├── 📁 ingestion/                # Ingestion & Knowledge Service
 │   │   ├── 📄 main.py               # Ingestion service entry point
 │   │   └── 📁 core/                 # Core ingestion components
@@ -35,12 +42,17 @@ multi-ai-agent/
 │   │   ├── 📄 main.py               # Analytics service entry point
 │   │   └── 📁 core/                 # Core analytics components
 │   │       ├── 📄 analytics_engine.py # Analytics engine
-│   │       └── 📄 dashboard_generator.py # Dashboard generator
-│   └── 📁 billing-service/          # Billing Service
-│       ├── 📄 main.py               # Billing service entry point
-│       └── 📁 core/                 # Core billing components
-│           ├── 📄 usage_tracker.py  # Usage tracking
-│           └── 📄 billing_engine.py # Billing engine
+│   │       ├── 📄 dashboard_generator.py # Dashboard generator
+│   │       └── 📄 warehouse_client.py # Warehouse integration
+│   ├── 📁 billing-service/          # Billing Service
+│   │   ├── 📄 main.py               # Billing service entry point
+│   │   ├── 📄 enhanced_main.py      # Enhanced billing service
+│   │   └── 📁 core/                 # Core billing components
+│   │       ├── 📄 usage_tracker.py  # Usage tracking
+│   │       ├── 📄 billing_engine.py # Billing engine
+│   │       └── 📄 invoice_preview.py # Invoice preview service
+│   └── 📁 capacity-monitor/         # Capacity Monitoring Service
+│       └── 📄 main.py               # Capacity monitoring service
 │
 ├── 📁 services/                      # Shared Services
 │   ├── 📁 agents/                   # Agent Management
@@ -151,11 +163,13 @@ multi-ai-agent/
 │   ├── 📄 evaluator.py             # Main evaluator
 │   ├── 📄 episode_replay.py        # Episode replay system
 │   ├── 📄 evaluation_metrics.py    # Evaluation metrics
+│   ├── 📄 run_evaluation.py        # Evaluation runner
 │   ├── 📁 golden_tasks/            # Golden test tasks
 │   │   ├── 📄 customer_support.py  # Customer support tasks
 │   │   ├── 📄 faq_handling.py      # FAQ handling tasks
 │   │   ├── 📄 order_management.py  # Order management tasks
-│   │   └── 📄 lead_capture.py      # Lead capture tasks
+│   │   ├── 📄 lead_capture.py      # Lead capture tasks
+│   │   └── 📄 comprehensive_tasks.py # Comprehensive golden tasks
 │   ├── 📁 judges/                  # Evaluation judges
 │   │   ├── 📄 base_judge.py        # Base judge class
 │   │   └── 📄 llm_judge.py         # LLM-powered judge
@@ -236,8 +250,14 @@ multi-ai-agent/
 │   │   ├── 📄 cd.yml              # Continuous Deployment
 │   │   ├── 📄 security.yml        # Security Scanning
 │   │   ├── 📄 release.yml         # Release Management
-│   │   └── 📄 quality-gate.yml    # Quality Gate
+│   │   ├── 📄 quality-gate.yml    # Quality Gate
+│   │   └── 📄 eval.yml            # Evaluation Suite CI
 │   └── 📄 dependabot.yml          # Dependency Management
+├── 📁 load_tests/                  # Production Load Testing
+│   ├── 📄 k6_load_test.js          # K6 comprehensive load test
+│   └── 📄 locust_load_test.py      # Locust load test script
+├── 📁 configs/                     # Configuration Management
+│   └── 📄 capacity_config.py       # Capacity configuration manager
 │
 ├── 📄 docker-compose.yml           # Development Docker Compose
 ├── 📄 docker-compose.prod.yml      # Production Docker Compose
