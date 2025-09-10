@@ -7,11 +7,12 @@ from dataclasses import dataclass
 import structlog
 import redis.asyncio as redis
 
-from apps.router-service.core.feature_extractor import FeatureExtractor, RouterFeatures, Tier
-from apps.router-service.core.calibrated_classifier import CalibratedClassifier
-from apps.router-service.core.bandit_policy import BanditPolicy
-from apps.router-service.core.early_exit_escalation import EarlyExitEscalation, EscalationDecision
-from apps.router-service.core.canary_manager import CanaryManager
+from .feature_extractor import FeatureExtractor, RouterFeatures, Tier
+from .calibrated_classifier import CalibratedClassifier
+from .bandit_policy import BanditPolicy
+from .early_exit_escalation import EarlyExitEscalation, EscalationDecision
+from .canary_manager import CanaryManager
+from .metrics import MetricsCollector
 
 logger = structlog.get_logger(__name__)
 
@@ -39,6 +40,7 @@ class RouterV2:
         self.bandit_policy = BanditPolicy(redis_client)
         self.early_exit = EarlyExitEscalation(redis_client)
         self.canary_manager = CanaryManager(redis_client)
+        self.metrics_collector = MetricsCollector(redis_client)
     
     async def route_request(
         self,
@@ -112,6 +114,13 @@ class RouterV2:
             # Record metrics
             await self._record_router_metrics(tenant_id, final_tier, decision_time, features)
             
+            # Record decision metrics
+            expected_cost = self._calculate_cost(final_tier)
+            actual_cost = expected_cost  # For now, assume actual equals expected
+            await self.metrics_collector.record_decision(
+                tenant_id, final_tier, decision_time, True, expected_cost, actual_cost
+            )
+            
             return RouterDecision(
                 tier=final_tier,
                 confidence=confidence,
@@ -173,6 +182,13 @@ class RouterV2:
                     tenant_id, tier, tier, None, success, latency
                 )
             
+            # Record outcome metrics
+            expected_cost = self._calculate_cost(tier)
+            actual_cost = expected_cost  # For now, assume actual equals expected
+            await self.metrics_collector.record_decision(
+                tenant_id, tier, latency, success, expected_cost, actual_cost
+            )
+            
         except Exception as e:
             logger.error("Failed to record outcome", error=str(e))
     
@@ -227,12 +243,24 @@ class RouterV2:
             # Get recent metrics
             recent_metrics = await self._get_recent_metrics(tenant_id)
             
+            # Get metrics collector data
+            metrics_data = await self.metrics_collector.get_metrics(tenant_id)
+            
             return {
                 'tenant_id': tenant_id,
                 'bandit_statistics': bandit_stats,
                 'canary_status': canary_status,
                 'escalation_statistics': escalation_stats,
-                'recent_metrics': recent_metrics
+                'recent_metrics': recent_metrics,
+                'metrics': {
+                    'decision_latency_ms': metrics_data.decision_latency_ms,
+                    'misroute_rate': metrics_data.misroute_rate,
+                    'tier_distribution': metrics_data.tier_distribution,
+                    'expected_vs_actual_cost': metrics_data.expected_vs_actual_cost,
+                    'total_requests': metrics_data.total_requests,
+                    'successful_requests': metrics_data.successful_requests,
+                    'failed_requests': metrics_data.failed_requests
+                }
             }
             
         except Exception as e:
@@ -311,7 +339,37 @@ class RouterV2:
             # Reset bandit arms
             await self.bandit_policy.reset_arms(tenant_id)
             
+            # Reset metrics
+            await self.metrics_collector.reset_metrics(tenant_id)
+            
             logger.info("Learning reset", tenant_id=tenant_id)
             
         except Exception as e:
             logger.error("Failed to reset learning", error=str(e))
+    
+    async def get_prometheus_metrics(self, tenant_id: str) -> Dict[str, Any]:
+        """Get metrics in Prometheus format."""
+        try:
+            metrics_data = await self.metrics_collector.get_metrics(tenant_id)
+            
+            return {
+                "router_decision_latency_ms": metrics_data.decision_latency_ms,
+                "router_misroute_rate": metrics_data.misroute_rate,
+                "tier_distribution": metrics_data.tier_distribution,
+                "expected_vs_actual_cost": metrics_data.expected_vs_actual_cost,
+                "total_requests": metrics_data.total_requests,
+                "successful_requests": metrics_data.successful_requests,
+                "failed_requests": metrics_data.failed_requests
+            }
+            
+        except Exception as e:
+            logger.error("Failed to get Prometheus metrics", error=str(e))
+            return {
+                "router_decision_latency_ms": 0.0,
+                "router_misroute_rate": 0.0,
+                "tier_distribution": {},
+                "expected_vs_actual_cost": 0.0,
+                "total_requests": 0,
+                "successful_requests": 0,
+                "failed_requests": 0
+            }

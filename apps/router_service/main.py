@@ -351,17 +351,11 @@ async def reset_learning(
 
 
 @app.get("/metrics")
-async def get_metrics():
+async def get_metrics(tenant_id: str = "default"):
     """Get Prometheus metrics."""
     try:
-        # Basic metrics for now
-        metrics = {
-            "router_requests_total": 0,
-            "router_decision_latency_ms": 0,
-            "router_misroute_rate": 0,
-            "tier_distribution": {"A": 0, "B": 0, "C": 0},
-            "expected_vs_actual_cost": 0
-        }
+        router = await get_router()
+        metrics = await router.get_prometheus_metrics(tenant_id)
         
         return metrics
         

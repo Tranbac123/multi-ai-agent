@@ -50,6 +50,8 @@ class RouterDecisionRequest(BaseModel):
 
 class RouterDecisionResponse(BaseModel):
     """Router decision response."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     request_id: UUID = Field(description="Request identifier")
     tier: RouterTier = Field(description="Selected tier")
     confidence: float = Field(ge=0.0, le=1.0, description="Decision confidence")
@@ -58,5 +60,4 @@ class RouterDecisionResponse(BaseModel):
     reasons: List[str] = Field(description="Decision reasons")
     policy_escalation: bool = Field(default=False, description="Policy escalation flag")
     fallback_tier: Optional[RouterTier] = Field(default=None, description="Fallback tier")
-    model_config: Dict[str, Any] = Field(default_factory=dict, description="Model configuration")
     created_at: datetime = Field(default_factory=datetime.utcnow)

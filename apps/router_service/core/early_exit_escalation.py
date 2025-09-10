@@ -8,7 +8,7 @@ from enum import Enum
 import structlog
 import redis.asyncio as redis
 
-from apps.router-service.core.feature_extractor import RouterFeatures, Tier
+from .feature_extractor import RouterFeatures, Tier
 
 logger = structlog.get_logger(__name__)
 

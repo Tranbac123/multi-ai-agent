@@ -96,18 +96,18 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 
 ### **On-Call Map**
 
-| **Service** | **Primary** | **Secondary** | **Escalation** |
-|-------------|-------------|---------------|----------------|
-| API Gateway | Service Team | Platform Team | SRE Team |
-| Orchestrator | Service Team | Platform Team | SRE Team |
-| Router Service | Service Team | Platform Team | SRE Team |
-| Realtime Service | Service Team | Platform Team | SRE Team |
-| Ingestion Service | Service Team | Platform Team | SRE Team |
-| Analytics Service | Service Team | Platform Team | SRE Team |
-| Billing Service | Service Team | Platform Team | SRE Team |
-| Database | Platform Team | SRE Team | Database Team |
-| Event Bus | Platform Team | SRE Team | Infrastructure Team |
-| Observability | Platform Team | SRE Team | Infrastructure Team |
+| **Service**       | **Primary**   | **Secondary** | **Escalation**      |
+| ----------------- | ------------- | ------------- | ------------------- |
+| API Gateway       | Service Team  | Platform Team | SRE Team            |
+| Orchestrator      | Service Team  | Platform Team | SRE Team            |
+| Router Service    | Service Team  | Platform Team | SRE Team            |
+| Realtime Service  | Service Team  | Platform Team | SRE Team            |
+| Ingestion Service | Service Team  | Platform Team | SRE Team            |
+| Analytics Service | Service Team  | Platform Team | SRE Team            |
+| Billing Service   | Service Team  | Platform Team | SRE Team            |
+| Database          | Platform Team | SRE Team      | Database Team       |
+| Event Bus         | Platform Team | SRE Team      | Infrastructure Team |
+| Observability     | Platform Team | SRE Team      | Infrastructure Team |
 
 ## Quick Start
 
