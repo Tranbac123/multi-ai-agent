@@ -1,2 +1,578 @@
-# Health check probes configuration
-# Stub implementation - will be implemented in later commits
+# Health probes configuration for Multi-Tenant AIaaS Platform
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-probes-config
+  namespace: production
+data:
+  # API Gateway health probes
+  api-gateway-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: api-gateway-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8000/health || exit 1
+  api-gateway-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: api-gateway-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8000/health/ready || exit 1
+
+  # Router Service health probes
+  router-service-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: router-service-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8002/health || exit 1
+  router-service-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: router-service-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8002/health/ready || exit 1
+
+  # Orchestrator health probes
+  orchestrator-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: orchestrator-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8001/health || exit 1
+  orchestrator-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: orchestrator-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8001/health/ready || exit 1
+
+  # Realtime Service health probes
+  realtime-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: realtime-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8003/health || exit 1
+  realtime-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: realtime-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8003/health/ready || exit 1
+
+  # Analytics Service health probes
+  analytics-service-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: analytics-service-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8005/health || exit 1
+  analytics-service-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+      name: analytics-service-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8005/health/ready || exit 1
+
+  # Billing Service health probes
+  billing-service-liveness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: billing-service-liveness
+      namespace: production
+    data:
+      liveness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8004/health || exit 1
+  billing-service-readiness.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: billing-service-readiness
+      namespace: production
+    data:
+      readiness.sh: |
+        #!/bin/bash
+        curl -f http://localhost:8004/health/ready || exit 1
+
+---
+# API Gateway Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: production
+  labels:
+    app: api-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: ai-platform/api-gateway:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8000"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Router Service Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router-service
+  namespace: production
+  labels:
+    app: router-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: router-service
+  template:
+    metadata:
+      labels:
+        app: router-service
+    spec:
+      containers:
+      - name: router-service
+        image: ai-platform/router-service:latest
+        ports:
+        - containerPort: 8002
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8002"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8002
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Orchestrator Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: production
+  labels:
+    app: orchestrator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+      - name: orchestrator
+        image: ai-platform/orchestrator:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8001"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Realtime Service Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime
+  namespace: production
+  labels:
+    app: realtime
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: realtime
+  template:
+    metadata:
+      labels:
+        app: realtime
+    spec:
+      containers:
+      - name: realtime
+        image: ai-platform/realtime:latest
+        ports:
+        - containerPort: 8003
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8003"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Analytics Service Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: production
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: ai-platform/analytics-service:latest
+        ports:
+        - containerPort: 8005
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8005"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8005
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Billing Service Deployment with Health Probes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: production
+  labels:
+    app: billing-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+    spec:
+      containers:
+      - name: billing-service
+        image: ai-platform/billing-service:latest
+        ports:
+        - containerPort: 8004
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8004"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8004
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8004
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Network Policy for Health Checks
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: health-check-policy
+  namespace: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 8002
+    - protocol: TCP
+      port: 8003
+    - protocol: TCP
+      port: 8004
+    - protocol: TCP
+      port: 8005
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: cache
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: messaging
+    ports:
+    - protocol: TCP
+      port: 4222

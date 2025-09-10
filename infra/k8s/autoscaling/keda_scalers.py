@@ -1,4 +1,4 @@
-"""KEDA scalers for Kubernetes autoscaling."""
+"""KEDA scalers for Kubernetes-native event-driven autoscaling."""
 
 import asyncio
 import time
@@ -12,9 +12,9 @@ logger = structlog.get_logger(__name__)
 
 
 class ScalerType(Enum):
-    """KEDA scaler types."""
-    REDIS = "redis"
-    NATS = "nats"
+    """Scaler type."""
+    NATS_QUEUE = "nats_queue"
+    REDIS_QUEUE = "redis_queue"
     PROMETHEUS = "prometheus"
     CPU = "cpu"
     MEMORY = "memory"
@@ -23,348 +23,369 @@ class ScalerType(Enum):
 
 @dataclass
 class ScalerConfig:
-    """KEDA scaler configuration."""
+    """Scaler configuration."""
     name: str
     scaler_type: ScalerType
     min_replicas: int = 1
     max_replicas: int = 10
     target_value: float = 1.0
-    cooldown_period: int = 300  # 5 minutes
-    scale_up_period: int = 60   # 1 minute
-    scale_down_period: int = 300  # 5 minutes
-    metadata: Dict[str, Any] = None
+    scale_up_threshold: float = 0.8
+    scale_down_threshold: float = 0.2
+    scale_up_period: int = 60  # seconds
+    scale_down_period: int = 300  # seconds
+    cooldown_period: int = 300  # seconds
+
+
+@dataclass
+class ScalerMetrics:
+    """Scaler metrics."""
+    current_value: float
+    target_value: float
+    scale_decision: str
+    last_scaled: float
+    replicas: int
 
 
 class KEDAScaler:
-    """KEDA scaler for Kubernetes autoscaling."""
+    """KEDA scaler for event-driven autoscaling."""
     
-    def __init__(self, redis_client: redis.Redis):
+    def __init__(
+        self,
+        config: ScalerConfig,
+        redis_client: redis.Redis
+    ):
+        self.config = config
         self.redis = redis_client
-        self.scalers = {}
-        self.metrics_cache = {}
-        self.cache_ttl = 30  # 30 seconds
+        self.metrics = ScalerMetrics(
+            current_value=0.0,
+            target_value=config.target_value,
+            scale_decision="none",
+            last_scaled=0.0,
+            replicas=config.min_replicas
+        )
     
-    def add_scaler(self, config: ScalerConfig) -> None:
-        """Add a KEDA scaler configuration."""
-        self.scalers[config.name] = config
-        logger.info("KEDA scaler added", name=config.name, type=config.scaler_type.value)
-    
-    async def get_metric_value(self, scaler_name: str) -> float:
-        """Get current metric value for scaler."""
+    async def get_scale_decision(self) -> Dict[str, Any]:
+        """Get scale decision based on current metrics."""
         try:
-            if scaler_name not in self.scalers:
-                logger.warning("Scaler not found", name=scaler_name)
-                return 0.0
+            # Get current metrics
+            current_value = await self._get_current_metric_value()
+            self.metrics.current_value = current_value
             
-            config = self.scalers[scaler_name]
+            # Determine scale decision
+            scale_decision = await self._determine_scale_decision(current_value)
+            self.metrics.scale_decision = scale_decision
             
-            # Check cache first
-            cache_key = f"scaler_metric:{scaler_name}"
-            cached_value = await self.redis.get(cache_key)
-            if cached_value:
-                return float(cached_value)
+            # Update last scaled time if scaling occurred
+            if scale_decision != "none":
+                self.metrics.last_scaled = time.time()
             
-            # Get metric value based on scaler type
-            if config.scaler_type == ScalerType.REDIS:
-                value = await self._get_redis_metric(config)
-            elif config.scaler_type == ScalerType.NATS:
-                value = await self._get_nats_metric(config)
-            elif config.scaler_type == ScalerType.PROMETHEUS:
-                value = await self._get_prometheus_metric(config)
-            elif config.scaler_type == ScalerType.CPU:
-                value = await self._get_cpu_metric(config)
-            elif config.scaler_type == ScalerType.MEMORY:
-                value = await self._get_memory_metric(config)
-            else:
-                value = 0.0
-            
-            # Cache the value
-            await self.redis.setex(cache_key, self.cache_ttl, str(value))
-            
-            return value
+            return {
+                'scaler_name': self.config.name,
+                'scaler_type': self.config.scaler_type.value,
+                'current_value': current_value,
+                'target_value': self.config.target_value,
+                'scale_decision': scale_decision,
+                'current_replicas': self.metrics.replicas,
+                'min_replicas': self.config.min_replicas,
+                'max_replicas': self.config.max_replicas,
+                'last_scaled': self.metrics.last_scaled
+            }
             
         except Exception as e:
-            logger.error("Failed to get metric value", error=str(e), scaler_name=scaler_name)
-            return 0.0
+            logger.error("Failed to get scale decision", error=str(e), scaler=self.config.name)
+            return {
+                'scaler_name': self.config.name,
+                'error': str(e),
+                'scale_decision': 'none'
+            }
     
-    async def _get_redis_metric(self, config: ScalerConfig) -> float:
-        """Get Redis-based metric value."""
+    async def _get_current_metric_value(self) -> float:
+        """Get current metric value based on scaler type."""
         try:
-            metadata = config.metadata or {}
-            list_name = metadata.get('listName', 'queue')
-            address = metadata.get('address', 'localhost:6379')
-            password = metadata.get('password', '')
-            database = int(metadata.get('database', 0))
-            
-            # Get list length
-            list_length = await self.redis.llen(list_name)
-            
-            # Get list memory usage
-            memory_usage = await self.redis.memory_usage(list_name)
-            
-            # Calculate metric value
-            if metadata.get('metricType') == 'listLength':
-                return float(list_length)
-            elif metadata.get('metricType') == 'memoryUsage':
-                return float(memory_usage) / (1024 * 1024)  # Convert to MB
+            if self.config.scaler_type == ScalerType.NATS_QUEUE:
+                return await self._get_nats_queue_depth()
+            elif self.config.scaler_type == ScalerType.REDIS_QUEUE:
+                return await self._get_redis_queue_length()
+            elif self.config.scaler_type == ScalerType.PROMETHEUS:
+                return await self._get_prometheus_metric()
+            elif self.config.scaler_type == ScalerType.CPU:
+                return await self._get_cpu_usage()
+            elif self.config.scaler_type == ScalerType.MEMORY:
+                return await self._get_memory_usage()
             else:
-                return float(list_length)
+                return 0.0
                 
         except Exception as e:
-            logger.error("Failed to get Redis metric", error=str(e))
+            logger.error("Failed to get metric value", error=str(e), scaler=self.config.name)
             return 0.0
     
-    async def _get_nats_metric(self, config: ScalerConfig) -> float:
-        """Get NATS-based metric value."""
+    async def _get_nats_queue_depth(self) -> float:
+        """Get NATS queue depth."""
         try:
-            metadata = config.metadata or {}
-            server_endpoint = metadata.get('serverEndpoint', 'nats://localhost:4222')
-            subject = metadata.get('subject', 'events.*')
-            queue_group = metadata.get('queueGroup', '')
+            # Mock NATS queue depth
+            # In production, this would query NATS JetStream
+            queue_depth = await self.redis.get(f"nats_queue_depth:{self.config.name}")
+            if queue_depth:
+                return float(queue_depth)
             
-            # This would typically connect to NATS and get consumer info
-            # For now, we'll simulate it
-            logger.info("Getting NATS metric", subject=subject, queue_group=queue_group)
-            
-            # Simulate getting consumer lag
-            consumer_lag = await self._simulate_nats_consumer_lag(subject, queue_group)
-            
-            return float(consumer_lag)
+            # Return mock value
+            return 5.0
             
         except Exception as e:
-            logger.error("Failed to get NATS metric", error=str(e))
+            logger.error("Failed to get NATS queue depth", error=str(e))
             return 0.0
     
-    async def _get_prometheus_metric(self, config: ScalerConfig) -> float:
-        """Get Prometheus-based metric value."""
+    async def _get_redis_queue_length(self) -> float:
+        """Get Redis queue length."""
         try:
-            metadata = config.metadata or {}
-            server_address = metadata.get('serverAddress', 'http://localhost:9090')
-            metric_name = metadata.get('metricName', '')
-            threshold = float(metadata.get('threshold', 1.0))
+            # Get Redis queue length
+            queue_length = await self.redis.llen(f"queue:{self.config.name}")
+            return float(queue_length)
             
-            # This would typically query Prometheus API
-            # For now, we'll simulate it
-            logger.info("Getting Prometheus metric", metric_name=metric_name)
+        except Exception as e:
+            logger.error("Failed to get Redis queue length", error=str(e))
+            return 0.0
+    
+    async def _get_prometheus_metric(self) -> float:
+        """Get Prometheus metric value."""
+        try:
+            # Mock Prometheus metric
+            # In production, this would query Prometheus API
+            metric_value = await self.redis.get(f"prometheus_metric:{self.config.name}")
+            if metric_value:
+                return float(metric_value)
             
-            # Simulate getting metric value
-            metric_value = await self._simulate_prometheus_query(metric_name)
-            
-            return metric_value
+            # Return mock value
+            return 0.5
             
         except Exception as e:
             logger.error("Failed to get Prometheus metric", error=str(e))
             return 0.0
     
-    async def _get_cpu_metric(self, config: ScalerConfig) -> float:
-        """Get CPU-based metric value."""
+    async def _get_cpu_usage(self) -> float:
+        """Get CPU usage percentage."""
         try:
-            metadata = config.metadata or {}
-            target_deployment = metadata.get('targetDeployment', '')
-            namespace = metadata.get('namespace', 'default')
+            # Mock CPU usage
+            # In production, this would query Kubernetes metrics API
+            cpu_usage = await self.redis.get(f"cpu_usage:{self.config.name}")
+            if cpu_usage:
+                return float(cpu_usage)
             
-            # This would typically query Kubernetes metrics API
-            # For now, we'll simulate it
-            logger.info("Getting CPU metric", deployment=target_deployment, namespace=namespace)
-            
-            # Simulate getting CPU usage
-            cpu_usage = await self._simulate_cpu_usage(target_deployment, namespace)
-            
-            return cpu_usage
+            # Return mock value
+            return 0.3
             
         except Exception as e:
-            logger.error("Failed to get CPU metric", error=str(e))
+            logger.error("Failed to get CPU usage", error=str(e))
             return 0.0
     
-    async def _get_memory_metric(self, config: ScalerConfig) -> float:
-        """Get memory-based metric value."""
+    async def _get_memory_usage(self) -> float:
+        """Get memory usage percentage."""
         try:
-            metadata = config.metadata or {}
-            target_deployment = metadata.get('targetDeployment', '')
-            namespace = metadata.get('namespace', 'default')
+            # Mock memory usage
+            # In production, this would query Kubernetes metrics API
+            memory_usage = await self.redis.get(f"memory_usage:{self.config.name}")
+            if memory_usage:
+                return float(memory_usage)
             
-            # This would typically query Kubernetes metrics API
-            # For now, we'll simulate it
-            logger.info("Getting memory metric", deployment=target_deployment, namespace=namespace)
-            
-            # Simulate getting memory usage
-            memory_usage = await self._simulate_memory_usage(target_deployment, namespace)
-            
-            return memory_usage
+            # Return mock value
+            return 0.4
             
         except Exception as e:
-            logger.error("Failed to get memory metric", error=str(e))
+            logger.error("Failed to get memory usage", error=str(e))
             return 0.0
     
-    async def _simulate_nats_consumer_lag(self, subject: str, queue_group: str) -> int:
-        """Simulate NATS consumer lag."""
-        # This would typically connect to NATS and get consumer info
-        # For now, we'll return a simulated value
-        await asyncio.sleep(0.1)  # Simulate network delay
-        return 50  # Simulated consumer lag
-    
-    async def _simulate_prometheus_query(self, metric_name: str) -> float:
-        """Simulate Prometheus query."""
-        # This would typically query Prometheus API
-        # For now, we'll return a simulated value
-        await asyncio.sleep(0.1)  # Simulate network delay
-        return 0.75  # Simulated metric value
-    
-    async def _simulate_cpu_usage(self, deployment: str, namespace: str) -> float:
-        """Simulate CPU usage."""
-        # This would typically query Kubernetes metrics API
-        # For now, we'll return a simulated value
-        await asyncio.sleep(0.1)  # Simulate network delay
-        return 0.65  # Simulated CPU usage (65%)
-    
-    async def _simulate_memory_usage(self, deployment: str, namespace: str) -> float:
-        """Simulate memory usage."""
-        # This would typically query Kubernetes metrics API
-        # For now, we'll return a simulated value
-        await asyncio.sleep(0.1)  # Simulate network delay
-        return 0.45  # Simulated memory usage (45%)
-    
-    async def calculate_desired_replicas(self, scaler_name: str) -> int:
-        """Calculate desired number of replicas based on metric value."""
+    async def _determine_scale_decision(self, current_value: float) -> str:
+        """Determine scale decision based on current value."""
         try:
-            if scaler_name not in self.scalers:
-                return 1
+            # Check cooldown period
+            if time.time() - self.metrics.last_scaled < self.config.cooldown_period:
+                return "cooldown"
             
-            config = self.scalers[scaler_name]
-            metric_value = await self.get_metric_value(scaler_name)
+            # Check if we need to scale up
+            if current_value > self.config.scale_up_threshold:
+                if self.metrics.replicas < self.config.max_replicas:
+                    return "scale_up"
+                else:
+                    return "max_replicas_reached"
             
-            # Calculate desired replicas
-            desired_replicas = int(metric_value / config.target_value)
+            # Check if we need to scale down
+            if current_value < self.config.scale_down_threshold:
+                if self.metrics.replicas > self.config.min_replicas:
+                    return "scale_down"
+                else:
+                    return "min_replicas_reached"
             
-            # Apply min/max constraints
-            desired_replicas = max(desired_replicas, config.min_replicas)
-            desired_replicas = min(desired_replicas, config.max_replicas)
+            return "none"
             
-            logger.info(
-                "Calculated desired replicas",
-                scaler_name=scaler_name,
-                metric_value=metric_value,
-                target_value=config.target_value,
-                desired_replicas=desired_replicas
+        except Exception as e:
+            logger.error("Failed to determine scale decision", error=str(e))
+            return "error"
+
+
+class KEDAManager:
+    """KEDA manager for managing multiple scalers."""
+    
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+        self.scalers = {}
+        self.scaler_configs = self._initialize_scaler_configs()
+    
+    def _initialize_scaler_configs(self) -> List[ScalerConfig]:
+        """Initialize scaler configurations for all services."""
+        return [
+            # Orchestrator - NATS queue depth
+            ScalerConfig(
+                name="orchestrator-nats",
+                scaler_type=ScalerType.NATS_QUEUE,
+                min_replicas=2,
+                max_replicas=20,
+                target_value=5.0,
+                scale_up_threshold=10.0,
+                scale_down_threshold=2.0
+            ),
+            
+            # Ingestion - NATS queue depth
+            ScalerConfig(
+                name="ingestion-nats",
+                scaler_type=ScalerType.NATS_QUEUE,
+                min_replicas=1,
+                max_replicas=15,
+                target_value=3.0,
+                scale_up_threshold=8.0,
+                scale_down_threshold=1.0
+            ),
+            
+            # Router Service - CPU usage
+            ScalerConfig(
+                name="router-service-cpu",
+                scaler_type=ScalerType.CPU,
+                min_replicas=2,
+                max_replicas=10,
+                target_value=0.7,
+                scale_up_threshold=0.8,
+                scale_down_threshold=0.3
+            ),
+            
+            # Realtime Service - CPU usage
+            ScalerConfig(
+                name="realtime-cpu",
+                scaler_type=ScalerType.CPU,
+                min_replicas=2,
+                max_replicas=15,
+                target_value=0.6,
+                scale_up_threshold=0.75,
+                scale_down_threshold=0.25
+            ),
+            
+            # Analytics Service - Memory usage
+            ScalerConfig(
+                name="analytics-service-memory",
+                scaler_type=ScalerType.MEMORY,
+                min_replicas=1,
+                max_replicas=8,
+                target_value=0.7,
+                scale_up_threshold=0.8,
+                scale_down_threshold=0.3
+            ),
+            
+            # Billing Service - Redis queue length
+            ScalerConfig(
+                name="billing-service-redis",
+                scaler_type=ScalerType.REDIS_QUEUE,
+                min_replicas=1,
+                max_replicas=5,
+                target_value=10.0,
+                scale_up_threshold=20.0,
+                scale_down_threshold=5.0
             )
+        ]
+    
+    async def initialize_scalers(self) -> None:
+        """Initialize all scalers."""
+        try:
+            for config in self.scaler_configs:
+                scaler = KEDAScaler(config, self.redis)
+                self.scalers[config.name] = scaler
+                logger.info("Scaler initialized", name=config.name, type=config.scaler_type.value)
             
-            return desired_replicas
+            logger.info("All scalers initialized", count=len(self.scalers))
             
         except Exception as e:
-            logger.error("Failed to calculate desired replicas", error=str(e))
-            return 1
+            logger.error("Failed to initialize scalers", error=str(e))
     
-    async def get_scaler_status(self, scaler_name: str) -> Dict[str, Any]:
-        """Get scaler status and metrics."""
+    async def get_all_scale_decisions(self) -> List[Dict[str, Any]]:
+        """Get scale decisions for all scalers."""
+        try:
+            decisions = []
+            
+            for scaler_name, scaler in self.scalers.items():
+                decision = await scaler.get_scale_decision()
+                decisions.append(decision)
+            
+            return decisions
+            
+        except Exception as e:
+            logger.error("Failed to get scale decisions", error=str(e))
+            return []
+    
+    async def get_scaler_metrics(self, scaler_name: str) -> Optional[Dict[str, Any]]:
+        """Get metrics for specific scaler."""
         try:
             if scaler_name not in self.scalers:
-                return {'error': 'Scaler not found'}
+                return None
             
-            config = self.scalers[scaler_name]
-            metric_value = await self.get_metric_value(scaler_name)
-            desired_replicas = await self.calculate_desired_replicas(scaler_name)
-            
-            return {
-                'name': scaler_name,
-                'type': config.scaler_type.value,
-                'min_replicas': config.min_replicas,
-                'max_replicas': config.max_replicas,
-                'target_value': config.target_value,
-                'current_metric_value': metric_value,
-                'desired_replicas': desired_replicas,
-                'cooldown_period': config.cooldown_period,
-                'scale_up_period': config.scale_up_period,
-                'scale_down_period': config.scale_down_period,
-                'metadata': config.metadata or {}
-            }
+            scaler = self.scalers[scaler_name]
+            return await scaler.get_scale_decision()
             
         except Exception as e:
-            logger.error("Failed to get scaler status", error=str(e))
-            return {'error': str(e)}
+            logger.error("Failed to get scaler metrics", error=str(e), scaler=scaler_name)
+            return None
     
-    async def get_all_scalers_status(self) -> Dict[str, Any]:
-        """Get status of all scalers."""
-        try:
-            status = {}
-            
-            for scaler_name in self.scalers:
-                status[scaler_name] = await self.get_scaler_status(scaler_name)
-            
-            return status
-            
-        except Exception as e:
-            logger.error("Failed to get all scalers status", error=str(e))
-            return {}
-    
-    async def update_scaler_config(self, scaler_name: str, updates: Dict[str, Any]) -> bool:
+    async def update_scaler_config(self, scaler_name: str, config_updates: Dict[str, Any]) -> bool:
         """Update scaler configuration."""
         try:
             if scaler_name not in self.scalers:
                 return False
             
-            config = self.scalers[scaler_name]
+            scaler = self.scalers[scaler_name]
             
             # Update configuration
-            if 'min_replicas' in updates:
-                config.min_replicas = updates['min_replicas']
-            if 'max_replicas' in updates:
-                config.max_replicas = updates['max_replicas']
-            if 'target_value' in updates:
-                config.target_value = updates['target_value']
-            if 'cooldown_period' in updates:
-                config.cooldown_period = updates['cooldown_period']
-            if 'scale_up_period' in updates:
-                config.scale_up_period = updates['scale_up_period']
-            if 'scale_down_period' in updates:
-                config.scale_down_period = updates['scale_down_period']
-            if 'metadata' in updates:
-                config.metadata = updates['metadata']
+            for key, value in config_updates.items():
+                if hasattr(scaler.config, key):
+                    setattr(scaler.config, key, value)
             
-            logger.info("Scaler configuration updated", scaler_name=scaler_name, updates=updates)
+            logger.info("Scaler configuration updated", scaler=scaler_name, updates=config_updates)
             return True
             
         except Exception as e:
-            logger.error("Failed to update scaler config", error=str(e))
+            logger.error("Failed to update scaler config", error=str(e), scaler=scaler_name)
             return False
     
-    async def remove_scaler(self, scaler_name: str) -> bool:
-        """Remove scaler configuration."""
+    async def get_autoscaling_summary(self) -> Dict[str, Any]:
+        """Get autoscaling summary."""
         try:
-            if scaler_name in self.scalers:
-                del self.scalers[scaler_name]
-                logger.info("Scaler removed", name=scaler_name)
-                return True
-            return False
+            decisions = await self.get_all_scale_decisions()
             
-        except Exception as e:
-            logger.error("Failed to remove scaler", error=str(e))
-            return False
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Perform health check on all scalers."""
-        try:
-            health_status = {
-                'status': 'healthy',
-                'scalers': {},
-                'timestamp': time.time()
+            summary = {
+                'total_scalers': len(self.scalers),
+                'scale_decisions': {
+                    'scale_up': 0,
+                    'scale_down': 0,
+                    'none': 0,
+                    'cooldown': 0,
+                    'error': 0
+                },
+                'scalers': decisions
             }
             
-            for scaler_name in self.scalers:
-                try:
-                    metric_value = await self.get_metric_value(scaler_name)
-                    health_status['scalers'][scaler_name] = {
-                        'status': 'healthy',
-                        'metric_value': metric_value
-                    }
-                except Exception as e:
-                    health_status['scalers'][scaler_name] = {
-                        'status': 'unhealthy',
-                        'error': str(e)
-                    }
-                    health_status['status'] = 'unhealthy'
+            # Count scale decisions
+            for decision in decisions:
+                scale_decision = decision.get('scale_decision', 'none')
+                if scale_decision in summary['scale_decisions']:
+                    summary['scale_decisions'][scale_decision] += 1
             
-            return health_status
+            return summary
             
         except Exception as e:
-            logger.error("Health check failed", error=str(e))
-            return {'status': 'unhealthy', 'error': str(e)}
+            logger.error("Failed to get autoscaling summary", error=str(e))
+            return {'error': str(e)}

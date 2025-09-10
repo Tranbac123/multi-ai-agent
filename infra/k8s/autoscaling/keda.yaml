@@ -1,2 +1,470 @@
-# KEDA autoscaling configuration
-# Stub implementation - will be implemented in later commits
+# KEDA autoscaling configuration for Multi-Tenant AIaaS Platform
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keda-system
+  labels:
+    name: keda-system
+
+---
+# KEDA Operator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-operator
+  namespace: keda-system
+  labels:
+    app: keda-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-operator
+  template:
+    metadata:
+      labels:
+        app: keda-operator
+    spec:
+      serviceAccountName: keda-operator
+      containers:
+      - name: keda-operator
+        image: ghcr.io/kedacore/keda:2.12.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: http-metrics
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "keda-operator"
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+
+---
+# KEDA Metrics Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-metrics-apiserver
+  namespace: keda-system
+  labels:
+    app: keda-metrics-apiserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-metrics-apiserver
+  template:
+    metadata:
+      labels:
+        app: keda-metrics-apiserver
+    spec:
+      serviceAccountName: keda-metrics-apiserver
+      containers:
+      - name: keda-metrics-apiserver
+        image: ghcr.io/kedacore/keda-metrics-apiserver:2.12.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: http-metrics
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "keda-metrics-apiserver"
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+
+---
+# KEDA Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keda-operator
+  namespace: keda-system
+
+---
+# KEDA Metrics Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keda-metrics-apiserver
+  namespace: keda-system
+
+---
+# KEDA ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: keda-operator
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["triggerauthentications"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["clustertriggerauthentications"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# KEDA ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keda-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-operator
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: keda-system
+
+---
+# KEDA Metrics ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: keda-metrics-apiserver
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["triggerauthentications"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["keda.sh"]
+  resources: ["clustertriggerauthentications"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# KEDA Metrics ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keda-metrics-apiserver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-metrics-apiserver
+subjects:
+- kind: ServiceAccount
+  name: keda-metrics-apiserver
+  namespace: keda-system
+
+---
+# KEDA Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-operator
+  namespace: keda-system
+  labels:
+    app: keda-operator
+spec:
+  selector:
+    app: keda-operator
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: http-metrics
+    port: 8081
+    targetPort: 8081
+
+---
+# KEDA Metrics Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-metrics-apiserver
+  namespace: keda-system
+  labels:
+    app: keda-metrics-apiserver
+spec:
+  selector:
+    app: keda-metrics-apiserver
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: http-metrics
+    port: 8081
+    targetPort: 8081
+
+---
+# KEDA ScaledObject for Orchestrator
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: orchestrator-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: orchestrator
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  - type: nats-jetstream
+    metadata:
+      natsServerMonitoringEndpoint: "nats://nats:8222"
+      stream: "orchestrator"
+      consumer: "orchestrator-consumer"
+      lagThreshold: "5"
+      activationLagThreshold: "10"
+      unsafeSsl: "false"
+
+---
+# KEDA ScaledObject for Ingestion
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ingestion-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: ingestion
+  minReplicaCount: 1
+  maxReplicaCount: 15
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: nats-jetstream
+    metadata:
+      natsServerMonitoringEndpoint: "nats://nats:8222"
+      stream: "ingestion"
+      consumer: "ingestion-consumer"
+      lagThreshold: "3"
+      activationLagThreshold: "8"
+      unsafeSsl: "false"
+
+---
+# KEDA ScaledObject for Router Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: router-service-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: router-service
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "router_requests_per_second"
+      threshold: "100"
+      query: "rate(router_requests_total[1m])"
+
+---
+# KEDA ScaledObject for Realtime Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: realtime-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: realtime
+  minReplicaCount: 2
+  maxReplicaCount: 15
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "websocket_connections_active"
+      threshold: "100"
+      query: "websocket_connections_active"
+
+---
+# KEDA ScaledObject for Analytics Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "analytics_queries_per_second"
+      threshold: "50"
+      query: "rate(analytics_queries_total[1m])"
+
+---
+# KEDA ScaledObject for Billing Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: billing-service-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: billing-service
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: redis
+    metadata:
+      address: "redis:6379"
+      listName: "billing_queue"
+      listLength: "10"
+      activationListLength: "5"
+      enableTLS: "false"
