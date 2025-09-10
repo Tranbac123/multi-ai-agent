@@ -230,7 +230,15 @@ async def get_metrics():
     # Get backpressure stats
     backpressure_stats = await backpressure_handler.get_stats()
     
+    # Calculate required metrics
+    ws_active_connections = connection_stats.get("active_connections", 0)
+    ws_backpressure_drops = backpressure_stats.get("messages_dropped", 0)
+    ws_send_errors = backpressure_stats.get("queue_overflows", 0)
+    
     return {
+        "ws_active_connections": ws_active_connections,
+        "ws_backpressure_drops": ws_backpressure_drops,
+        "ws_send_errors": ws_send_errors,
         "connections": connection_stats,
         "backpressure": backpressure_stats,
         "timestamp": time.time()
