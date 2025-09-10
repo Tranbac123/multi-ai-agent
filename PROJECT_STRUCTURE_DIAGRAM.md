@@ -30,9 +30,15 @@ multi-ai-agent/
 │   │       ├── 📄 document_processor.py # Document processing
 │   │       ├── 📄 embedding_service.py # Embedding generation
 │   │       └── 📄 vector_indexer.py # Vector indexing
+│   ├── 📁 analytics-service/        # Analytics Service (CQRS)
+│   │   ├── 📄 main.py               # Analytics service entry point
+│   │   └── 📁 core/                 # Core analytics components
+│   │       ├── 📄 analytics_engine.py # Analytics engine
+│   │       └── 📄 dashboard_generator.py # Dashboard generator
 │   └── 📁 billing-service/          # Billing Service
 │       ├── 📄 main.py               # Billing service entry point
 │       └── 📁 core/                 # Core billing components
+│           ├── 📄 usage_tracker.py  # Usage tracking
 │           └── 📄 billing_engine.py # Billing engine
 │
 ├── 📁 configs/                      # Configuration Management
@@ -129,8 +135,13 @@ multi-ai-agent/
 │
 ├── 📁 eval/                        # Evaluation Framework
 │   ├── 📄 evaluator.py             # Main evaluator
+│   ├── 📄 episode_replay.py        # Episode replay system
+│   ├── 📄 evaluation_metrics.py    # Evaluation metrics
 │   ├── 📁 golden_tasks/            # Golden test tasks
-│   │   └── 📄 customer_support.py  # Customer support tasks
+│   │   ├── 📄 customer_support.py  # Customer support tasks
+│   │   ├── 📄 faq_handling.py      # FAQ handling tasks
+│   │   ├── 📄 order_management.py  # Order management tasks
+│   │   └── 📄 lead_capture.py      # Lead capture tasks
 │   ├── 📁 judges/                  # Evaluation judges
 │   │   ├── 📄 base_judge.py        # Base judge class
 │   │   └── 📄 llm_judge.py         # LLM-powered judge
@@ -141,6 +152,10 @@ multi-ai-agent/
 │   └── 📄 resilient_adapters_example.py # Adapter examples
 │
 ├── 📁 infra/                       # Infrastructure Configuration
+│   ├── 📁 k8s/                     # Kubernetes Configuration
+│   │   ├── 📁 helm/                # Helm Charts
+│   │   ├── 📁 autoscaling/         # KEDA/HPA Configuration
+│   │   └── 📁 health/              # Health Check Configuration
 │   └── 📁 docker/                  # Docker Configuration
 │       ├── 📄 compose.dev.yml      # Development compose
 │       ├── 📄 Dockerfile.api-gateway # API Gateway Dockerfile
@@ -150,11 +165,16 @@ multi-ai-agent/
 │   └── 📄 prometheus.yml           # Prometheus configuration
 │
 ├── 📁 data-plane/                  # Data Plane
-│   └── 📁 migrations/              # Database Migrations
-│       ├── 📄 001_multi_tenant_schema.py # Multi-tenant schema
-│       ├── 📄 002_consolidated_schema.py # Consolidated schema
-│       ├── 📄 003_multi_tenant_complete.py # Complete multi-tenant schema
-│       └── 📄 004_events_tables.py # Event system tables
+│   ├── 📁 migrations/              # Database Migrations
+│   │   ├── 📄 001_multi_tenant_schema.py # Multi-tenant schema
+│   │   ├── 📄 002_consolidated_schema.py # Consolidated schema
+│   │   ├── 📄 003_multi_tenant_complete.py # Complete multi-tenant schema
+│   │   └── 📄 004_events_tables.py # Event system tables
+│   ├── 📁 events/                  # Event System
+│   │   ├── 📄 nats_event_bus.py    # NATS event bus
+│   │   └── 📄 event_handlers.py    # Event handlers
+│   └── 📁 storages/                # Storage Layer
+│       └── 📄 database.py          # Database client
 │
 ├── 📁 control-plane/              # Control Plane
 │   ├── 📁 feature_flags/          # Feature Flag Management
@@ -171,10 +191,15 @@ multi-ai-agent/
 │       └── 📄 knowledge_service.py # Knowledge service
 │
 ├── 📁 observability/              # Observability Stack
-│   ├── 📁 metrics/                # Prometheus Metrics
-│   │   └── 📄 prometheus_metrics.py # Custom metrics
+│   ├── 📁 otel/                   # OpenTelemetry
+│   │   └── 📄 tracing.py          # Distributed tracing
+│   ├── 📁 logging/                # Structured Logging
+│   │   └── 📄 logger.py           # Logger configuration
 │   ├── 📁 dashboards/             # Grafana Dashboards
-│   │   └── 📄 grafana_dashboards.py # Dashboard generator
+│   │   ├── 📄 grafana_dashboards.py # Dashboard generator
+│   │   └── 📄 *.json              # Dashboard JSON files
+│   ├── 📁 slo/                    # SLO Monitoring
+│   │   └── 📄 slo_monitor.py      # SLO monitoring
 │   └── 📁 runbooks/               # Operational Runbooks
 │       └── 📄 RUNBOOKS.md         # Runbook documentation
 │

@@ -66,12 +66,16 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 ## RACI (Responsibility Assignment)
 
 ### **Control Plane** (Platform Team)
+**Responsible for**: Platform infrastructure, configuration, and governance
 
 - **Feature Flags**: Runtime feature toggling and A/B testing
-- **Registries**: Agent/tool manifest management and versioning
+- **Registries**: Agent/tool manifest management and versioning  
 - **Configs**: Environment-specific configuration and secrets
+- **Infrastructure**: Kubernetes, monitoring, security policies
+- **Data Plane**: Database migrations, event schemas, storage policies
 
 ### **Runtime** (Service Teams)
+**Responsible for**: Service development, deployment, and operations
 
 - **API Gateway**: Authentication, rate limiting, request routing
 - **Orchestrator**: Workflow execution and tool coordination
@@ -80,6 +84,10 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 - **Ingestion Service**: Document processing and knowledge indexing
 - **Analytics Service**: Metrics aggregation and reporting
 - **Billing Service**: Usage metering and invoice generation
+
+### **Observability** (Shared Responsibility)
+**Platform Team**: Infrastructure, dashboards, alerting rules
+**Service Teams**: Service-specific metrics, health checks, runbooks
 
 ## Quick Start
 
@@ -194,6 +202,7 @@ make update-docker # Update Docker images
 The platform includes a comprehensive GitHub Actions CI/CD pipeline with:
 
 ### **Pipeline Jobs**
+
 - **Quality Checks**: Format, lint, type checking, security scanning
 - **Unit Tests**: Test coverage with pytest and codecov
 - **Integration Tests**: Service integration with database dependencies
@@ -204,6 +213,7 @@ The platform includes a comprehensive GitHub Actions CI/CD pipeline with:
 - **Security Scan**: Trivy vulnerability scanning and CodeQL analysis
 
 ### **Branch Strategy**
+
 - `main`: Production deployments
 - `develop`: Staging deployments
 - Pull requests: Full CI pipeline validation
