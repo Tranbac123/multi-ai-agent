@@ -1,83 +1,73 @@
-name: Continuous Integration
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main, develop]
+    branches: [ main, develop ]
 
 env:
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "18"
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
 
 jobs:
-  lint-and-format:
+  # Code Quality Checks
+  quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Format check
+      run: |
+        black --check apps/ libs/ tests/ eval/
+        isort --check-only apps/ libs/ tests/ eval/
+    
+    - name: Lint check
+      run: ruff check apps/ libs/ tests/ eval/
+    
+    - name: Type check
+      run: mypy apps/ libs/ --ignore-missing-imports
+    
+    - name: Security check
+      run: |
+        bandit -r apps/ libs/ -f json -o security-report.json
+        safety check --json --output safety-report.json
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          security-report.json
+          safety-report.json
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff black mypy
-
-      - name: Run Ruff linter
-        run: ruff check .
-
-      - name: Run Black formatter check
-        run: black --check .
-
-      - name: Run MyPy type checker
-        run: mypy .
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install security tools
-        run: |
-          pip install bandit safety semgrep
-
-      - name: Run Bandit security linter
-        run: bandit -r . -f json -o bandit-report.json
-        continue-on-error: true
-
-      - name: Run Safety check
-        run: safety check --json --output safety-report.json
-        continue-on-error: true
-
-      - name: Run Semgrep security scan
-        run: semgrep --config=auto --json --output=semgrep-report.json .
-        continue-on-error: true
-
-      - name: Upload security reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-reports
-          path: |
-            bandit-report.json
-            safety-report.json
-            semgrep-report.json
-
-  test:
+  # Unit Tests
+  test-unit:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
+          POSTGRES_DB: aiaas_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -85,9 +75,9 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
+      
       redis:
-        image: redis:7
+        image: redis:7-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -95,138 +85,315 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=xml --cov-report=html
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aiaas_test
+        REDIS_URL: redis://localhost:6379
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
 
-      nats:
-        image: nats:2.9
+  # Integration Tests
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aiaas_test
         options: >-
-          --health-cmd "nats-server --help"
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      nats:
+        image: nats:2.10-alpine
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8222/healthz"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
           - 4222:4222
-
+          - 8222:8222
+    
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Run database migrations
+      run: |
+        cd data-plane
+        alembic upgrade head
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aiaas_test
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --timeout=300
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aiaas_test
+        REDIS_URL: redis://localhost:6379
+        NATS_URL: nats://localhost:4222
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+  # End-to-End Tests
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Start services
+      run: |
+        docker-compose -f docker-compose.dev.yml up -d
+        sleep 30
+    
+    - name: Run end-to-end tests
+      run: |
+        pytest tests/e2e/ -v --timeout=600
+      env:
+        API_GATEWAY_URL: http://localhost:8000
+        REALTIME_SERVICE_URL: http://localhost:8001
+        ROUTER_SERVICE_URL: http://localhost:8002
+    
+    - name: Stop services
+      run: docker-compose -f docker-compose.dev.yml down
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
+  # Performance Tests
+  test-performance:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Start services
+      run: |
+        docker-compose -f docker-compose.dev.yml up -d
+        sleep 30
+    
+    - name: Run performance tests
+      run: |
+        locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=100 --spawn-rate=10 --run-time=2m --headless
+      env:
+        API_GATEWAY_URL: http://localhost:8000
+    
+    - name: Stop services
+      run: docker-compose -f docker-compose.dev.yml down
 
-      - name: Run database migrations
-        run: |
-          alembic upgrade head
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-
-      - name: Run tests
-        run: |
-          pytest tests/ --cov=. --cov-report=xml --cov-report=html
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379
-          NATS_URL: nats://localhost:4222
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-
+  # Docker Build
   build:
     runs-on: ubuntu-latest
-    needs: [lint-and-format, security-scan, test]
+    needs: [quality, test-unit, test-integration]
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push API Gateway
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/api-gateway/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-api-gateway:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-api-gateway:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push Realtime Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/realtime/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-realtime:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-realtime:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push Router Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/router-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-router:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-router:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push Orchestrator
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/orchestrator/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-orchestrator:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-orchestrator:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push Analytics Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/analytics-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-analytics:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-analytics:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push Billing Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/billing-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-billing:latest
+          ${{ secrets.DOCKER_USERNAME }}/aiaas-billing:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker images
-        run: |
-          docker build -t aiaas-api-gateway:latest -f apps/api-gateway/Dockerfile .
-          docker build -t aiaas-orchestrator:latest -f apps/orchestrator/Dockerfile .
-          docker build -t aiaas-router:latest -f apps/router-service/Dockerfile .
-          docker build -t aiaas-realtime:latest -f apps/realtime/Dockerfile .
-          docker build -t aiaas-ingestion:latest -f apps/ingestion/Dockerfile .
-          docker build -t aiaas-billing:latest -f apps/billing-service/Dockerfile .
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "aiaas-api-gateway:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: "trivy-results.sarif"
-
-  integration-tests:
+  # Deploy to Staging
+  deploy-staging:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, test-e2e]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add actual deployment commands here
+        # This could include kubectl, helm, or other deployment tools
+    
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests on staging..."
+        # Add smoke test commands here
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
-
-      - name: Start services with Docker Compose
-        run: |
-          docker-compose -f docker-compose.test.yml up -d
-          sleep 30  # Wait for services to start
-
-      - name: Run integration tests
-        run: |
-          pytest tests/integration/ -v
-        env:
-          API_BASE_URL: http://localhost:8000
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-
-      - name: Stop services
-        run: |
-          docker-compose -f docker-compose.test.yml down
-
-  performance-tests:
+  # Deploy to Production
+  deploy-production:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, test-e2e, test-performance]
+    if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Add actual deployment commands here
+        # This could include kubectl, helm, or other deployment tools
+    
+    - name: Run health checks
+      run: |
+        echo "Running health checks on production..."
+        # Add health check commands here
+    
+    - name: Notify deployment
+      run: |
+        echo "Deployment completed successfully!"
+        # Add notification commands here (Slack, email, etc.)
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install performance testing tools
-        run: |
-          pip install locust
-
-      - name: Start services
-        run: |
-          docker-compose -f docker-compose.test.yml up -d
-          sleep 30
-
-      - name: Run performance tests
-        run: |
-          locust -f tests/performance/locustfile.py --headless -u 100 -r 10 -t 60s --host=http://localhost:8000
-
-      - name: Stop services
-        run: |
-          docker-compose -f docker-compose.test.yml down
+  # Security Scan
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        languages: python

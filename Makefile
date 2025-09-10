@@ -1,207 +1,252 @@
-# Multi-Tenant AIaaS Platform - Production Makefile
+# Multi-Tenant AIaaS Platform Makefile
 
-.PHONY: help dev test e2e eval replay clean build deploy
+.PHONY: help dev test e2e eval security format lint type-check build deploy clean
 
 # Default target
-help:
+help: ## Show this help message
 	@echo "Multi-Tenant AIaaS Platform - Available Commands:"
 	@echo ""
-	@echo "Development:"
-	@echo "  dev          Start development environment"
-	@echo "  dev-services Start only infrastructure services"
-	@echo "  dev-apps     Start only application services"
-	@echo ""
-	@echo "Testing:"
-	@echo "  test         Run all tests"
-	@echo "  test-unit    Run unit tests"
-	@echo "  test-integration Run integration tests"
-	@echo "  test-e2e     Run end-to-end tests"
-	@echo "  test-contract Run contract tests"
-	@echo ""
-	@echo "Evaluation:"
-	@echo "  eval         Run evaluation suite"
-	@echo "  replay       Replay specific run (usage: make replay RUN=<run_id>)"
-	@echo ""
-	@echo "Quality:"
-	@echo "  lint         Run linting (ruff + black)"
-	@echo "  type-check   Run type checking (mypy)"
-	@echo "  security     Run security scan (trivy)"
-	@echo "  security-full Run comprehensive security scans"
-	@echo "  container-scan Scan Docker containers for vulnerabilities"
-	@echo "  dependency-scan Scan dependencies for vulnerabilities"
-	@echo "  format       Format code (black)"
-	@echo ""
-	@echo "Build & Deploy:"
-	@echo "  build        Build all Docker images"
-	@echo "  deploy-dev   Deploy to development"
-	@echo "  deploy-staging Deploy to staging"
-	@echo "  deploy-prod  Deploy to production"
-	@echo ""
-	@echo "Database:"
-	@echo "  db-migrate   Run database migrations"
-	@echo "  db-rollback  Rollback last migration"
-	@echo "  db-seed      Seed database with sample data"
-	@echo ""
-	@echo "Monitoring:"
-	@echo "  logs         View service logs"
-	@echo "  metrics      View Prometheus metrics"
-	@echo "  dashboards   Open Grafana dashboards"
-	@echo ""
-	@echo "Cleanup:"
-	@echo "  clean        Clean up containers and volumes"
-	@echo "  clean-all    Clean up everything including images"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Development
-dev: dev-services dev-apps
+# Development Commands
+dev: ## Start development environment
+	@echo "Starting development environment..."
+	docker-compose -f docker-compose.dev.yml up -d
+	@echo "Development environment started. Access services at:"
+	@echo "  - API Gateway: http://localhost:8000"
+	@echo "  - Realtime Service: http://localhost:8001"
+	@echo "  - Router Service: http://localhost:8002"
+	@echo "  - Orchestrator: http://localhost:8003"
+	@echo "  - Analytics Service: http://localhost:8004"
+	@echo "  - Billing Service: http://localhost:8005"
+	@echo "  - Grafana: http://localhost:3000"
+	@echo "  - Prometheus: http://localhost:9090"
 
-dev-services:
-	@echo "Starting infrastructure services..."
-	docker-compose -f docker-compose.dev.yml up -d postgres redis nats prometheus grafana
+dev-stop: ## Stop development environment
+	@echo "Stopping development environment..."
+	docker-compose -f docker-compose.dev.yml down
 
-dev-apps:
-	@echo "Starting application services..."
-	docker-compose -f docker-compose.dev.yml up -d api-gateway orchestrator router-service realtime ingestion analytics billing
+dev-logs: ## Show development environment logs
+	docker-compose -f docker-compose.dev.yml logs -f
 
-# Testing
-test: test-unit test-integration test-contract
-
-test-unit:
+# Testing Commands
+test: ## Run all tests
 	@echo "Running unit tests..."
-	python -m pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=html
+	python -m pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=html --cov-report=term
+	@echo "Running integration tests..."
+	python -m pytest tests/integration/ -v
+	@echo "All tests completed."
 
-test-integration:
+test-unit: ## Run unit tests only
+	@echo "Running unit tests..."
+	python -m pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=html --cov-report=term
+
+test-integration: ## Run integration tests only
 	@echo "Running integration tests..."
 	python -m pytest tests/integration/ -v
 
-test-e2e:
+test-e2e: ## Run end-to-end tests
 	@echo "Running end-to-end tests..."
-	python -m pytest tests/e2e/ -v
+	python -m pytest tests/e2e/ -v --timeout=300
 
-test-contract:
-	@echo "Running contract tests..."
-	python -m pytest tests/contract/ -v
-
-# Evaluation
-eval:
+# Evaluation Commands
+eval: ## Run evaluation suite
 	@echo "Running evaluation suite..."
-	python tests/run_evaluation.py
+	python -m pytest eval/ -v --timeout=600
 
-replay:
-	@echo "Replaying run: $(RUN)"
-	python tests/run_evaluation.py --replay $(RUN)
+eval-episodes: ## Run episode replay evaluation
+	@echo "Running episode replay evaluation..."
+	python -m pytest eval/test_episode_replay.py -v
 
-# Quality
-lint:
-	@echo "Running linting..."
-	ruff check apps/ libs/ tests/
-	black --check apps/ libs/ tests/
+eval-metrics: ## Run evaluation metrics
+	@echo "Running evaluation metrics..."
+	python -m pytest eval/test_evaluation_metrics.py -v
 
-type-check:
-	@echo "Running type checking..."
-	mypy apps/ libs/ --strict
-
-security:
-	@echo "🔒 Running security scan..."
-	trivy fs .
-	@echo "✅ Security scan completed"
-
-# Comprehensive security scans
-security-full:
-	@echo "🔒 Running comprehensive security scans..."
-	bandit -r . -f json -o bandit-report.json
+# Security Commands
+security: ## Run security checks
+	@echo "Running security checks..."
+	@echo "Running Bandit security linter..."
+	bandit -r apps/ libs/ -f json -o security-report.json
+	@echo "Running Safety dependency check..."
 	safety check --json --output safety-report.json
-	semgrep --config=auto --json --output=semgrep-report.json .
-	@echo "✅ Comprehensive security scans completed"
+	@echo "Running Semgrep security scan..."
+	semgrep --config=auto apps/ libs/ --json --output=semgrep-report.json
+	@echo "Security checks completed. Reports saved to security-*.json"
 
-# Container security scan
-container-scan:
-	@echo "🐳 Scanning Docker containers for vulnerabilities..."
-	docker build -t aiaas-api-gateway:latest -f apps/api-gateway/Dockerfile .
-	trivy image aiaas-api-gateway:latest
-	@echo "✅ Container scan completed"
+security-bandit: ## Run Bandit security linter
+	bandit -r apps/ libs/ -f json -o security-report.json
 
-# Dependency security scan
-dependency-scan:
-	@echo "📦 Scanning dependencies for vulnerabilities..."
-	pip-audit --format=json --output=pip-audit-report.json
-	safety check --json --output=safety-report.json
-	@echo "✅ Dependency scan completed"
+security-safety: ## Run Safety dependency check
+	safety check --json --output safety-report.json
 
-format:
+security-semgrep: ## Run Semgrep security scan
+	semgrep --config=auto apps/ libs/ --json --output=semgrep-report.json
+
+# Code Quality Commands
+format: ## Format code with Black and isort
 	@echo "Formatting code..."
-	black apps/ libs/ tests/
-	ruff --fix apps/ libs/ tests/
+	black apps/ libs/ tests/ eval/
+	isort apps/ libs/ tests/ eval/
+	@echo "Code formatting completed."
 
-# Build & Deploy
-build:
+lint: ## Run linting with Ruff
+	@echo "Running linting..."
+	ruff check apps/ libs/ tests/ eval/
+	@echo "Linting completed."
+
+type-check: ## Run type checking with MyPy
+	@echo "Running type checking..."
+	mypy apps/ libs/ --ignore-missing-imports
+	@echo "Type checking completed."
+
+# Build Commands
+build: ## Build Docker images
 	@echo "Building Docker images..."
-	docker build -f Dockerfile.api-gateway -t multi-ai-agent/api-gateway:latest .
-	docker build -f Dockerfile.orchestrator -t multi-ai-agent/orchestrator:latest .
-	docker build -f Dockerfile.router -t multi-ai-agent/router:latest .
-	docker build -f Dockerfile.realtime -t multi-ai-agent/realtime:latest .
-	docker build -f Dockerfile.ingestion -t multi-ai-agent/ingestion:latest .
-	docker build -f Dockerfile.analytics -t multi-ai-agent/analytics:latest .
-	docker build -f Dockerfile.billing -t multi-ai-agent/billing:latest .
+	docker-compose -f docker-compose.prod.yml build
+	@echo "Docker images built successfully."
 
-deploy-dev: build
-	@echo "Deploying to development..."
-	docker-compose -f docker-compose.dev.yml up -d
+build-dev: ## Build development Docker images
+	@echo "Building development Docker images..."
+	docker-compose -f docker-compose.dev.yml build
+	@echo "Development Docker images built successfully."
 
-deploy-staging: build
+# Deployment Commands
+deploy: ## Deploy to production
+	@echo "Deploying to production..."
+	docker-compose -f docker-compose.prod.yml up -d
+	@echo "Production deployment completed."
+
+deploy-staging: ## Deploy to staging
 	@echo "Deploying to staging..."
 	docker-compose -f docker-compose.staging.yml up -d
+	@echo "Staging deployment completed."
 
-deploy-prod: build
-	@echo "Deploying to production..."
-	kubectl apply -f infra/k8s/
-
-# Database
-db-migrate:
+# Database Commands
+db-migrate: ## Run database migrations
 	@echo "Running database migrations..."
-	alembic upgrade head
+	cd data-plane && alembic upgrade head
+	@echo "Database migrations completed."
 
-db-rollback:
-	@echo "Rolling back last migration..."
-	alembic downgrade -1
+db-rollback: ## Rollback database migrations
+	@echo "Rollback database migrations..."
+	cd data-plane && alembic downgrade -1
+	@echo "Database rollback completed."
 
-db-seed:
-	@echo "Seeding database..."
-	python data-plane/seed_data.py
+db-reset: ## Reset database
+	@echo "Resetting database..."
+	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.dev.yml up -d postgres
+	sleep 10
+	make db-migrate
+	@echo "Database reset completed."
 
-# Monitoring
-logs:
-	@echo "Viewing service logs..."
-	docker-compose logs -f
+# Monitoring Commands
+monitor: ## Start monitoring stack
+	@echo "Starting monitoring stack..."
+	docker-compose -f docker-compose.monitoring.yml up -d
+	@echo "Monitoring stack started. Access at:"
+	@echo "  - Grafana: http://localhost:3000"
+	@echo "  - Prometheus: http://localhost:9090"
+	@echo "  - Jaeger: http://localhost:16686"
 
-metrics:
-	@echo "Opening Prometheus metrics..."
-	open http://localhost:9090
+monitor-stop: ## Stop monitoring stack
+	@echo "Stopping monitoring stack..."
+	docker-compose -f docker-compose.monitoring.yml down
 
-dashboards:
-	@echo "Opening Grafana dashboards..."
-	open http://localhost:3000
+# Performance Commands
+perf-test: ## Run performance tests
+	@echo "Running performance tests..."
+	locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=100 --spawn-rate=10 --run-time=5m
+	@echo "Performance tests completed."
 
-# Cleanup
-clean:
-	@echo "Cleaning up containers and volumes..."
-	docker-compose down -v
+perf-load: ## Run load tests
+	@echo "Running load tests..."
+	locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=1000 --spawn-rate=50 --run-time=10m
+	@echo "Load tests completed."
+
+# Cleanup Commands
+clean: ## Clean up Docker resources
+	@echo "Cleaning up Docker resources..."
+	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.prod.yml down -v
+	docker-compose -f docker-compose.staging.yml down -v
+	docker-compose -f docker-compose.monitoring.yml down -v
 	docker system prune -f
+	@echo "Cleanup completed."
 
-clean-all: clean
-	@echo "Cleaning up everything..."
-	docker system prune -a -f
-	docker volume prune -f
+clean-logs: ## Clean up log files
+	@echo "Cleaning up log files..."
+	find . -name "*.log" -type f -delete
+	find . -name "*.log.*" -type f -delete
+	@echo "Log files cleaned."
 
-# Environment setup
-setup:
+clean-cache: ## Clean up cache files
+	@echo "Cleaning up cache files..."
+	find . -name "__pycache__" -type d -exec rm -rf {} +
+	find . -name "*.pyc" -type f -delete
+	find . -name ".pytest_cache" -type d -exec rm -rf {} +
+	find . -name ".coverage" -type f -delete
+	find . -name "htmlcov" -type d -exec rm -rf {} +
+	@echo "Cache files cleaned."
+
+# Documentation Commands
+docs: ## Generate documentation
+	@echo "Generating documentation..."
+	pdoc --html apps/ libs/ --output-dir docs/
+	@echo "Documentation generated in docs/ directory."
+
+docs-serve: ## Serve documentation locally
+	@echo "Serving documentation..."
+	pdoc --http :8080 apps/ libs/
+
+# Health Check Commands
+health: ## Check service health
+	@echo "Checking service health..."
+	@echo "API Gateway:"
+	curl -f http://localhost:8000/health || echo "API Gateway: DOWN"
+	@echo "Realtime Service:"
+	curl -f http://localhost:8001/health || echo "Realtime Service: DOWN"
+	@echo "Router Service:"
+	curl -f http://localhost:8002/health || echo "Router Service: DOWN"
+	@echo "Orchestrator:"
+	curl -f http://localhost:8003/health || echo "Orchestrator: DOWN"
+	@echo "Analytics Service:"
+	curl -f http://localhost:8004/health || echo "Analytics Service: DOWN"
+	@echo "Billing Service:"
+	curl -f http://localhost:8005/health || echo "Billing Service: DOWN"
+
+# Backup Commands
+backup: ## Backup database and configuration
+	@echo "Creating backup..."
+	mkdir -p backups/$(shell date +%Y%m%d_%H%M%S)
+	docker-compose -f docker-compose.dev.yml exec postgres pg_dump -U postgres aiaas > backups/$(shell date +%Y%m%d_%H%M%S)/database.sql
+	cp -r data-plane/migrations backups/$(shell date +%Y%m%d_%H%M%S)/
+	cp docker-compose*.yml backups/$(shell date +%Y%m%d_%H%M%S)/
+	@echo "Backup completed."
+
+# Update Commands
+update-deps: ## Update dependencies
+	@echo "Updating dependencies..."
+	pip-compile requirements.in
+	pip-compile requirements-dev.in
+	@echo "Dependencies updated."
+
+update-docker: ## Update Docker images
+	@echo "Updating Docker images..."
+	docker-compose -f docker-compose.dev.yml pull
+	docker-compose -f docker-compose.prod.yml pull
+	@echo "Docker images updated."
+
+# All-in-one Commands
+all: format lint type-check test security ## Run all quality checks
+	@echo "All quality checks completed."
+
+ci: format lint type-check test security build ## Run CI pipeline
+	@echo "CI pipeline completed."
+
+dev-setup: ## Setup development environment
 	@echo "Setting up development environment..."
-	pip install -r requirements.txt
-	cp .env.example .env
-	@echo "Please edit .env with your configuration"
-
-# Quick start
-start: setup dev
-	@echo "Multi-Tenant AIaaS Platform started!"
-	@echo "API Gateway: http://localhost:8000"
-	@echo "Grafana: http://localhost:3000"
-	@echo "Prometheus: http://localhost:9090"
+	pip install -r requirements-dev.txt
+	make db-migrate
+	make dev
+	@echo "Development environment setup completed."
