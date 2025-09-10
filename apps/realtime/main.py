@@ -1,78 +1,143 @@
-"""Realtime Service - WebSocket service with backpressure handling."""
+"""Realtime service with enhanced backpressure handling and Redis session storage."""
 
 import asyncio
 import json
 import time
-import uuid
 from typing import Dict, Any, Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.responses import JSONResponse
 import structlog
 import redis.asyncio as redis
+from contextlib import asynccontextmanager
 
-from apps.realtime.core.connection_manager import ConnectionManager
-from apps.realtime.core.backpressure_handler import BackpressureHandler
-from libs.contracts.error import ErrorResponse, ServiceError
+from .core.backpressure_handler import BackpressureHandler, BackpressureMetrics
+from .core.connection_manager import ConnectionManager
 
 logger = structlog.get_logger(__name__)
 
-app = FastAPI(title="Realtime Service", version="1.0.0")
-
-# Global instances
+# Global variables for Redis and handlers
+redis_client: Optional[redis.Redis] = None
 connection_manager: Optional[ConnectionManager] = None
 backpressure_handler: Optional[BackpressureHandler] = None
-redis_client: Optional[redis.Redis] = None
+metrics_collector: Optional[BackpressureMetrics] = None
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize service on startup."""
-    global connection_manager, backpressure_handler, redis_client
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    global redis_client, connection_manager, backpressure_handler, metrics_collector
     
-    # Initialize Redis client
-    redis_client = redis.Redis(host="localhost", port=6379, db=3)
-    await redis_client.ping()
-    
-    # Initialize connection manager
-    connection_manager = ConnectionManager(redis_client)
-    
-    # Initialize backpressure handler
-    backpressure_handler = BackpressureHandler(
-        connection_manager=connection_manager,
-        max_queue_size=1000,
-        drop_policy="intermediate"
+    # Initialize Redis connection
+    redis_client = redis.Redis(
+        host="localhost",
+        port=6379,
+        db=0,
+        decode_responses=False  # Keep as bytes for JSON serialization
     )
     
-    logger.info("Realtime service started")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    global redis_client
+    # Initialize connection manager
+    connection_manager = ConnectionManager()
+    
+    # Initialize backpressure handler with Redis
+    backpressure_handler = BackpressureHandler(
+        connection_manager=connection_manager,
+        redis_client=redis_client,
+        max_queue_size=1000,
+        drop_policy="intermediate",
+        session_ttl=3600
+    )
+    
+    # Initialize metrics collector
+    metrics_collector = BackpressureMetrics(redis_client)
+    
+    # Start cleanup task
+    await backpressure_handler.start_cleanup_task()
+    
+    logger.info("Realtime service started with Redis session storage")
+    
+    yield
+    
+    # Cleanup
+    if backpressure_handler:
+        await backpressure_handler.shutdown()
     
     if redis_client:
         await redis_client.close()
     
-    logger.info("Realtime service stopped")
+    logger.info("Realtime service shutdown")
 
 
-@app.websocket("/ws/chat")
-async def websocket_chat(websocket: WebSocket, tenant_id: str, user_id: Optional[str] = None):
-    """WebSocket endpoint for chat with backpressure handling."""
+app = FastAPI(
+    title="Realtime Service",
+    description="WebSocket service with backpressure handling and Redis session storage",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "realtime"}
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint."""
+    try:
+        # Check Redis connection
+        await redis_client.ping()
+        return {"status": "ready", "service": "realtime"}
+    except Exception as e:
+        logger.error("Readiness check failed", error=str(e))
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get realtime service metrics."""
+    try:
+        if not backpressure_handler:
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        stats = await backpressure_handler.get_stats()
+        
+        # Add additional metrics
+        stats.update({
+            "timestamp": time.time(),
+            "service": "realtime",
+            "version": "2.0.0"
+        })
+        
+        return JSONResponse(content=stats)
+        
+    except Exception as e:
+        logger.error("Failed to get metrics", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get metrics")
+
+
+@app.websocket("/ws/{tenant_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str] = None,
+    session_id: Optional[str] = None
+):
+    """WebSocket endpoint with backpressure handling."""
     if not connection_manager or not backpressure_handler:
-        raise HTTPException(status_code=500, detail="Service not initialized")
+        await websocket.close(code=1011, reason="Service not ready")
+        return
+    
+    # Generate session ID if not provided
+    if not session_id:
+        session_id = f"{tenant_id}_{user_id}_{int(time.time())}"
     
     # Accept connection
-    await websocket.accept()
+    await connection_manager.connect(websocket, tenant_id, user_id, session_id)
     
-    # Generate session ID
-    session_id = str(uuid.uuid4())
-    
-    # Register connection
-    await connection_manager.register_connection(
-        websocket, tenant_id, user_id, session_id
-    )
+    # Update active connections count
+    if backpressure_handler:
+        backpressure_handler.stats["active_connections"] = len(connection_manager.active_connections)
     
     try:
         # Send welcome message
@@ -83,168 +148,198 @@ async def websocket_chat(websocket: WebSocket, tenant_id: str, user_id: Optional
             "user_id": user_id,
             "timestamp": time.time()
         }
-        await websocket.send_text(json.dumps(welcome_message))
         
-        # Handle messages
+        await backpressure_handler.send_message(
+            websocket, tenant_id, user_id, session_id, welcome_message
+        )
+        
+        # Retrieve any pending messages from Redis
+        await _deliver_pending_messages(websocket, session_id, tenant_id)
+        
+        # Main message loop
         while True:
             try:
-                # Receive message
+                # Receive message from client
                 data = await websocket.receive_text()
                 message = json.loads(data)
                 
                 # Process message
-                await _process_message(websocket, tenant_id, user_id, session_id, message)
+                await _process_client_message(websocket, tenant_id, user_id, session_id, message)
                 
             except WebSocketDisconnect:
-                logger.info("WebSocket disconnected", tenant_id=tenant_id, user_id=user_id)
+                logger.info("WebSocket disconnected", session_id=session_id, tenant_id=tenant_id)
                 break
             except json.JSONDecodeError:
-                error_message = {
-                    "type": "error",
-                    "message": "Invalid JSON format",
-                    "timestamp": time.time()
-                }
-                await websocket.send_text(json.dumps(error_message))
+                logger.warning("Invalid JSON received", session_id=session_id)
+                await _send_error_message(websocket, session_id, "Invalid JSON format")
             except Exception as e:
-                logger.error("WebSocket error", error=str(e), tenant_id=tenant_id)
-                error_message = {
-                    "type": "error",
-                    "message": "Internal server error",
-                    "timestamp": time.time()
-                }
-                await websocket.send_text(json.dumps(error_message))
-    
+                logger.error("Error processing message", error=str(e), session_id=session_id)
+                await _send_error_message(websocket, session_id, "Internal error")
+                
+    except Exception as e:
+        logger.error("WebSocket error", error=str(e), session_id=session_id, tenant_id=tenant_id)
     finally:
-        # Unregister connection
-        await connection_manager.unregister_connection(websocket, tenant_id, user_id)
+        # Disconnect and cleanup
+        await connection_manager.disconnect(websocket, session_id)
+        
+        # Update active connections count
+        if backpressure_handler:
+            backpressure_handler.stats["active_connections"] = len(connection_manager.active_connections)
 
 
-async def _process_message(
+async def _deliver_pending_messages(websocket: WebSocket, session_id: str, tenant_id: str):
+    """Deliver any pending messages from Redis."""
+    try:
+        if not backpressure_handler:
+            return
+        
+        # Retrieve messages from Redis
+        redis_messages = await backpressure_handler._retrieve_messages_from_redis(session_id)
+        
+        if redis_messages:
+            logger.info(
+                "Delivering pending messages",
+                session_id=session_id,
+                count=len(redis_messages)
+            )
+            
+            # Send each message
+            for message in redis_messages:
+                await backpressure_handler.send_message(
+                    websocket, tenant_id, None, session_id, message
+                )
+                
+    except Exception as e:
+        logger.error("Failed to deliver pending messages", error=str(e), session_id=session_id)
+
+
+async def _process_client_message(
     websocket: WebSocket,
     tenant_id: str,
     user_id: Optional[str],
     session_id: str,
     message: Dict[str, Any]
 ):
-    """Process incoming WebSocket message."""
-    message_type = message.get("type", "unknown")
-    
-    if message_type == "ping":
-        # Handle ping
-        pong_message = {
-            "type": "pong",
+    """Process message from client."""
+    try:
+        message_type = message.get("type", "unknown")
+        
+        if message_type == "ping":
+            # Respond to ping
+            pong_message = {
+                "type": "pong",
+                "timestamp": time.time(),
+                "session_id": session_id
+            }
+            await backpressure_handler.send_message(
+                websocket, tenant_id, user_id, session_id, pong_message
+            )
+            
+        elif message_type == "subscribe":
+            # Handle subscription requests
+            await _handle_subscription(websocket, tenant_id, user_id, session_id, message)
+            
+        elif message_type == "unsubscribe":
+            # Handle unsubscription requests
+            await _handle_unsubscription(websocket, tenant_id, user_id, session_id, message)
+            
+        else:
+            # Echo message back (for testing)
+            echo_message = {
+                "type": "echo",
+                "original_message": message,
+                "timestamp": time.time(),
+                "session_id": session_id
+            }
+            await backpressure_handler.send_message(
+                websocket, tenant_id, user_id, session_id, echo_message
+            )
+            
+    except Exception as e:
+        logger.error("Failed to process client message", error=str(e), session_id=session_id)
+        await _send_error_message(websocket, session_id, "Failed to process message")
+
+
+async def _handle_subscription(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str],
+    session_id: str,
+    message: Dict[str, Any]
+):
+    """Handle subscription requests."""
+    try:
+        topic = message.get("topic", "default")
+        
+        # Store subscription in Redis
+        subscription_key = f"subscription:{session_id}:{topic}"
+        await redis_client.setex(subscription_key, 3600, json.dumps({
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "session_id": session_id,
+            "topic": topic,
             "timestamp": time.time()
+        }))
+        
+        # Send confirmation
+        confirm_message = {
+            "type": "subscription_confirmed",
+            "topic": topic,
+            "timestamp": time.time(),
+            "session_id": session_id
         }
-        await websocket.send_text(json.dumps(pong_message))
-    
-    elif message_type == "chat":
-        # Handle chat message
-        await _handle_chat_message(websocket, tenant_id, user_id, session_id, message)
-    
-    elif message_type == "typing":
-        # Handle typing indicator
-        await _handle_typing_indicator(websocket, tenant_id, user_id, session_id, message)
-    
-    else:
-        # Unknown message type
-        error_message = {
-            "type": "error",
-            "message": f"Unknown message type: {message_type}",
-            "timestamp": time.time()
-        }
-        await websocket.send_text(json.dumps(error_message))
-
-
-async def _handle_chat_message(
-    websocket: WebSocket,
-    tenant_id: str,
-    user_id: Optional[str],
-    session_id: str,
-    message: Dict[str, Any]
-):
-    """Handle chat message with backpressure."""
-    if not backpressure_handler:
-        return
-    
-    # Create response message
-    response_message = {
-        "type": "response",
-        "content": f"Echo: {message.get('content', '')}",
-        "timestamp": time.time(),
-        "session_id": session_id
-    }
-    
-    # Send with backpressure handling
-    await backpressure_handler.send_message(
-        websocket, tenant_id, user_id, session_id, response_message
-    )
-
-
-async def _handle_typing_indicator(
-    websocket: WebSocket,
-    tenant_id: str,
-    user_id: Optional[str],
-    session_id: str,
-    message: Dict[str, Any]
-):
-    """Handle typing indicator."""
-    # Broadcast typing indicator to other connections in the same tenant
-    if connection_manager:
-        await connection_manager.broadcast_to_tenant(
-            tenant_id, {
-                "type": "typing",
-                "user_id": user_id,
-                "is_typing": message.get("is_typing", False),
-                "timestamp": time.time()
-            },
-            exclude_session=session_id
+        await backpressure_handler.send_message(
+            websocket, tenant_id, user_id, session_id, confirm_message
         )
+        
+    except Exception as e:
+        logger.error("Failed to handle subscription", error=str(e), session_id=session_id)
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    if not connection_manager or not backpressure_handler:
-        raise HTTPException(status_code=500, detail="Service not initialized")
-    
-    # Get connection stats
-    stats = await connection_manager.get_connection_stats()
-    
-    return {
-        "status": "healthy",
-        "active_connections": stats["active_connections"],
-        "tenant_connections": stats["tenant_connections"],
-        "timestamp": time.time()
-    }
+async def _handle_unsubscription(
+    websocket: WebSocket,
+    tenant_id: str,
+    user_id: Optional[str],
+    session_id: str,
+    message: Dict[str, Any]
+):
+    """Handle unsubscription requests."""
+    try:
+        topic = message.get("topic", "default")
+        
+        # Remove subscription from Redis
+        subscription_key = f"subscription:{session_id}:{topic}"
+        await redis_client.delete(subscription_key)
+        
+        # Send confirmation
+        confirm_message = {
+            "type": "unsubscription_confirmed",
+            "topic": topic,
+            "timestamp": time.time(),
+            "session_id": session_id
+        }
+        await backpressure_handler.send_message(
+            websocket, tenant_id, user_id, session_id, confirm_message
+        )
+        
+    except Exception as e:
+        logger.error("Failed to handle unsubscription", error=str(e), session_id=session_id)
 
 
-@app.get("/metrics")
-async def get_metrics():
-    """Get service metrics."""
-    if not connection_manager or not backpressure_handler:
-        raise HTTPException(status_code=500, detail="Service not initialized")
-    
-    # Get connection stats
-    connection_stats = await connection_manager.get_connection_stats()
-    
-    # Get backpressure stats
-    backpressure_stats = await backpressure_handler.get_stats()
-    
-    # Calculate required metrics
-    ws_active_connections = connection_stats.get("active_connections", 0)
-    ws_backpressure_drops = backpressure_stats.get("messages_dropped", 0)
-    ws_send_errors = backpressure_stats.get("queue_overflows", 0)
-    
-    return {
-        "ws_active_connections": ws_active_connections,
-        "ws_backpressure_drops": ws_backpressure_drops,
-        "ws_send_errors": ws_send_errors,
-        "connections": connection_stats,
-        "backpressure": backpressure_stats,
-        "timestamp": time.time()
-    }
+async def _send_error_message(websocket: WebSocket, session_id: str, error_message: str):
+    """Send error message to client."""
+    try:
+        error_response = {
+            "type": "error",
+            "message": error_message,
+            "timestamp": time.time(),
+            "session_id": session_id
+        }
+        await websocket.send_text(json.dumps(error_response))
+    except Exception as e:
+        logger.error("Failed to send error message", error=str(e), session_id=session_id)
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=8003)

@@ -1,8 +1,9 @@
-"""Backpressure handler for WebSocket connections."""
+"""Backpressure handler for WebSocket connections with Redis session storage."""
 
 import asyncio
 import json
 import time
+import uuid
 from typing import Dict, List, Optional, Any, Deque
 from collections import deque
 from fastapi import WebSocket
@@ -13,19 +14,23 @@ logger = structlog.get_logger(__name__)
 
 
 class BackpressureHandler:
-    """Handles backpressure for WebSocket connections."""
+    """Handles backpressure for WebSocket connections with Redis session storage."""
     
     def __init__(
         self,
         connection_manager,
+        redis_client: redis.Redis,
         max_queue_size: int = 1000,
-        drop_policy: str = "intermediate"
+        drop_policy: str = "intermediate",
+        session_ttl: int = 3600
     ):
         self.connection_manager = connection_manager
+        self.redis = redis_client
         self.max_queue_size = max_queue_size
         self.drop_policy = drop_policy  # "intermediate", "oldest", "newest"
+        self.session_ttl = session_ttl  # Session TTL in seconds
         
-        # Per-connection message queues
+        # Per-connection message queues (in-memory for active connections)
         self.message_queues: Dict[str, Deque[Dict[str, Any]]] = {}
         
         # Statistics
@@ -33,11 +38,18 @@ class BackpressureHandler:
             "messages_sent": 0,
             "messages_dropped": 0,
             "queue_overflows": 0,
-            "backpressure_events": 0
+            "backpressure_events": 0,
+            "active_connections": 0,
+            "ws_send_errors": 0
         }
         
-        # Start cleanup task
-        self._cleanup_task = asyncio.create_task(self._cleanup_queues())
+        # Cleanup task will be started when needed
+        self._cleanup_task = None
+    
+    async def start_cleanup_task(self) -> None:
+        """Start the cleanup task."""
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_queues())
     
     async def send_message(
         self,
@@ -47,11 +59,13 @@ class BackpressureHandler:
         session_id: str,
         message: Dict[str, Any]
     ) -> bool:
-        """Send message with backpressure handling."""
+        """Send message with backpressure handling and Redis session storage."""
         try:
             # Check if connection is still active
             if not await self._is_connection_active(websocket):
                 logger.warning("Connection not active", session_id=session_id)
+                # Store message in Redis for later delivery
+                await self._store_message_in_redis(session_id, message, tenant_id)
                 return False
             
             # Add message to queue
@@ -68,6 +82,8 @@ class BackpressureHandler:
                 error=str(e),
                 session_id=session_id
             )
+            # Store message in Redis for later delivery
+            await self._store_message_in_redis(session_id, message, tenant_id)
             return False
     
     async def _add_to_queue(self, session_id: str, message: Dict[str, Any]) -> None:
@@ -121,30 +137,110 @@ class BackpressureHandler:
         # Add message to queue
         queue.append(message)
     
+    async def _store_message_in_redis(self, session_id: str, message: Dict[str, Any], tenant_id: str) -> None:
+        """Store message in Redis for later delivery."""
+        try:
+            message_data = {
+                "message": message,
+                "timestamp": time.time(),
+                "tenant_id": tenant_id,
+                "session_id": session_id
+            }
+            
+            # Store in Redis list
+            redis_key = f"ws_queue:{session_id}"
+            await self.redis.lpush(redis_key, json.dumps(message_data))
+            await self.redis.expire(redis_key, self.session_ttl)
+            
+            # Update statistics
+            self.stats["backpressure_events"] += 1
+            
+        except Exception as e:
+            logger.error("Failed to store message in Redis", error=str(e), session_id=session_id)
+    
+    async def _retrieve_messages_from_redis(self, session_id: str) -> List[Dict[str, Any]]:
+        """Retrieve messages from Redis for a session."""
+        try:
+            redis_key = f"ws_queue:{session_id}"
+            messages = await self.redis.lrange(redis_key, 0, -1)
+            
+            retrieved_messages = []
+            for message_json in messages:
+                try:
+                    message_data = json.loads(message_json)
+                    retrieved_messages.append(message_data["message"])
+                except (json.JSONDecodeError, KeyError):
+                    continue
+            
+            # Clear Redis queue after retrieval
+            await self.redis.delete(redis_key)
+            
+            return retrieved_messages
+            
+        except Exception as e:
+            logger.error("Failed to retrieve messages from Redis", error=str(e), session_id=session_id)
+            return []
+    
     async def _process_queue(self, session_id: str, websocket: WebSocket) -> None:
-        """Process message queue for a connection."""
+        """Process message queue for a connection with Redis fallback."""
+        # First, retrieve any messages from Redis
+        redis_messages = await self._retrieve_messages_from_redis(session_id)
+        if redis_messages:
+            # Add Redis messages to the front of the queue
+            if session_id not in self.message_queues:
+                self.message_queues[session_id] = deque()
+            
+            # Add Redis messages in reverse order (they were stored with lpush)
+            for message in reversed(redis_messages):
+                self.message_queues[session_id].appendleft(message)
+        
         if session_id not in self.message_queues:
             return
         
         queue = self.message_queues[session_id]
         
-        # Process messages in queue
-        while queue:
+        # Process messages in queue with improved backpressure handling
+        messages_processed = 0
+        max_batch_size = 10  # Process up to 10 messages at once
+        
+        while queue and messages_processed < max_batch_size:
             try:
                 # Check if connection is still active
                 if not await self._is_connection_active(websocket):
                     logger.warning("Connection not active during queue processing", session_id=session_id)
+                    # Store remaining messages in Redis
+                    await self._store_remaining_messages_in_redis(session_id, queue)
                     break
                 
                 # Get next message
                 message = queue.popleft()
                 
-                # Send message
-                await websocket.send_text(json.dumps(message))
-                self.stats["messages_sent"] += 1
+                # Check if this is a final message (should always be delivered)
+                is_final = message.get("type") == "final" or message.get("final", False)
                 
-                # Small delay to prevent overwhelming the connection
-                await asyncio.sleep(0.001)
+                # Send message
+                try:
+                    await websocket.send_text(json.dumps(message))
+                    self.stats["messages_sent"] += 1
+                    messages_processed += 1
+                    
+                    # Small delay to prevent overwhelming the connection
+                    await asyncio.sleep(0.001)
+                    
+                except Exception as send_error:
+                    self.stats["ws_send_errors"] += 1
+                    logger.warning(
+                        "Failed to send message to WebSocket",
+                        error=str(send_error),
+                        session_id=session_id,
+                        message_type=message.get("type", "unknown")
+                    )
+                    
+                    # If it's a final message, store it in Redis for later delivery
+                    if is_final:
+                        await self._store_message_in_redis(session_id, message, message.get("tenant_id", "unknown"))
+                    
+                    break
                 
             except Exception as e:
                 logger.error(
@@ -153,6 +249,15 @@ class BackpressureHandler:
                     session_id=session_id
                 )
                 break
+    
+    async def _store_remaining_messages_in_redis(self, session_id: str, queue: Deque[Dict[str, Any]]) -> None:
+        """Store remaining messages in Redis when connection is lost."""
+        try:
+            while queue:
+                message = queue.popleft()
+                await self._store_message_in_redis(session_id, message, message.get("tenant_id", "unknown"))
+        except Exception as e:
+            logger.error("Failed to store remaining messages in Redis", error=str(e), session_id=session_id)
     
     async def _is_connection_active(self, websocket: WebSocket) -> bool:
         """Check if WebSocket connection is still active."""
@@ -183,16 +288,43 @@ class BackpressureHandler:
         """Get backpressure statistics."""
         total_queued = sum(len(queue) for queue in self.message_queues.values())
         
+        # Get Redis queue statistics
+        redis_queues = await self._get_redis_queue_stats()
+        
         return {
+            "ws_active_connections": len(self.message_queues),
+            "ws_backpressure_drops": self.stats["messages_dropped"],
+            "ws_send_errors": self.stats["ws_send_errors"],
             "total_queued_messages": total_queued,
             "active_queues": len(self.message_queues),
             "messages_sent": self.stats["messages_sent"],
             "messages_dropped": self.stats["messages_dropped"],
             "queue_overflows": self.stats["queue_overflows"],
             "backpressure_events": self.stats["backpressure_events"],
+            "redis_queues": redis_queues,
             "drop_policy": self.drop_policy,
             "max_queue_size": self.max_queue_size
         }
+    
+    async def _get_redis_queue_stats(self) -> Dict[str, Any]:
+        """Get Redis queue statistics."""
+        try:
+            # Get all Redis queue keys
+            pattern = "ws_queue:*"
+            keys = await self.redis.keys(pattern)
+            
+            total_redis_messages = 0
+            for key in keys:
+                length = await self.redis.llen(key)
+                total_redis_messages += length
+            
+            return {
+                "total_redis_queues": len(keys),
+                "total_redis_messages": total_redis_messages
+            }
+        except Exception as e:
+            logger.error("Failed to get Redis queue stats", error=str(e))
+            return {"total_redis_queues": 0, "total_redis_messages": 0}
     
     async def _cleanup_queues(self) -> None:
         """Periodically clean up empty queues."""
