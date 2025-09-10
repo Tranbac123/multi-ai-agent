@@ -3,6 +3,7 @@
 import pytest
 import asyncio
 import time
+import json
 from unittest.mock import AsyncMock, MagicMock
 import redis.asyncio as redis
 
