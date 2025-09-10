@@ -35,11 +35,13 @@ The platform has been transformed from a monolithic MVP into a production-ready 
 ## 🚀 **Production Hardening Commits (9 Additional Commits)**
 
 ### **COMMIT 1 — Documentation as Source of Truth**
+
 - ✅ Updated README.md, VISUAL_ARCHITECTURE.md, PROJECT_STRUCTURE_DIAGRAM.md
 - ✅ Added RACI section with control-plane vs runtime ownership
-- ✅ Included all runtime services, control-plane, data-plane, observability, eval/* components
+- ✅ Included all runtime services, control-plane, data-plane, observability, eval/\* components
 
 ### **COMMIT 2 — Router v2 Hardening**
+
 - ✅ Feature extractor: token_count, json_schema_strictness, domain_flags, novelty_score, historical_failure_rate
 - ✅ Calibrated classifier with temperature scaling and deterministic fallback
 - ✅ Bandit policy minimizing E[cost + λ·error]
@@ -47,40 +49,47 @@ The platform has been transformed from a monolithic MVP into a production-ready 
 - ✅ Metrics: router_decision_latency_ms, router_misroute_rate, tier_distribution, expected_vs_actual_cost
 
 ### **COMMIT 3 — Analytics Service + Dashboards**
+
 - ✅ Read-only CQRS API for KPIs per tenant
 - ✅ Grafana dashboard JSON configurations
 - ✅ Warehouse integration (ClickHouse/BigQuery) or Postgres read-replica
 
 ### **COMMIT 4 — Reliability Enforcement**
+
 - ✅ Tool adapters with timeouts, retries (exponential backoff + jitter)
 - ✅ Circuit-breaker, bulkhead, idempotency patterns
 - ✅ Write-ahead events: tool.call.requested/succeeded/failed
 - ✅ Saga compensation for side-effects
 
 ### **COMMIT 5 — Realtime Backpressure**
+
 - ✅ Dedicated ASGI WS app with sticky sessions
 - ✅ Redis session store and outbound Redis queue
 - ✅ Backpressure policies with metrics: ws_active_connections, ws_backpressure_drops, ws_send_errors
 
 ### **COMMIT 6 — Kubernetes Autoscaling & Security**
+
 - ✅ KEDA autoscaling for orchestrator/ingestion (NATS queue depth)
 - ✅ HPA for router/realtime (CPU/memory)
 - ✅ Readiness/liveness probes for all services
 - ✅ NetworkPolicy for east-west traffic control
 
 ### **COMMIT 7 — Evaluation Suite + Episode Replay**
+
 - ✅ Golden tasks per use-case (FAQ, Order, Lead) with JSON assertions
 - ✅ Episode replay system (EXACT, PARAMETRIC, STRESS modes)
 - ✅ LLM-judge rubric with CI gate (fails if score < threshold)
 - ✅ Nightly evaluation runs with quality gates
 
 ### **COMMIT 8 — Billing E2E Verification**
+
 - ✅ Webhook aggregation of usage_counters
 - ✅ Invoice preview endpoint with cost calculations
 - ✅ Plan enforcement in API Gateway (HTTP 429 when over quota)
 - ✅ Payment processing with Stripe/Braintree support
 
 ### **COMMIT 9 — Dependency Hygiene & Security**
+
 - ✅ constraints.txt for reproducible builds
 - ✅ Security tools: trivy, safety, bandit in CI
 - ✅ Dependency deduplication and validation

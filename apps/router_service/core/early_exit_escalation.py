@@ -98,34 +98,39 @@ class EarlyExitEscalation:
         features: RouterFeatures,
         tenant_id: str
     ) -> Dict[str, Any]:
-        """Check if request can use early exit to Tier A."""
+        """Check if request can use early exit to Tier A with strict JSON/schema validation."""
         try:
-            # Early exit conditions for Tier A (SLM_A)
+            # Early exit conditions for Tier A (SLM_A) - must pass strict validation
             can_exit_to_a = True
             exit_confidence = 1.0
             
-            # Check JSON schema strictness
-            if features.schema_strictness < 0.8:
+            # STRICT: JSON schema strictness must be very high
+            if features.schema_strictness < 0.9:
                 can_exit_to_a = False
-                exit_confidence *= 0.5
+                exit_confidence *= 0.1  # Heavy penalty for low schema strictness
             
-            # Check token count
-            if features.token_count > 200:
+            # STRICT: Must pass JSON validation
+            if not await self._validate_json_strict(features, tenant_id):
+                can_exit_to_a = False
+                exit_confidence *= 0.1  # Heavy penalty for failed JSON validation
+            
+            # Check token count (moderate threshold)
+            if features.token_count > 150:
                 can_exit_to_a = False
                 exit_confidence *= 0.3
             
-            # Check complexity
-            if features.request_complexity > 0.3:
+            # Check complexity (strict threshold)
+            if features.request_complexity > 0.2:
                 can_exit_to_a = False
                 exit_confidence *= 0.2
             
-            # Check novelty
-            if features.novelty_score > 0.5:
+            # Check novelty (strict threshold)
+            if features.novelty_score > 0.3:
                 can_exit_to_a = False
                 exit_confidence *= 0.4
             
-            # Check historical failure rate
-            if features.historical_failure_rate > 0.2:
+            # Check historical failure rate (strict threshold)
+            if features.historical_failure_rate > 0.1:
                 can_exit_to_a = False
                 exit_confidence *= 0.3
             
@@ -134,7 +139,8 @@ class EarlyExitEscalation:
                 can_exit_to_a = False
                 exit_confidence *= 0.6
             
-            if can_exit_to_a and exit_confidence >= 0.8:
+            # Only allow early exit if confidence is very high
+            if can_exit_to_a and exit_confidence >= 0.9:
                 return {
                     'can_exit': True,
                     'tier': Tier.A,
@@ -146,6 +152,74 @@ class EarlyExitEscalation:
         except Exception as e:
             logger.error("Early exit check failed", error=str(e))
             return {'can_exit': False, 'tier': None, 'confidence': 0.0}
+    
+    async def _validate_json_strict(self, features: RouterFeatures, tenant_id: str) -> bool:
+        """Strict JSON validation for early exit."""
+        try:
+            # Very strict JSON validation requirements
+            # Schema strictness must be very high
+            if features.schema_strictness < 0.9:
+                return False
+            
+            # Request complexity must be low
+            if features.request_complexity > 0.2:
+                return False
+            
+            # Check for structured data indicators
+            has_structured_indicators = (
+                features.schema_strictness > 0.8 and
+                features.request_complexity < 0.3
+            )
+            
+            # Additional validation based on tenant requirements
+            tenant_requirements = await self._get_tenant_json_requirements(tenant_id)
+            if tenant_requirements:
+                if not self._meets_tenant_requirements(features, tenant_requirements):
+                    return False
+            
+            return has_structured_indicators
+            
+        except Exception as e:
+            logger.error("Strict JSON validation failed", error=str(e))
+            return False
+    
+    async def _get_tenant_json_requirements(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get tenant-specific JSON requirements."""
+        try:
+            requirements_key = f"json_requirements:{tenant_id}"
+            requirements = await self.redis.hgetall(requirements_key)
+            
+            if not requirements:
+                return None
+            
+            return {
+                'min_schema_strictness': float(requirements.get('min_schema_strictness', 0.9)),
+                'max_complexity': float(requirements.get('max_complexity', 0.2)),
+                'max_token_count': int(requirements.get('max_token_count', 150)),
+                'require_validation': requirements.get('require_validation', 'true').lower() == 'true'
+            }
+        except Exception:
+            return None
+    
+    def _meets_tenant_requirements(
+        self, 
+        features: RouterFeatures, 
+        requirements: Dict[str, Any]
+    ) -> bool:
+        """Check if features meet tenant requirements."""
+        try:
+            if features.schema_strictness < requirements.get('min_schema_strictness', 0.9):
+                return False
+            
+            if features.request_complexity > requirements.get('max_complexity', 0.2):
+                return False
+            
+            if features.token_count > requirements.get('max_token_count', 150):
+                return False
+            
+            return True
+        except Exception:
+            return False
     
     async def _check_domain_early_exit_rules(
         self,

@@ -3,10 +3,13 @@
 import asyncio
 import time
 import math
+import hashlib
+import json
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import structlog
 import redis.asyncio as redis
+from functools import lru_cache
 
 from .feature_extractor import RouterFeatures, Tier
 
@@ -269,19 +272,102 @@ class CalibratedClassifier:
             logger.error("Failed to update calibration data", error=str(e))
     
     async def _deterministic_fallback(self, features: RouterFeatures) -> Tuple[Tier, float, bool]:
-        """Deterministic fallback routing."""
+        """Deterministic fallback routing with seeded consistency."""
         try:
-            # Simple deterministic rules
-            if features.token_count < 100 and features.request_complexity < 0.3:
-                return Tier.A, 0.8, False
-            elif features.token_count > 1000 or features.request_complexity > 0.7:
-                return Tier.C, 0.8, False
+            # Create a deterministic hash for consistent routing
+            feature_hash = self._create_feature_hash(features)
+            hash_value = int(feature_hash, 16) % 1000  # 0-999
+            
+            # Deterministic rules based on features and hash
+            tier_a_score = 0
+            tier_b_score = 0
+            tier_c_score = 0
+            
+            # Tier A scoring (fast, cheap)
+            if features.token_count < 100:
+                tier_a_score += 3
+            elif features.token_count < 500:
+                tier_a_score += 2
+            else:
+                tier_a_score += 1
+            
+            if features.request_complexity < 0.3:
+                tier_a_score += 3
+            elif features.request_complexity < 0.6:
+                tier_a_score += 2
+            else:
+                tier_a_score += 1
+            
+            if features.schema_strictness > 0.7:
+                tier_a_score += 2
+            
+            if features.historical_failure_rate < 0.2:
+                tier_a_score += 2
+            
+            # Tier C scoring (slow, expensive, accurate)
+            if features.token_count > 1000:
+                tier_c_score += 3
+            elif features.token_count > 500:
+                tier_c_score += 2
+            else:
+                tier_c_score += 1
+            
+            if features.request_complexity > 0.7:
+                tier_c_score += 3
+            elif features.request_complexity > 0.4:
+                tier_c_score += 2
+            else:
+                tier_c_score += 1
+            
+            if features.novelty_score > 0.7:
+                tier_c_score += 2
+            
+            if features.historical_failure_rate > 0.5:
+                tier_c_score += 2
+            
+            if features.user_tier == "enterprise":
+                tier_c_score += 2
+            
+            # Tier B is default
+            tier_b_score = 2
+            
+            # Use hash for tie-breaking to ensure consistency
+            if tier_a_score > tier_c_score and tier_a_score > tier_b_score:
+                return Tier.A, 0.85, False
+            elif tier_c_score > tier_a_score and tier_c_score > tier_b_score:
+                return Tier.C, 0.85, False
+            elif tier_a_score == tier_c_score:
+                # Use hash for tie-breaking
+                if hash_value % 2 == 0:
+                    return Tier.A, 0.8, False
+                else:
+                    return Tier.C, 0.8, False
             else:
                 return Tier.B, 0.8, False
                 
         except Exception as e:
             logger.error("Deterministic fallback failed", error=str(e))
             return Tier.B, 0.5, True
+    
+    def _create_feature_hash(self, features: RouterFeatures) -> str:
+        """Create a deterministic hash from features."""
+        try:
+            # Create a stable hash for deterministic routing
+            feature_data = {
+                'token_count': features.token_count,
+                'schema_strictness': round(features.schema_strictness, 2),
+                'novelty_score': round(features.novelty_score, 2),
+                'historical_failure_rate': round(features.historical_failure_rate, 2),
+                'request_complexity': round(features.request_complexity, 2),
+                'user_tier': features.user_tier,
+                'time_of_day': features.time_of_day,
+                'day_of_week': features.day_of_week
+            }
+            
+            feature_str = json.dumps(feature_data, sort_keys=True)
+            return hashlib.md5(feature_str.encode()).hexdigest()[:8]
+        except Exception:
+            return "default"
     
     async def calibrate_temperature(self, tenant_id: str) -> None:
         """Calibrate temperature based on historical decisions."""

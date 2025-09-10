@@ -18,6 +18,7 @@ class RouterMetrics:
     misroute_rate: float
     tier_distribution: Dict[str, int]
     expected_vs_actual_cost: float
+    expected_vs_actual_latency: float
     total_requests: int
     successful_requests: int
     failed_requests: int
@@ -38,7 +39,9 @@ class MetricsCollector:
         decision_time_ms: float,
         success: bool,
         expected_cost: float,
-        actual_cost: float
+        actual_cost: float,
+        expected_latency_ms: float = None,
+        actual_latency_ms: float = None
     ) -> None:
         """Record a routing decision."""
         try:
@@ -55,6 +58,10 @@ class MetricsCollector:
             
             # Record cost comparison
             await self._record_cost_comparison(tenant_id, expected_cost, actual_cost, timestamp)
+            
+            # Record latency comparison if provided
+            if expected_latency_ms is not None and actual_latency_ms is not None:
+                await self._record_latency_comparison(tenant_id, expected_latency_ms, actual_latency_ms, timestamp)
             
             # Update total requests
             await self._increment_total_requests(tenant_id, timestamp)
@@ -77,6 +84,9 @@ class MetricsCollector:
             # Get cost comparison
             cost_comparison = await self._get_cost_comparison(tenant_id)
             
+            # Get latency comparison
+            latency_comparison = await self._get_latency_comparison(tenant_id)
+            
             # Calculate misroute rate
             misroute_rate = await self._calculate_misroute_rate(tenant_id)
             
@@ -85,6 +95,7 @@ class MetricsCollector:
                 misroute_rate=misroute_rate,
                 tier_distribution=tier_distribution,
                 expected_vs_actual_cost=cost_comparison,
+                expected_vs_actual_latency=latency_comparison,
                 total_requests=success_metrics.get('total', 0),
                 successful_requests=success_metrics.get('successful', 0),
                 failed_requests=success_metrics.get('failed', 0),
@@ -98,6 +109,7 @@ class MetricsCollector:
                 misroute_rate=0.0,
                 tier_distribution={},
                 expected_vs_actual_cost=0.0,
+                expected_vs_actual_latency=0.0,
                 total_requests=0,
                 successful_requests=0,
                 failed_requests=0,
@@ -301,3 +313,44 @@ class MetricsCollector:
             
         except Exception as e:
             logger.error("Failed to reset metrics", error=str(e))
+    
+    async def _record_latency_comparison(self, tenant_id: str, expected_latency_ms: float, actual_latency_ms: float, timestamp: float) -> None:
+        """Record latency comparison."""
+        try:
+            latency_comp_key = f"{self.metrics_prefix}:latency_comp:{tenant_id}"
+            
+            # Store latency comparison
+            latency_comp_data = {
+                'expected': expected_latency_ms,
+                'actual': actual_latency_ms,
+                'timestamp': timestamp
+            }
+            
+            await self.redis.hset(latency_comp_key, mapping=latency_comp_data)
+            
+            # Set TTL
+            await self.redis.expire(latency_comp_key, 86400 * 7)  # 7 days
+            
+        except Exception as e:
+            logger.error("Failed to record latency comparison", error=str(e))
+    
+    async def _get_latency_comparison(self, tenant_id: str) -> float:
+        """Get latency comparison ratio."""
+        try:
+            latency_comp_key = f"{self.metrics_prefix}:latency_comp:{tenant_id}"
+            latency_comp_data = await self.redis.hgetall(latency_comp_key)
+            
+            if not latency_comp_data:
+                return 0.0
+            
+            expected = float(latency_comp_data.get('expected', 0))
+            actual = float(latency_comp_data.get('actual', 0))
+            
+            if expected == 0:
+                return 0.0
+            
+            return actual / expected
+            
+        except Exception as e:
+            logger.error("Failed to get latency comparison", error=str(e))
+            return 0.0
