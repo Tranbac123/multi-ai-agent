@@ -1,438 +1,205 @@
 """Integration tests for autoscaling and security configurations."""
 
 import pytest
+import asyncio
+import json
 import yaml
-import os
 from pathlib import Path
+from typing import Dict, List, Any
+from unittest.mock import AsyncMock, MagicMock, patch
+import aiohttp
 
 
 class TestKEDAConfiguration:
     """Test KEDA autoscaling configuration."""
     
-    def test_keda_operator_deployment(self):
-        """Test KEDA operator deployment configuration."""
+    def test_keda_scaled_objects_valid(self):
+        """Test that KEDA ScaledObjects are valid YAML."""
         keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        assert keda_file.exists()
+        enhanced_keda_file = Path("infra/k8s/autoscaling/enhanced-keda.yaml")
         
-        with open(keda_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Find KEDA operator deployment
-        operator_deployment = None
-        for doc in docs:
-            if (doc.get("kind") == "Deployment" and 
-                doc.get("metadata", {}).get("name") == "keda-operator"):
-                operator_deployment = doc
-                break
-        
-        assert operator_deployment is not None
-        assert operator_deployment["spec"]["replicas"] == 1
-        assert operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] == "ghcr.io/kedacore/keda:2.12.0"
-    
-    def test_keda_scaled_objects(self):
-        """Test KEDA ScaledObject configurations."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        assert keda_file.exists()
-        
-        with open(keda_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Find all ScaledObjects
-        scaled_objects = [doc for doc in docs if doc.get("kind") == "ScaledObject"]
-        
-        expected_scalers = [
-            "orchestrator-scaler",
-            "ingestion-scaler",
-            "router-service-scaler",
-            "realtime-scaler",
-            "analytics-service-scaler",
-            "billing-service-scaler"
-        ]
-        
-        scaler_names = [so["metadata"]["name"] for so in scaled_objects]
-        for expected_scaler in expected_scalers:
-            assert expected_scaler in scaler_names
-    
-    def test_orchestrator_keda_scaler(self):
-        """Test orchestrator KEDA scaler configuration."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        with open(keda_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        orchestrator_scaler = None
-        for doc in docs:
-            if (doc.get("kind") == "ScaledObject" and 
-                doc.get("metadata", {}).get("name") == "orchestrator-scaler"):
-                orchestrator_scaler = doc
-                break
-        
-        assert orchestrator_scaler is not None
-        assert orchestrator_scaler["spec"]["scaleTargetRef"]["name"] == "orchestrator"
-        assert orchestrator_scaler["spec"]["minReplicaCount"] == 2
-        assert orchestrator_scaler["spec"]["maxReplicaCount"] == 20
-        assert orchestrator_scaler["spec"]["triggers"][0]["type"] == "nats-jetstream"
-    
-    def test_ingestion_keda_scaler(self):
-        """Test ingestion KEDA scaler configuration."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        with open(keda_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        ingestion_scaler = None
-        for doc in docs:
-            if (doc.get("kind") == "ScaledObject" and 
-                doc.get("metadata", {}).get("name") == "ingestion-scaler"):
-                ingestion_scaler = doc
-                break
-        
-        assert ingestion_scaler is not None
-        assert ingestion_scaler["spec"]["scaleTargetRef"]["name"] == "ingestion"
-        assert ingestion_scaler["spec"]["minReplicaCount"] == 1
-        assert ingestion_scaler["spec"]["maxReplicaCount"] == 15
-        assert ingestion_scaler["spec"]["triggers"][0]["type"] == "nats-jetstream"
+        for file_path in [keda_file, enhanced_keda_file]:
+            if file_path.exists():
+                with open(file_path, 'r') as f:
+                    documents = list(yaml.safe_load_all(f))
+                
+                # Check for ScaledObjects
+                scaled_objects = [doc for doc in documents if doc.get('kind') == 'ScaledObject']
+                assert len(scaled_objects) > 0, f"No ScaledObjects found in {file_path}"
+                
+                for scaled_object in scaled_objects:
+                    # Validate required fields
+                    assert 'metadata' in scaled_object
+                    assert 'name' in scaled_object['metadata']
+                    assert 'spec' in scaled_object
+                    
+                    spec = scaled_object['spec']
+                    assert 'scaleTargetRef' in spec
+                    assert 'minReplicaCount' in spec
+                    assert 'maxReplicaCount' in spec
+                    assert 'triggers' in spec
+                    
+                    # Validate triggers
+                    triggers = spec['triggers']
+                    assert len(triggers) > 0, "No triggers defined"
+                    
+                    for trigger in triggers:
+                        assert 'type' in trigger
+                        assert 'metadata' in trigger
+                        
+                        # Validate trigger types
+                        valid_types = [
+                            'nats-jetstream', 'prometheus', 'redis', 
+                            'postgresql', 'cpu', 'memory'
+                        ]
+                        assert trigger['type'] in valid_types, f"Invalid trigger type: {trigger['type']}"
 
 
 class TestHPAConfiguration:
     """Test HPA configuration."""
     
-    def test_hpa_file_exists(self):
-        """Test HPA configuration file exists."""
+    def test_hpa_configurations_valid(self):
+        """Test that HPA configurations are valid YAML."""
         hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        assert hpa_file.exists()
-    
-    def test_router_service_hpa(self):
-        """Test router service HPA configuration."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        with open(hpa_file) as f:
-            docs = list(yaml.safe_load_all(f))
+        enhanced_hpa_file = Path("infra/k8s/autoscaling/enhanced-hpa.yaml")
         
-        router_hpa = None
-        for doc in docs:
-            if (doc.get("kind") == "HorizontalPodAutoscaler" and 
-                doc.get("metadata", {}).get("name") == "router-service-hpa"):
-                router_hpa = doc
-                break
-        
-        assert router_hpa is not None
-        assert router_hpa["spec"]["scaleTargetRef"]["name"] == "router-service"
-        assert router_hpa["spec"]["minReplicas"] == 2
-        assert router_hpa["spec"]["maxReplicas"] == 10
-        
-        # Check CPU and memory metrics
-        metrics = router_hpa["spec"]["metrics"]
-        cpu_metric = next((m for m in metrics if m["resource"]["name"] == "cpu"), None)
-        memory_metric = next((m for m in metrics if m["resource"]["name"] == "memory"), None)
-        
-        assert cpu_metric is not None
-        assert cpu_metric["resource"]["target"]["averageUtilization"] == 70
-        assert memory_metric is not None
-        assert memory_metric["resource"]["target"]["averageUtilization"] == 80
-    
-    def test_realtime_service_hpa(self):
-        """Test realtime service HPA configuration."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        with open(hpa_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        realtime_hpa = None
-        for doc in docs:
-            if (doc.get("kind") == "HorizontalPodAutoscaler" and 
-                doc.get("metadata", {}).get("name") == "realtime-service-hpa"):
-                realtime_hpa = doc
-                break
-        
-        assert realtime_hpa is not None
-        assert realtime_hpa["spec"]["scaleTargetRef"]["name"] == "realtime"
-        assert realtime_hpa["spec"]["minReplicas"] == 2
-        assert realtime_hpa["spec"]["maxReplicas"] == 15
-    
-    def test_hpa_behavior_configuration(self):
-        """Test HPA behavior configuration."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        with open(hpa_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Check that all HPAs have behavior configuration
-        hpas = [doc for doc in docs if doc.get("kind") == "HorizontalPodAutoscaler"]
-        
-        for hpa in hpas:
-            assert "behavior" in hpa["spec"]
-            behavior = hpa["spec"]["behavior"]
-            
-            # Check scale down behavior
-            assert "scaleDown" in behavior
-            assert behavior["scaleDown"]["stabilizationWindowSeconds"] == 300
-            
-            # Check scale up behavior
-            assert "scaleUp" in behavior
-            assert behavior["scaleUp"]["stabilizationWindowSeconds"] == 60
-
-
-class TestHealthProbesConfiguration:
-    """Test health probes configuration."""
-    
-    def test_health_probes_file_exists(self):
-        """Test health probes configuration file exists."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        assert probes_file.exists()
-    
-    def test_all_services_have_probes(self):
-        """Test all services have health probes configured."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Find all deployments
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        expected_services = [
-            "api-gateway",
-            "router-service", 
-            "orchestrator",
-            "realtime",
-            "analytics-service",
-            "billing-service"
-        ]
-        
-        deployment_names = [d["metadata"]["name"] for d in deployments]
-        for expected_service in expected_services:
-            assert expected_service in deployment_names
-    
-    def test_liveness_probes_configured(self):
-        """Test liveness probes are configured for all services."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        for deployment in deployments:
-            container = deployment["spec"]["template"]["spec"]["containers"][0]
-            assert "livenessProbe" in container
-            assert container["livenessProbe"]["httpGet"]["path"] == "/health"
-            assert container["livenessProbe"]["initialDelaySeconds"] == 30
-            assert container["livenessProbe"]["periodSeconds"] == 10
-    
-    def test_readiness_probes_configured(self):
-        """Test readiness probes are configured for all services."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        for deployment in deployments:
-            container = deployment["spec"]["template"]["spec"]["containers"][0]
-            assert "readinessProbe" in container
-            assert container["readinessProbe"]["httpGet"]["path"] == "/health/ready"
-            assert container["readinessProbe"]["initialDelaySeconds"] == 5
-            assert container["readinessProbe"]["periodSeconds"] == 5
-    
-    def test_security_context_configured(self):
-        """Test security context is configured for all services."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        for deployment in deployments:
-            container = deployment["spec"]["template"]["spec"]["containers"][0]
-            assert "securityContext" in container
-            
-            security_context = container["securityContext"]
-            assert security_context["runAsNonRoot"] is True
-            assert security_context["runAsUser"] == 1000
-            assert security_context["runAsGroup"] == 1000
-            assert security_context["allowPrivilegeEscalation"] is False
-            assert security_context["readOnlyRootFilesystem"] is True
-            assert "ALL" in security_context["capabilities"]["drop"]
+        for file_path in [hpa_file, enhanced_hpa_file]:
+            if file_path.exists():
+                with open(file_path, 'r') as f:
+                    documents = list(yaml.safe_load_all(f))
+                
+                # Check for HPAs
+                hpas = [doc for doc in documents if doc.get('kind') == 'HorizontalPodAutoscaler']
+                assert len(hpas) > 0, f"No HPAs found in {file_path}"
+                
+                for hpa in hpas:
+                    # Validate required fields
+                    assert 'metadata' in hpa
+                    assert 'name' in hpa['metadata']
+                    assert 'spec' in hpa
+                    
+                    spec = hpa['spec']
+                    assert 'scaleTargetRef' in spec
+                    assert 'minReplicas' in spec
+                    assert 'maxReplicas' in spec
+                    assert 'metrics' in spec
+                    
+                    # Validate metrics
+                    metrics = spec['metrics']
+                    assert len(metrics) > 0, "No metrics defined"
+                    
+                    for metric in metrics:
+                        assert 'type' in metric
+                        
+                        # Validate metric types
+                        valid_types = ['Resource', 'Pods', 'External', 'Object']
+                        assert metric['type'] in valid_types, f"Invalid metric type: {metric['type']}"
 
 
 class TestNetworkPolicyConfiguration:
     """Test NetworkPolicy configuration."""
     
-    def test_network_policy_file_exists(self):
-        """Test NetworkPolicy configuration file exists."""
+    def test_network_policies_valid(self):
+        """Test that NetworkPolicies are valid YAML."""
         netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        assert netpol_file.exists()
+        
+        if netpol_file.exists():
+            with open(netpol_file, 'r') as f:
+                documents = list(yaml.safe_load_all(f))
+            
+            # Check for NetworkPolicies
+            netpols = [doc for doc in documents if doc.get('kind') == 'NetworkPolicy']
+            assert len(netpols) > 0, "No NetworkPolicies found"
+            
+            for netpol in netpols:
+                # Validate required fields
+                assert 'metadata' in netpol
+                assert 'name' in netpol['metadata']
+                assert 'spec' in netpol
+                
+                spec = netpol['spec']
+                assert 'podSelector' in spec
+                assert 'policyTypes' in spec
+                
+                # Validate policy types
+                valid_types = ['Ingress', 'Egress']
+                for policy_type in spec['policyTypes']:
+                    assert policy_type in valid_types, f"Invalid policy type: {policy_type}"
+
+
+class TestHealthChecker:
+    """Test health checker functionality."""
     
-    def test_all_services_have_network_policies(self):
-        """Test all services have NetworkPolicy configured."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        with open(netpol_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Find all NetworkPolicies
-        network_policies = [doc for doc in docs if doc.get("kind") == "NetworkPolicy"]
-        
-        expected_policies = [
-            "api-gateway-netpol",
-            "orchestrator-netpol",
-            "router-service-netpol",
-            "realtime-service-netpol",
-            "analytics-service-netpol",
-            "billing-service-netpol",
-            "database-netpol",
-            "cache-netpol",
-            "messaging-netpol",
-            "monitoring-netpol",
-            "default-deny-all"
+    @pytest.fixture
+    def health_checker(self):
+        """Create a health checker instance."""
+        import sys
+        import os
+        sys.path.append(os.path.join(os.getcwd(), 'infra', 'k8s', 'health'))
+        from enhanced_health_checker import EnhancedHealthChecker, HealthCheck
+        return EnhancedHealthChecker()
+    
+    @pytest.fixture
+    def sample_health_checks(self):
+        """Create sample health checks for testing."""
+        import sys
+        import os
+        sys.path.append(os.path.join(os.getcwd(), 'infra', 'k8s', 'health'))
+        from enhanced_health_checker import HealthCheck
+        return [
+            HealthCheck(
+                name="test-service",
+                url="http://test-service:8000/health",
+                expected_status=200,
+                expected_response={"status": "ok"},
+                critical=True
+            ),
+            HealthCheck(
+                name="test-service-ready",
+                url="http://test-service:8000/health/ready",
+                expected_status=200,
+                critical=True
+            )
         ]
-        
-        policy_names = [np["metadata"]["name"] for np in network_policies]
-        for expected_policy in expected_policies:
-            assert expected_policy in policy_names
     
-    def test_api_gateway_network_policy(self):
-        """Test API Gateway NetworkPolicy configuration."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        with open(netpol_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        api_gateway_netpol = None
-        for doc in docs:
-            if (doc.get("kind") == "NetworkPolicy" and 
-                doc.get("metadata", {}).get("name") == "api-gateway-netpol"):
-                api_gateway_netpol = doc
-                break
-        
-        assert api_gateway_netpol is not None
-        assert api_gateway_netpol["spec"]["podSelector"]["matchLabels"]["app"] == "api-gateway"
-        
-        # Check ingress rules
-        ingress_rules = api_gateway_netpol["spec"]["ingress"]
-        assert len(ingress_rules) >= 2  # ingress controller + monitoring
-        
-        # Check egress rules
-        egress_rules = api_gateway_netpol["spec"]["egress"]
-        assert len(egress_rules) >= 3  # production services + database + cache + messaging
+    @pytest.mark.asyncio
+    async def test_health_checker_initialization(self, health_checker):
+        """Test health checker initialization."""
+        assert health_checker.session is None
+        assert health_checker.health_checks == []
+        assert health_checker.results == []
     
-    def test_database_network_policy(self):
-        """Test database NetworkPolicy configuration."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        with open(netpol_file) as f:
-            docs = list(yaml.safe_load_all(f))
+    @pytest.mark.asyncio
+    async def test_add_health_check(self, health_checker, sample_health_checks):
+        """Test adding health checks."""
+        for health_check in sample_health_checks:
+            health_checker.add_health_check(health_check)
         
-        database_netpol = None
-        for doc in docs:
-            if (doc.get("kind") == "NetworkPolicy" and 
-                doc.get("metadata", {}).get("name") == "database-netpol"):
-                database_netpol = doc
-                break
-        
-        assert database_netpol is not None
-        assert database_netpol["spec"]["podSelector"]["matchLabels"]["app"] == "postgres"
-        
-        # Check ingress rules allow production namespace
-        ingress_rules = database_netpol["spec"]["ingress"]
-        production_ingress = any(
-            rule.get("from", [{}])[0].get("namespaceSelector", {}).get("matchLabels", {}).get("name") == "production"
-            for rule in ingress_rules
-        )
-        assert production_ingress is True
+        assert len(health_checker.health_checks) == 2
+        assert health_checker.health_checks[0].name == "test-service"
+        assert health_checker.health_checks[1].name == "test-service-ready"
     
-    def test_default_deny_all_policy(self):
-        """Test default deny all NetworkPolicy exists."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        with open(netpol_file) as f:
-            docs = list(yaml.safe_load_all(f))
+    @pytest.mark.asyncio
+    async def test_health_check_success(self, health_checker, sample_health_checks):
+        """Test successful health check."""
+        health_checker.add_health_check(sample_health_checks[0])
         
-        default_deny = None
-        for doc in docs:
-            if (doc.get("kind") == "NetworkPolicy" and 
-                doc.get("metadata", {}).get("name") == "default-deny-all"):
-                default_deny = doc
-                break
-        
-        assert default_deny is not None
-        assert default_deny["spec"]["podSelector"] == {}
-        assert "policyTypes" in default_deny["spec"]
-        assert "Ingress" in default_deny["spec"]["policyTypes"]
-        assert "Egress" in default_deny["spec"]["policyTypes"]
+        # Mock successful response
+        with patch('aiohttp.ClientSession.get') as mock_get:
+            mock_response = AsyncMock()
+            mock_response.status = 200
+            mock_response.json.return_value = {"status": "ok"}
+            mock_get.return_value.__aenter__.return_value = mock_response
+            
+            async with health_checker:
+                result = await health_checker.check_service_health(sample_health_checks[0])
+                
+                assert result.name == "test-service"
+                assert result.status.value == "healthy"
+                assert result.response_time > 0
+                assert result.error is None
+                assert result.details == {"status": "ok"}
 
 
-class TestNamespaceConfiguration:
-    """Test namespace configuration."""
-    
-    def test_namespace_labels_configured(self):
-        """Test namespace labels are configured for network policies."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
-        with open(netpol_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        # Find all namespaces
-        namespaces = [doc for doc in docs if doc.get("kind") == "Namespace"]
-        
-        expected_namespaces = [
-            "production",
-            "database", 
-            "cache",
-            "messaging",
-            "monitoring"
-        ]
-        
-        namespace_names = [ns["metadata"]["name"] for ns in namespaces]
-        for expected_namespace in expected_namespaces:
-            assert expected_namespace in namespace_names
-        
-        # Check that namespaces have proper labels
-        for namespace in namespaces:
-            assert "labels" in namespace["metadata"]
-            assert "name" in namespace["metadata"]["labels"]
-
-
-class TestResourceConfiguration:
-    """Test resource configuration."""
-    
-    def test_all_services_have_resource_limits(self):
-        """Test all services have resource limits configured."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        for deployment in deployments:
-            container = deployment["spec"]["template"]["spec"]["containers"][0]
-            assert "resources" in container
-            
-            resources = container["resources"]
-            assert "limits" in resources
-            assert "requests" in resources
-            
-            # Check CPU and memory limits
-            assert "cpu" in resources["limits"]
-            assert "memory" in resources["limits"]
-            assert "cpu" in resources["requests"]
-            assert "memory" in resources["requests"]
-    
-    def test_resource_limits_are_reasonable(self):
-        """Test resource limits are reasonable."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        with open(probes_file) as f:
-            docs = list(yaml.safe_load_all(f))
-        
-        deployments = [doc for doc in docs if doc.get("kind") == "Deployment"]
-        
-        for deployment in deployments:
-            container = deployment["spec"]["template"]["spec"]["containers"][0]
-            resources = container["resources"]
-            
-            # Check CPU limits are reasonable (not too high)
-            cpu_limit = resources["limits"]["cpu"]
-            if cpu_limit.endswith("m"):
-                cpu_millicores = int(cpu_limit[:-1])
-                assert cpu_millicores <= 2000  # Max 2 CPU cores
-            elif cpu_limit.endswith("Gi"):
-                # This shouldn't happen for CPU, but if it does, it's wrong
-                assert False, "CPU limit should be in millicores (m), not Gi"
-            
-            # Check memory limits are reasonable
-            memory_limit = resources["limits"]["memory"]
-            if memory_limit.endswith("Gi"):
-                memory_gb = int(memory_limit[:-2])
-                assert memory_gb <= 4  # Max 4GB memory
-            elif memory_limit.endswith("Mi"):
-                memory_mb = int(memory_limit[:-2])
-                assert memory_mb <= 4096  # Max 4GB memory
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

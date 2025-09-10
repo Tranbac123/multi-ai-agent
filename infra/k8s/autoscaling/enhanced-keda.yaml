@@ -1,0 +1,340 @@
+# Enhanced KEDA configuration with advanced scaling triggers
+
+---
+# KEDA ScaledObject for Orchestrator with multiple triggers
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: orchestrator-enhanced-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: orchestrator
+  minReplicaCount: 2
+  maxReplicaCount: 50
+  pollingInterval: 15
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  # NATS JetStream queue depth
+  - type: nats-jetstream
+    metadata:
+      natsServerMonitoringEndpoint: "nats://nats:8222"
+      stream: "orchestrator"
+      consumer: "orchestrator-consumer"
+      lagThreshold: "10"
+      activationLagThreshold: "5"
+      unsafeSsl: "false"
+  # CPU-based scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "orchestrator_cpu_usage"
+      threshold: "70"
+      query: "rate(container_cpu_usage_seconds_total{pod=~\"orchestrator-.*\"}[5m]) * 100"
+  # Memory-based scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "orchestrator_memory_usage"
+      threshold: "80"
+      query: "container_memory_usage_bytes{pod=~\"orchestrator-.*\"} / container_spec_memory_limit_bytes{pod=~\"orchestrator-.*\"} * 100"
+
+---
+# KEDA ScaledObject for Router Service with advanced metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: router-service-enhanced-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: router-service
+  minReplicaCount: 2
+  maxReplicaCount: 30
+  pollingInterval: 15
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  # Request rate scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "router_requests_per_second"
+      threshold: "100"
+      query: "rate(router_requests_total[1m])"
+  # Decision latency scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "router_decision_latency_p95"
+      threshold: "100"
+      query: "histogram_quantile(0.95, rate(router_decision_latency_ms_bucket[5m]))"
+  # Error rate scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "router_error_rate"
+      threshold: "5"
+      query: "rate(router_errors_total[5m]) / rate(router_requests_total[5m]) * 100"
+
+---
+# KEDA ScaledObject for Realtime Service with WebSocket metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: realtime-enhanced-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: realtime
+  minReplicaCount: 2
+  maxReplicaCount: 40
+  pollingInterval: 15
+  cooldownPeriod: 300
+  idleReplicaCount: 2
+  triggers:
+  # WebSocket connection count
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "websocket_connections_active"
+      threshold: "200"
+      query: "websocket_connections_active"
+  # Message queue depth
+  - type: redis
+    metadata:
+      address: "redis:6379"
+      listName: "ws_message_queue"
+      listLength: "50"
+      activationListLength: "10"
+      enableTLS: "false"
+  # Backpressure events
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "websocket_backpressure_rate"
+      threshold: "10"
+      query: "rate(ws_backpressure_drops[1m])"
+
+---
+# KEDA ScaledObject for Analytics Service with query metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-enhanced-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  # Query rate scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "analytics_queries_per_second"
+      threshold: "20"
+      query: "rate(analytics_queries_total[1m])"
+  # Query latency scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "analytics_query_latency_p95"
+      threshold: "2000"
+      query: "histogram_quantile(0.95, rate(analytics_query_duration_ms_bucket[5m]))"
+  # Cache hit rate scaling
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "analytics_cache_hit_rate"
+      threshold: "80"
+      query: "rate(analytics_cache_hits_total[5m]) / rate(analytics_cache_requests_total[5m]) * 100"
+
+---
+# KEDA ScaledObject for Billing Service with transaction metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: billing-service-enhanced-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: billing-service
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  # Billing queue depth
+  - type: redis
+    metadata:
+      address: "redis:6379"
+      listName: "billing_queue"
+      listLength: "20"
+      activationListLength: "5"
+      enableTLS: "false"
+  # Transaction processing rate
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "billing_transactions_per_second"
+      threshold: "10"
+      query: "rate(billing_transactions_total[1m])"
+  # Invoice generation rate
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "billing_invoices_per_second"
+      threshold: "5"
+      query: "rate(billing_invoices_generated_total[1m])"
+
+---
+# KEDA ScaledJob for batch processing
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: batch-processor-scaler
+  namespace: production
+spec:
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    activeDeadlineSeconds: 3600
+    backoffLimit: 3
+    template:
+      spec:
+        containers:
+        - name: batch-processor
+          image: ai-platform/batch-processor:latest
+          command: ["python", "batch_processor.py"]
+          env:
+          - name: BATCH_SIZE
+            value: "100"
+          resources:
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+        restartPolicy: Never
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 30
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  triggers:
+  - type: redis
+    metadata:
+      address: "redis:6379"
+      listName: "batch_queue"
+      listLength: "10"
+      activationListLength: "1"
+      enableTLS: "false"
+
+---
+# KEDA ScaledObject for Database connection pooling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: database-pool-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: database-pool-manager
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: postgresql
+    metadata:
+      connection: "postgresql://user:password@postgres:5432/ai_platform"
+      query: "SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active'"
+      targetQueryValue: "80"
+      activationTargetQueryValue: "60"
+
+---
+# KEDA ScaledObject for Redis connection scaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: redis-pool-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: redis-pool-manager
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: redis
+    metadata:
+      address: "redis:6379"
+      listName: "connection_pool"
+      listLength: "100"
+      activationListLength: "50"
+      enableTLS: "false"
+
+---
+# KEDA ScaledObject for NATS JetStream scaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: nats-jetstream-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: nats-jetstream-manager
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  triggers:
+  - type: nats-jetstream
+    metadata:
+      natsServerMonitoringEndpoint: "nats://nats:8222"
+      stream: "system"
+      consumer: "system-consumer"
+      lagThreshold: "1000"
+      activationLagThreshold: "500"
+      unsafeSsl: "false"
+
+---
+# KEDA ScaledObject for monitoring and alerting
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: monitoring-scaler
+  namespace: monitoring
+spec:
+  scaleTargetRef:
+    name: prometheus
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 60
+  cooldownPeriod: 600
+  idleReplicaCount: 1
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "prometheus_tsdb_head_samples_appended_total"
+      threshold: "1000000"
+      query: "rate(prometheus_tsdb_head_samples_appended_total[5m])"
+  - type: prometheus
+    metadata:
+      serverAddress: "http://prometheus:9090"
+      metricName: "prometheus_rule_evaluation_duration_seconds"
+      threshold: "1"
+      query: "histogram_quantile(0.95, rate(prometheus_rule_evaluation_duration_seconds_bucket[5m]))"
