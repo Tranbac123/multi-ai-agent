@@ -1,0 +1,313 @@
+# Prometheus Alert Rules for Multi-Tenant AIaaS Platform
+
+groups:
+  - name: slo_alerts
+    rules:
+      # API Gateway SLO Alerts
+      - alert: APIGatewayAvailabilitySLO
+        expr: (1 - (rate(http_requests_total{service="api-gateway",status=~"5.."}[30d]) / rate(http_requests_total{service="api-gateway"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: api-gateway
+          slo: availability
+        annotations:
+          summary: "API Gateway availability SLO breach"
+          description: "API Gateway availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/api-gateway-availability"
+
+      - alert: APIGatewayLatencySLO
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="api-gateway"}[30d])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+          slo: latency
+        annotations:
+          summary: "API Gateway latency SLO breach"
+          description: "API Gateway P95 latency is {{ $value }}s above 500ms target"
+          runbook_url: "https://docs.example.com/runbooks/api-gateway-latency"
+
+      # Router Service SLO Alerts
+      - alert: RouterServiceAvailabilitySLO
+        expr: (1 - (rate(router_requests_total{service="router-service",status=~"5.."}[30d]) / rate(router_requests_total{service="router-service"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: router-service
+          slo: availability
+        annotations:
+          summary: "Router Service availability SLO breach"
+          description: "Router Service availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/router-service-availability"
+
+      - alert: RouterServiceDecisionLatencySLO
+        expr: histogram_quantile(0.50, rate(router_decision_duration_seconds_bucket{service="router-service"}[30d])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: router-service
+          slo: decision_latency
+        annotations:
+          summary: "Router Service decision latency SLO breach"
+          description: "Router Service P50 decision latency is {{ $value }}s above 50ms target"
+          runbook_url: "https://docs.example.com/runbooks/router-service-latency"
+
+      - alert: RouterServiceMisrouteRateSLO
+        expr: rate(router_misroutes_total{service="router-service"}[30d]) / rate(router_requests_total{service="router-service"}[30d]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: router-service
+          slo: misroute_rate
+        annotations:
+          summary: "Router Service misroute rate SLO breach"
+          description: "Router Service misroute rate is {{ $value | humanizePercentage }} above 5% target"
+          runbook_url: "https://docs.example.com/runbooks/router-service-misroute"
+
+      # Orchestrator SLO Alerts
+      - alert: OrchestratorAvailabilitySLO
+        expr: (1 - (rate(orchestrator_requests_total{service="orchestrator",status=~"5.."}[30d]) / rate(orchestrator_requests_total{service="orchestrator"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: orchestrator
+          slo: availability
+        annotations:
+          summary: "Orchestrator availability SLO breach"
+          description: "Orchestrator availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/orchestrator-availability"
+
+      - alert: OrchestratorWorkflowCompletionSLO
+        expr: rate(orchestrator_workflows_completed_total{service="orchestrator"}[30d]) / rate(orchestrator_workflows_started_total{service="orchestrator"}[30d]) < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          service: orchestrator
+          slo: workflow_completion
+        annotations:
+          summary: "Orchestrator workflow completion SLO breach"
+          description: "Orchestrator workflow completion rate is {{ $value | humanizePercentage }} below 95% target"
+          runbook_url: "https://docs.example.com/runbooks/orchestrator-workflow-completion"
+
+      # Realtime Service SLO Alerts
+      - alert: RealtimeServiceAvailabilitySLO
+        expr: (1 - (rate(websocket_connections_failed_total{service="realtime"}[30d]) / rate(websocket_connections_total{service="realtime"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: realtime
+          slo: availability
+        annotations:
+          summary: "Realtime Service availability SLO breach"
+          description: "Realtime Service availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/realtime-service-availability"
+
+      - alert: RealtimeServiceBackpressureSLO
+        expr: rate(websocket_backpressure_drops_total{service="realtime"}[30d]) / rate(websocket_messages_total{service="realtime"}[30d]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+          slo: backpressure
+        annotations:
+          summary: "Realtime Service backpressure SLO breach"
+          description: "Realtime Service backpressure drop rate is {{ $value | humanizePercentage }} above 1% target"
+          runbook_url: "https://docs.example.com/runbooks/realtime-service-backpressure"
+
+      # Analytics Service SLO Alerts
+      - alert: AnalyticsServiceAvailabilitySLO
+        expr: (1 - (rate(analytics_requests_total{service="analytics-service",status=~"5.."}[30d]) / rate(analytics_requests_total{service="analytics-service"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: analytics-service
+          slo: availability
+        annotations:
+          summary: "Analytics Service availability SLO breach"
+          description: "Analytics Service availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/analytics-service-availability"
+
+      - alert: AnalyticsServiceQueryLatencySLO
+        expr: histogram_quantile(0.95, rate(analytics_query_duration_seconds_bucket{service="analytics-service"}[30d])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: analytics-service
+          slo: query_latency
+        annotations:
+          summary: "Analytics Service query latency SLO breach"
+          description: "Analytics Service P95 query latency is {{ $value }}s above 1s target"
+          runbook_url: "https://docs.example.com/runbooks/analytics-service-latency"
+
+      # Billing Service SLO Alerts
+      - alert: BillingServiceAvailabilitySLO
+        expr: (1 - (rate(billing_requests_total{service="billing-service",status=~"5.."}[30d]) / rate(billing_requests_total{service="billing-service"}[30d]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          service: billing-service
+          slo: availability
+        annotations:
+          summary: "Billing Service availability SLO breach"
+          description: "Billing Service availability is {{ $value | humanizePercentage }} below 99.9% target"
+          runbook_url: "https://docs.example.com/runbooks/billing-service-availability"
+
+      - alert: BillingServiceInvoiceAccuracySLO
+        expr: rate(billing_invoice_errors_total{service="billing-service"}[30d]) / rate(billing_invoices_generated_total{service="billing-service"}[30d]) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          service: billing-service
+          slo: invoice_accuracy
+        annotations:
+          summary: "Billing Service invoice accuracy SLO breach"
+          description: "Billing Service invoice error rate is {{ $value | humanizePercentage }} above 0.1% target"
+          runbook_url: "https://docs.example.com/runbooks/billing-service-accuracy"
+
+  - name: system_alerts
+    rules:
+      # High Error Rate Alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+
+      # High Latency Alerts
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+          description: "P95 latency is {{ $value }}s for service {{ $labels.service }}"
+          runbook_url: "https://docs.example.com/runbooks/high-latency"
+
+      # Circuit Breaker Open Alerts
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker is open for service {{ $labels.service }}"
+          runbook_url: "https://docs.example.com/runbooks/circuit-breaker-open"
+
+      # High Memory Usage Alerts
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} for pod {{ $labels.pod }}"
+          runbook_url: "https://docs.example.com/runbooks/high-memory-usage"
+
+      # High CPU Usage Alerts
+      - alert: HighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total[5m]) / container_spec_cpu_quota * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% for pod {{ $labels.pod }}"
+          runbook_url: "https://docs.example.com/runbooks/high-cpu-usage"
+
+      # Disk Space Alerts
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space detected"
+          description: "Disk space is {{ $value | humanizePercentage }} available on node {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/low-disk-space"
+
+      # Database Connection Alerts
+      - alert: HighDatabaseConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections detected"
+          description: "Database connections are {{ $value | humanizePercentage }} of max for database {{ $labels.datname }}"
+          runbook_url: "https://docs.example.com/runbooks/high-database-connections"
+
+      # Redis Memory Usage Alerts
+      - alert: HighRedisMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Redis memory usage detected"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} of max"
+          runbook_url: "https://docs.example.com/runbooks/high-redis-memory-usage"
+
+      # NATS JetStream Alerts
+      - alert: HighNATSJetStreamLag
+        expr: nats_jetstream_consumer_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High NATS JetStream lag detected"
+          description: "NATS JetStream consumer lag is {{ $value }} for consumer {{ $labels.consumer }}"
+          runbook_url: "https://docs.example.com/runbooks/high-nats-jetstream-lag"
+
+  - name: business_alerts
+    rules:
+      # High Router Misroute Rate
+      - alert: HighRouterMisrouteRate
+        expr: rate(router_misroutes_total[5m]) / rate(router_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High router misroute rate detected"
+          description: "Router misroute rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-router-misroute-rate"
+
+      # High WebSocket Backpressure Drops
+      - alert: HighWebSocketBackpressureDrops
+        expr: rate(websocket_backpressure_drops_total[5m]) / rate(websocket_messages_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket backpressure drops detected"
+          description: "WebSocket backpressure drop rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-websocket-backpressure-drops"
+
+      # High Billing Invoice Errors
+      - alert: HighBillingInvoiceErrors
+        expr: rate(billing_invoice_errors_total[5m]) / rate(billing_invoices_generated_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High billing invoice errors detected"
+          description: "Billing invoice error rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-billing-invoice-errors"
+
+      # High Workflow Failure Rate
+      - alert: HighWorkflowFailureRate
+        expr: rate(orchestrator_workflows_failed_total[5m]) / rate(orchestrator_workflows_started_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High workflow failure rate detected"
+          description: "Workflow failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-workflow-failure-rate"
