@@ -21,12 +21,17 @@ This is a production-grade, multi-tenant AI-as-a-Service (AIaaS) platform that p
 
 - **Multi-Tenant Architecture** - Complete tenant isolation with RLS
 - **YAML Workflow System** - Declarative workflow definitions
-- **Intelligent Routing** - Cost-optimized request routing
-- **Event Sourcing** - Complete audit trail and replay capability
-- **Resilience Patterns** - Circuit breakers, retries, timeouts, bulkheads
-- **Comprehensive Monitoring** - OpenTelemetry, Prometheus, Grafana
+- **Router v2 Hardening** - Feature extraction, calibrated classifier, bandit policy, early-exit, canary deployments
+- **Analytics & Dashboards** - Read-only CQRS API with Grafana dashboards
+- **Reliability & Resilience** - Circuit breakers, retries, timeouts, bulkheads, Saga compensation
+- **Realtime Backpressure** - ASGI WS app with sticky sessions and Redis queue
+- **Kubernetes Autoscaling** - KEDA and HPA with health probes and NetworkPolicy
+- **Evaluation Suite** - Golden tasks, episode replay, LLM-judge with CI gates
+- **Billing & Usage** - Webhook aggregation, invoice preview, plan enforcement
+- **Security & Hygiene** - Dependency constraints, security scanning, no plaintext secrets
+- **Comprehensive Monitoring** - OpenTelemetry, Prometheus, Grafana, SLOs, Alerts
 - **User Management** - Registration, subscriptions, service packages
-- **Real-time Communication** - WebSocket support
+- **Real-time Communication** - WebSocket support with backpressure handling
 
 ## 🚀 Quick Start
 

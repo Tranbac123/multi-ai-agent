@@ -61,12 +61,74 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 
 ## Technology Stack
 
-- **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2.0 (async)
-- **AI**: OpenAI API + LangGraph workflows & agents
-- **Database**: PostgreSQL 16 + Redis 7 + NATS JetStream
+- **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2.0 (async) + asyncpg
+- **AI**: OpenAI API + LangGraph workflows & agents + LangGraph/FSM
+- **Database**: PostgreSQL 16 + RLS + Redis 7 + NATS JetStream
 - **Frontend**: React + TypeScript + Tailwind CSS
-- **Deployment**: Docker + Kubernetes + Helm
-- **Monitoring**: OpenTelemetry + Prometheus + Grafana
+- **Deployment**: Docker + Kubernetes + KEDA + HPA + NetworkPolicy
+- **Monitoring**: OpenTelemetry + Prometheus + Grafana + SLOs + Alerts
+- **Security**: `ruff` + `black` + `mypy(strict)` + `trivy` + `safety`
+- **Testing**: pytest + httpx + Hypothesis + LLM-judge + Episode replay
+- **Billing**: Usage tracking + Invoice generation + Payment processing
+
+## 🚀 Recent Production Hardening (9 Commits)
+
+The platform has been significantly enhanced with production-grade features:
+
+### **Router v2 Hardening**
+
+- Feature extraction (token_count, json_schema_strictness, domain_flags, novelty_score)
+- Calibrated classifier with temperature scaling and deterministic fallback
+- Bandit policy minimizing E[cost + λ·error]
+- Early-exit logic and canary deployments with auto-rollback
+- Metrics: `router_decision_latency_ms`, `router_misroute_rate`, `tier_distribution`
+
+### **Analytics & Dashboards**
+
+- Read-only CQRS API for KPIs per tenant
+- Grafana dashboard JSON configurations
+- Warehouse integration (ClickHouse/BigQuery) or Postgres read-replica
+
+### **Reliability & Resilience**
+
+- Tool adapters with timeouts, retries (exponential backoff + jitter)
+- Circuit-breaker, bulkhead, idempotency patterns
+- Write-ahead events: tool.call.requested/succeeded/failed
+- Saga compensation for side-effects
+
+### **Realtime & Backpressure**
+
+- Dedicated ASGI WS app with sticky sessions
+- Redis session store and outbound Redis queue
+- Backpressure policies with metrics: `ws_active_connections`, `ws_backpressure_drops`
+
+### **Kubernetes & Security**
+
+- KEDA autoscaling for orchestrator/ingestion (NATS queue depth)
+- HPA for router/realtime (CPU/memory)
+- Readiness/liveness probes for all services
+- NetworkPolicy for east-west traffic control
+
+### **Evaluation & Testing**
+
+- Golden tasks per use-case (FAQ, Order, Lead) with JSON assertions
+- Episode replay system (EXACT, PARAMETRIC, STRESS modes)
+- LLM-judge rubric with CI gate (fails if score < threshold)
+- Comprehensive test suite: unit, contract, integration, E2E, chaos
+
+### **Billing & Usage**
+
+- Webhook aggregation of usage_counters
+- Invoice preview endpoint with cost calculations
+- Plan enforcement in API Gateway (HTTP 429 when over quota)
+- Payment processing with Stripe/Braintree support
+
+### **Dependency & Security Hygiene**
+
+- `constraints.txt` for reproducible builds
+- Security tools: `trivy`, `safety`, `bandit` in CI
+- Dependency deduplication and validation
+- No plaintext secrets with `.env.example` only
 
 ## RACI (Responsibility Assignment)
 
