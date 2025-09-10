@@ -84,10 +84,16 @@ class BaseAdapter(Generic[T]):
             if not await self._check_circuit_breaker():
                 raise Exception(f"Circuit breaker is open for adapter {self.name}")
             
+            # Write-ahead event: tool.call.requested
+            await self._write_ahead_event("requested", idempotency_key, operation, args, kwargs)
+            
             # Acquire bulkhead semaphore
             async with self.bulkhead_semaphore:
                 # Execute with timeout and retries
                 result = await self._execute_with_reliability(operation, *args, **kwargs)
+                
+                # Write-ahead event: tool.call.succeeded
+                await self._write_ahead_event("succeeded", idempotency_key, operation, args, kwargs, result)
                 
                 # Store result for idempotency
                 await self._store_idempotency_result(idempotency_key, result)
@@ -102,6 +108,9 @@ class BaseAdapter(Generic[T]):
                 return result
                 
         except Exception as e:
+            # Write-ahead event: tool.call.failed
+            await self._write_ahead_event("failed", idempotency_key, operation, args, kwargs, error=str(e))
+            
             # Update metrics
             self.metrics.total_requests += 1
             self.metrics.failed_requests += 1
@@ -252,6 +261,43 @@ class BaseAdapter(Generic[T]):
             await self.redis.setex(key, self.config.idempotency_ttl_seconds, result_json)
         except Exception as e:
             logger.error("Failed to store idempotency result", adapter=self.name, key=key, error=str(e))
+    
+    async def _write_ahead_event(
+        self,
+        event_type: str,
+        idempotency_key: str,
+        operation: Callable[..., T],
+        args: tuple,
+        kwargs: dict,
+        result: Optional[T] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """Write ahead event for operation."""
+        try:
+            import json
+            import time
+            
+            event = {
+                'event_type': f'tool.call.{event_type}',
+                'adapter_name': self.name,
+                'idempotency_key': idempotency_key,
+                'operation_name': operation.__name__ if hasattr(operation, '__name__') else str(operation),
+                'args': args,
+                'kwargs': kwargs,
+                'timestamp': time.time(),
+                'result': result,
+                'error': error
+            }
+            
+            event_key = f"write_ahead_event:{idempotency_key}:{event_type}"
+            event_json = json.dumps(event, default=str)
+            
+            await self.redis.setex(event_key, self.config.idempotency_ttl_seconds, event_json)
+            
+            logger.info("Write-ahead event recorded", adapter=self.name, event_type=event_type, key=idempotency_key)
+            
+        except Exception as e:
+            logger.error("Failed to write ahead event", adapter=self.name, event_type=event_type, error=str(e))
     
     async def get_metrics(self) -> Dict[str, Any]:
         """Get adapter metrics."""
