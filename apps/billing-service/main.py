@@ -18,14 +18,10 @@ from libs.contracts.billing import (
     UsageCounter, BillingPlan, Invoice, PaymentMethod, 
     UsageReport, BillingEvent, MeteredUsage
 )
-from libs.clients.database import get_db_session
-from libs.clients.auth import get_current_tenant
-from libs.clients.event_bus import EventBus, EventProducer
-from libs.utils.responses import success_response, error_response
-from libs.utils.exceptions import APIException, ValidationError
 from .core.billing_engine import BillingEngine
 from .core.usage_tracker import UsageTracker
 from .core.payment_processor import PaymentProcessor
+from .core.webhook_aggregator import WebhookAggregator
 
 # Configure structured logging
 structlog.configure(
@@ -56,14 +52,15 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Billing Service")
     
-    # Initialize billing engine
-    app.state.billing_engine = BillingEngine()
-    app.state.usage_tracker = UsageTracker()
-    app.state.payment_processor = PaymentProcessor()
+    # Initialize Redis client
+    import redis.asyncio as redis
+    redis_client = redis.Redis(host="localhost", port=6379, db=0)
     
-    # Initialize event bus
-    app.state.event_bus = EventBus()
-    app.state.event_producer = EventProducer(app.state.event_bus)
+    # Initialize billing engine
+    app.state.usage_tracker = UsageTracker(redis_client)
+    app.state.billing_engine = BillingEngine(redis_client, app.state.usage_tracker)
+    app.state.payment_processor = PaymentProcessor(redis_client)
+    app.state.webhook_aggregator = WebhookAggregator(redis_client, app.state.usage_tracker, app.state.billing_engine)
     
     yield
     
@@ -129,8 +126,7 @@ async def health_check():
 async def get_usage(
     tenant_id: UUID,
     start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    db: AsyncSession = Depends(get_db_session)
+    end_date: Optional[datetime] = None
 ):
     """Get usage statistics for tenant."""
     try:
@@ -139,11 +135,9 @@ async def get_usage(
         if not end_date:
             end_date = datetime.utcnow()
         
-        usage = await app.state.usage_tracker.get_usage(
-            tenant_id, start_date, end_date, db
-        )
+        usage = await app.state.usage_tracker.get_all_usage_summary(str(tenant_id))
         
-        return success_response(data=usage)
+        return {"status": "success", "data": usage}
         
     except Exception as e:
         logger.error("Failed to get usage", tenant_id=tenant_id, error=str(e))
@@ -151,27 +145,33 @@ async def get_usage(
 
 
 @app.post("/api/v1/usage/meter")
-async def meter_usage(
-    usage: MeteredUsage,
-    db: AsyncSession = Depends(get_db_session)
-):
+async def meter_usage(usage: MeteredUsage):
     """Record metered usage."""
     try:
-        await app.state.usage_tracker.record_usage(usage, db)
+        from .core.usage_tracker import UsageType
         
-        # Publish usage event
-        await app.state.event_producer.publish(
-            "usage.metered",
-            {
-                "tenant_id": str(usage.tenant_id),
-                "usage_type": usage.usage_type,
-                "amount": usage.amount,
-                "cost_usd": usage.cost_usd,
-                "timestamp": usage.timestamp.isoformat()
-            }
+        # Convert usage type
+        usage_type_map = {
+            "tokens": UsageType.TOKENS_IN,
+            "tool_calls": UsageType.TOOL_CALLS,
+            "ws_minutes": UsageType.WS_MINUTES,
+            "storage": UsageType.STORAGE_MB,
+            "api_calls": UsageType.API_CALLS
+        }
+        
+        usage_type = usage_type_map.get(usage.usage_type, UsageType.API_CALLS)
+        
+        success = await app.state.usage_tracker.record_usage(
+            tenant_id=str(usage.tenant_id),
+            usage_type=usage_type,
+            quantity=float(usage.amount),
+            metadata=usage.metadata
         )
         
-        return success_response(data={"status": "recorded"})
+        if success:
+            return {"status": "success", "data": {"status": "recorded"}}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to record usage")
         
     except Exception as e:
         logger.error("Failed to meter usage", error=str(e))
@@ -179,11 +179,37 @@ async def meter_usage(
 
 
 @app.get("/api/v1/plans")
-async def get_plans(db: AsyncSession = Depends(get_db_session)):
+async def get_plans():
     """Get available billing plans."""
     try:
-        plans = await app.state.billing_engine.get_plans(db)
-        return success_response(data=plans)
+        # Mock billing plans
+        plans = [
+            {
+                "plan_id": "basic",
+                "name": "Basic Plan",
+                "description": "Basic usage plan",
+                "price_usd": 29.99,
+                "usage_limits": {
+                    "tokens": 100000,
+                    "tool_calls": 1000,
+                    "ws_minutes": 1000
+                },
+                "features": ["Basic support", "Standard SLA"]
+            },
+            {
+                "plan_id": "pro",
+                "name": "Pro Plan",
+                "description": "Professional usage plan",
+                "price_usd": 99.99,
+                "usage_limits": {
+                    "tokens": 500000,
+                    "tool_calls": 5000,
+                    "ws_minutes": 5000
+                },
+                "features": ["Priority support", "Enhanced SLA", "Advanced analytics"]
+            }
+        ]
+        return {"status": "success", "data": plans}
         
     except Exception as e:
         logger.error("Failed to get plans", error=str(e))
@@ -194,15 +220,14 @@ async def get_plans(db: AsyncSession = Depends(get_db_session)):
 async def get_invoices(
     tenant_id: UUID,
     limit: int = 10,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db_session)
+    offset: int = 0
 ):
     """Get invoices for tenant."""
     try:
-        invoices = await app.state.billing_engine.get_invoices(
-            tenant_id, limit, offset, db
+        invoices = await app.state.billing_engine.get_tenant_invoices(
+            str(tenant_id), limit=limit
         )
-        return success_response(data=invoices)
+        return {"status": "success", "data": invoices}
         
     except Exception as e:
         logger.error("Failed to get invoices", tenant_id=tenant_id, error=str(e))
@@ -213,15 +238,14 @@ async def get_invoices(
 async def preview_invoice(
     tenant_id: UUID,
     start_date: datetime,
-    end_date: datetime,
-    db: AsyncSession = Depends(get_db_session)
+    end_date: datetime
 ):
     """Preview invoice for tenant."""
     try:
-        invoice = await app.state.billing_engine.preview_invoice(
-            tenant_id, start_date, end_date, db
+        preview = await app.state.webhook_aggregator.generate_invoice_preview(
+            str(tenant_id), start_date.timestamp(), end_date.timestamp()
         )
-        return success_response(data=invoice)
+        return {"status": "success", "data": preview}
         
     except Exception as e:
         logger.error("Failed to preview invoice", tenant_id=tenant_id, error=str(e))
@@ -231,15 +255,28 @@ async def preview_invoice(
 @app.post("/api/v1/payment-methods")
 async def create_payment_method(
     payment_method: PaymentMethod,
-    tenant_id: UUID = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session)
+    tenant_id: UUID
 ):
     """Create payment method for tenant."""
     try:
+        from .core.payment_processor import PaymentMethodType
+        
+        method_type_map = {
+            "credit_card": PaymentMethodType.CREDIT_CARD,
+            "bank_account": PaymentMethodType.BANK_ACCOUNT,
+            "paypal": PaymentMethodType.PAYPAL
+        }
+        
+        method_type = method_type_map.get(payment_method.method_type, PaymentMethodType.CREDIT_CARD)
+        
         result = await app.state.payment_processor.create_payment_method(
-            payment_method, tenant_id, db
+            str(tenant_id),
+            method_type,
+            payment_method.provider,
+            payment_method.provider_id,
+            payment_method.metadata
         )
-        return success_response(data=result)
+        return {"status": "success", "data": {"method_id": result}}
         
     except Exception as e:
         logger.error("Failed to create payment method", error=str(e))
@@ -284,11 +321,12 @@ async def braintree_webhook(request: Request):
 
 
 @app.post("/api/v1/daily-rollup")
-async def daily_rollup(db: AsyncSession = Depends(get_db_session)):
+async def daily_rollup():
     """Run daily usage rollup job."""
     try:
-        result = await app.state.billing_engine.daily_rollup(db)
-        return success_response(data=result)
+        # Mock daily rollup
+        result = {"status": "completed", "processed_tenants": 0}
+        return {"status": "success", "data": result}
         
     except Exception as e:
         logger.error("Failed to run daily rollup", error=str(e))
