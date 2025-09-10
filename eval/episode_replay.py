@@ -1,380 +1,259 @@
-"""Episode replay system for testing and debugging."""
+"""Episode replay system for evaluation and testing."""
 
 import asyncio
-import json
 import time
-from datetime import datetime
-from typing import Dict, Any, List, Optional
-from uuid import UUID
+import json
+import uuid
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, asdict
+from enum import Enum
 import structlog
-from dataclasses import dataclass
+import redis.asyncio as redis
 
 logger = structlog.get_logger(__name__)
 
 
+class EpisodeStatus(Enum):
+    """Episode status."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ReplayMode(Enum):
+    """Replay mode."""
+    EXACT = "exact"
+    PARAMETRIC = "parametric"
+    STRESS = "stress"
+
+
 @dataclass
 class EpisodeStep:
-    """Episode step definition."""
+    """Individual step in an episode."""
     step_id: str
+    step_type: str
     timestamp: float
-    action: str
-    input_data: Dict[str, Any]
-    output_data: Dict[str, Any]
-    duration: float
-    success: bool
-    error: Optional[str] = None
+    data: Dict[str, Any]
+    metadata: Dict[str, Any] = None
 
 
 @dataclass
 class Episode:
-    """Episode definition."""
+    """Episode representation."""
     episode_id: str
-    tenant_id: UUID
-    workflow: str
-    start_time: float
-    end_time: Optional[float]
-    status: str
-    steps: List[EpisodeStep]
-    metadata: Dict[str, Any]
+    tenant_id: str
+    user_id: str
+    session_id: str
+    status: EpisodeStatus
+    created_at: float
+    steps: List[EpisodeStep] = None
+    metadata: Dict[str, Any] = None
 
 
-class EpisodeRecorder:
-    """Records episodes for later replay."""
+class EpisodeReplay:
+    """Episode replay system for evaluation and testing."""
     
-    def __init__(self):
-        self.episodes: Dict[str, Episode] = {}
-        self.current_episodes: Dict[str, Episode] = {}
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+        self.active_replays = {}
     
-    def start_episode(
+    async def record_episode(
         self,
-        episode_id: str,
-        tenant_id: UUID,
-        workflow: str,
+        tenant_id: str,
+        user_id: str,
+        session_id: str,
+        steps: List[EpisodeStep],
         metadata: Optional[Dict[str, Any]] = None
-    ) -> Episode:
-        """Start recording an episode."""
-        episode = Episode(
-            episode_id=episode_id,
-            tenant_id=tenant_id,
-            workflow=workflow,
-            start_time=time.time(),
-            end_time=None,
-            status="running",
-            steps=[],
-            metadata=metadata or {}
-        )
-        
-        self.current_episodes[episode_id] = episode
-        
-        logger.info("Episode started", 
-                   episode_id=episode_id, 
-                   tenant_id=tenant_id, 
-                   workflow=workflow)
-        
-        return episode
-    
-    def record_step(
-        self,
-        episode_id: str,
-        step_id: str,
-        action: str,
-        input_data: Dict[str, Any],
-        output_data: Dict[str, Any],
-        duration: float,
-        success: bool,
-        error: Optional[str] = None
-    ):
-        """Record a step in the episode."""
-        if episode_id not in self.current_episodes:
-            logger.warning("Episode not found", episode_id=episode_id)
-            return
-        
-        episode = self.current_episodes[episode_id]
-        
-        step = EpisodeStep(
-            step_id=step_id,
-            timestamp=time.time(),
-            action=action,
-            input_data=input_data,
-            output_data=output_data,
-            duration=duration,
-            success=success,
-            error=error
-        )
-        
-        episode.steps.append(step)
-        
-        logger.debug("Step recorded", 
-                    episode_id=episode_id, 
-                    step_id=step_id, 
-                    action=action)
-    
-    def end_episode(
-        self,
-        episode_id: str,
-        status: str = "completed"
-    ):
-        """End an episode."""
-        if episode_id not in self.current_episodes:
-            logger.warning("Episode not found", episode_id=episode_id)
-            return
-        
-        episode = self.current_episodes[episode_id]
-        episode.end_time = time.time()
-        episode.status = status
-        
-        # Move to completed episodes
-        self.episodes[episode_id] = episode
-        del self.current_episodes[episode_id]
-        
-        logger.info("Episode ended", 
-                   episode_id=episode_id, 
-                   status=status,
-                   duration=episode.end_time - episode.start_time)
-    
-    def get_episode(self, episode_id: str) -> Optional[Episode]:
-        """Get episode by ID."""
-        return self.episodes.get(episode_id)
-    
-    def get_episodes_by_tenant(self, tenant_id: UUID) -> List[Episode]:
-        """Get episodes for tenant."""
-        return [ep for ep in self.episodes.values() if ep.tenant_id == tenant_id]
-    
-    def get_episodes_by_workflow(self, workflow: str) -> List[Episode]:
-        """Get episodes for workflow."""
-        return [ep for ep in self.episodes.values() if ep.workflow == workflow]
-    
-    def save_episode(self, episode_id: str, file_path: str):
-        """Save episode to file."""
-        episode = self.get_episode(episode_id)
-        if not episode:
-            raise ValueError(f"Episode {episode_id} not found")
-        
-        # Convert to serializable format
-        episode_data = {
-            "episode_id": episode.episode_id,
-            "tenant_id": str(episode.tenant_id),
-            "workflow": episode.workflow,
-            "start_time": episode.start_time,
-            "end_time": episode.end_time,
-            "status": episode.status,
-            "steps": [
-                {
-                    "step_id": step.step_id,
-                    "timestamp": step.timestamp,
-                    "action": step.action,
-                    "input_data": step.input_data,
-                    "output_data": step.output_data,
-                    "duration": step.duration,
-                    "success": step.success,
-                    "error": step.error
-                }
-                for step in episode.steps
-            ],
-            "metadata": episode.metadata
-        }
-        
-        with open(file_path, 'w') as f:
-            json.dump(episode_data, f, indent=2)
-        
-        logger.info("Episode saved", episode_id=episode_id, file_path=file_path)
-    
-    def load_episode(self, file_path: str) -> Episode:
-        """Load episode from file."""
-        with open(file_path, 'r') as f:
-            episode_data = json.load(f)
-        
-        # Convert back to Episode object
-        episode = Episode(
-            episode_id=episode_data["episode_id"],
-            tenant_id=UUID(episode_data["tenant_id"]),
-            workflow=episode_data["workflow"],
-            start_time=episode_data["start_time"],
-            end_time=episode_data["end_time"],
-            status=episode_data["status"],
-            steps=[
-                EpisodeStep(
-                    step_id=step["step_id"],
-                    timestamp=step["timestamp"],
-                    action=step["action"],
-                    input_data=step["input_data"],
-                    output_data=step["output_data"],
-                    duration=step["duration"],
-                    success=step["success"],
-                    error=step.get("error")
-                )
-                for step in episode_data["steps"]
-            ],
-            metadata=episode_data["metadata"]
-        )
-        
-        self.episodes[episode.episode_id] = episode
-        
-        logger.info("Episode loaded", episode_id=episode.episode_id, file_path=file_path)
-        
-        return episode
-
-
-class EpisodeReplayer:
-    """Replays episodes for testing and debugging."""
-    
-    def __init__(self, recorder: EpisodeRecorder):
-        self.recorder = recorder
-        self.replay_results: Dict[str, Dict[str, Any]] = {}
+    ) -> str:
+        """Record an episode for later replay."""
+        try:
+            episode_id = str(uuid.uuid4())
+            
+            episode = Episode(
+                episode_id=episode_id,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+                status=EpisodeStatus.COMPLETED,
+                created_at=time.time(),
+                steps=steps,
+                metadata=metadata or {}
+            )
+            
+            # Store episode
+            await self._store_episode(episode)
+            
+            logger.info("Episode recorded", episode_id=episode_id, tenant_id=tenant_id)
+            return episode_id
+            
+        except Exception as e:
+            logger.error("Failed to record episode", error=str(e))
+            raise
     
     async def replay_episode(
         self,
         episode_id: str,
-        tenant_id: UUID,
-        workflow_executor: callable,
-        step_executor: callable
-    ) -> Dict[str, Any]:
-        """Replay an episode."""
-        episode = self.recorder.get_episode(episode_id)
-        if not episode:
-            raise ValueError(f"Episode {episode_id} not found")
-        
-        logger.info("Starting episode replay", 
-                   episode_id=episode_id, 
-                   tenant_id=tenant_id)
-        
-        replay_start = time.time()
-        replay_steps = []
-        success_count = 0
-        error_count = 0
-        
+        replay_mode: ReplayMode = ReplayMode.EXACT,
+        parameters: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Replay an episode for evaluation."""
         try:
-            # Replay each step
+            # Get episode
+            episode = await self._get_episode(episode_id)
+            if not episode:
+                raise ValueError(f"Episode {episode_id} not found")
+            
+            # Create replay session
+            replay_id = str(uuid.uuid4())
+            
+            # Start replay
+            asyncio.create_task(self._execute_replay(replay_id, episode, replay_mode, parameters))
+            
+            logger.info("Episode replay started", replay_id=replay_id, episode_id=episode_id)
+            return replay_id
+            
+        except Exception as e:
+            logger.error("Failed to start episode replay", error=str(e))
+            raise
+    
+    async def _execute_replay(
+        self,
+        replay_id: str,
+        episode: Episode,
+        replay_mode: ReplayMode,
+        parameters: Optional[Dict[str, Any]]
+    ) -> None:
+        """Execute episode replay."""
+        try:
+            # Replay steps
             for step in episode.steps:
-                step_start = time.time()
-                
                 try:
-                    # Execute step
-                    result = await step_executor(
-                        step.action,
-                        step.input_data,
-                        tenant_id
-                    )
+                    # Apply replay mode modifications
+                    modified_step = await self._apply_replay_mode(step, replay_mode, parameters)
                     
-                    step_duration = time.time() - step_start
-                    success = True
-                    error = None
-                    success_count += 1
+                    # Execute step
+                    step_result = await self._execute_step(modified_step, episode)
+                    
+                    # Add delay between steps
+                    await asyncio.sleep(0.5)
                     
                 except Exception as e:
-                    step_duration = time.time() - step_start
-                    result = None
-                    success = False
-                    error = str(e)
-                    error_count += 1
-                
-                # Record replay step
-                replay_step = {
-                    "step_id": step.step_id,
-                    "action": step.action,
-                    "input_data": step.input_data,
-                    "output_data": result,
-                    "duration": step_duration,
-                    "success": success,
-                    "error": error,
-                    "original_duration": step.duration,
-                    "original_success": step.success
-                }
-                
-                replay_steps.append(replay_step)
-                
-                # Check if step matches original
-                if success != step.success:
-                    logger.warning("Step result mismatch", 
-                                 step_id=step.step_id, 
-                                 original_success=step.success, 
-                                 replay_success=success)
-        
+                    logger.error("Step execution failed", error=str(e), step_id=step.step_id)
+            
+            logger.info("Episode replay completed", replay_id=replay_id, episode_id=episode.episode_id)
+            
         except Exception as e:
-            logger.error("Episode replay failed", 
-                        episode_id=episode_id, 
-                        error=str(e))
-            raise
-        
-        replay_duration = time.time() - replay_start
-        total_steps = len(episode.steps)
-        
-        # Calculate replay statistics
-        replay_stats = {
-            "episode_id": episode_id,
-            "tenant_id": str(tenant_id),
-            "workflow": episode.workflow,
-            "replay_duration": replay_duration,
-            "original_duration": episode.end_time - episode.start_time if episode.end_time else 0,
-            "total_steps": total_steps,
-            "success_count": success_count,
-            "error_count": error_count,
-            "success_rate": success_count / total_steps if total_steps > 0 else 0,
-            "steps": replay_steps,
-            "timestamp": time.time()
-        }
-        
-        self.replay_results[episode_id] = replay_stats
-        
-        logger.info("Episode replay completed", 
-                   episode_id=episode_id, 
-                   success_rate=replay_stats["success_rate"])
-        
-        return replay_stats
+            logger.error("Episode replay failed", error=str(e))
     
-    def get_replay_result(self, episode_id: str) -> Optional[Dict[str, Any]]:
-        """Get replay result by episode ID."""
-        return self.replay_results.get(episode_id)
-    
-    def get_all_replay_results(self) -> Dict[str, Dict[str, Any]]:
-        """Get all replay results."""
-        return self.replay_results
-    
-    def compare_episodes(
+    async def _apply_replay_mode(
         self,
-        episode_id: str,
-        tolerance: float = 0.1
-    ) -> Dict[str, Any]:
-        """Compare original episode with replay."""
-        episode = self.recorder.get_episode(episode_id)
-        replay_result = self.get_replay_result(episode_id)
-        
-        if not episode or not replay_result:
-            raise ValueError("Episode or replay result not found")
-        
-        comparison = {
-            "episode_id": episode_id,
-            "duration_match": abs(
-                replay_result["replay_duration"] - replay_result["original_duration"]
-            ) <= tolerance,
-            "step_count_match": len(episode.steps) == len(replay_result["steps"]),
-            "success_rate_match": abs(
-                replay_result["success_rate"] - 
-                sum(1 for step in episode.steps if step.success) / len(episode.steps)
-            ) <= tolerance,
-            "step_comparisons": []
-        }
-        
-        # Compare individual steps
-        for i, (original_step, replay_step) in enumerate(
-            zip(episode.steps, replay_result["steps"])
-        ):
-            step_comparison = {
-                "step_index": i,
-                "step_id": original_step.step_id,
-                "action_match": original_step.action == replay_step["action"],
-                "success_match": original_step.success == replay_step["success"],
-                "duration_match": abs(
-                    original_step.duration - replay_step["duration"]
-                ) <= tolerance,
-                "input_match": original_step.input_data == replay_step["input_data"]
+        step: EpisodeStep,
+        replay_mode: ReplayMode,
+        parameters: Dict[str, Any]
+    ) -> EpisodeStep:
+        """Apply replay mode modifications to step."""
+        if replay_mode == ReplayMode.EXACT:
+            return step
+        elif replay_mode == ReplayMode.PARAMETRIC:
+            modified_data = step.data.copy()
+            for param_name, param_value in parameters.items():
+                if param_name in modified_data:
+                    modified_data[param_name] = param_value
+            return EpisodeStep(
+                step_id=step.step_id,
+                step_type=step.step_type,
+                timestamp=step.timestamp,
+                data=modified_data,
+                metadata=step.metadata
+            )
+        else:
+            return step
+    
+    async def _execute_step(self, step: EpisodeStep, episode: Episode) -> Dict[str, Any]:
+        """Execute a single step."""
+        try:
+            start_time = time.time()
+            
+            # Simulate step execution
+            if step.step_type == 'user_message':
+                await asyncio.sleep(0.1)
+                result = {'status': 'processed'}
+            elif step.step_type == 'agent_response':
+                await asyncio.sleep(0.2)
+                result = {'status': 'generated'}
+            elif step.step_type == 'tool_call':
+                await asyncio.sleep(0.3)
+                result = {'status': 'executed'}
+            else:
+                result = {'status': 'unknown_step_type'}
+            
+            execution_time = time.time() - start_time
+            
+            return {
+                'step_id': step.step_id,
+                'step_type': step.step_type,
+                'execution_time': execution_time,
+                'result': result,
+                'timestamp': time.time()
             }
             
-            comparison["step_comparisons"].append(step_comparison)
-        
-        return comparison
-
-
-# Global instances
-episode_recorder = EpisodeRecorder()
-episode_replayer = EpisodeReplayer(episode_recorder)
+        except Exception as e:
+            logger.error("Step execution failed", error=str(e))
+            return {'step_id': step.step_id, 'error': str(e)}
+    
+    async def _store_episode(self, episode: Episode) -> None:
+        """Store episode in Redis."""
+        try:
+            episode_key = f"episode:{episode.tenant_id}:{episode.episode_id}"
+            
+            episode_data = {
+                'episode_id': episode.episode_id,
+                'tenant_id': episode.tenant_id,
+                'user_id': episode.user_id,
+                'session_id': episode.session_id,
+                'status': episode.status.value,
+                'created_at': episode.created_at,
+                'steps': json.dumps([asdict(step) for step in episode.steps]),
+                'metadata': json.dumps(episode.metadata)
+            }
+            
+            await self.redis.hset(episode_key, mapping=episode_data)
+            await self.redis.expire(episode_key, 86400 * 30)  # 30 days TTL
+            
+        except Exception as e:
+            logger.error("Failed to store episode", error=str(e))
+    
+    async def _get_episode(self, episode_id: str) -> Optional[Episode]:
+        """Get episode by ID."""
+        try:
+            pattern = f"episode:*:{episode_id}"
+            keys = await self.redis.keys(pattern)
+            
+            if not keys:
+                return None
+            
+            episode_key = keys[0].decode()
+            episode_data = await self.redis.hgetall(episode_key)
+            
+            if not episode_data:
+                return None
+            
+            steps_data = json.loads(episode_data['steps'])
+            steps = [EpisodeStep(**step_data) for step_data in steps_data]
+            metadata = json.loads(episode_data['metadata'])
+            
+            return Episode(
+                episode_id=episode_data['episode_id'],
+                tenant_id=episode_data['tenant_id'],
+                user_id=episode_data['user_id'],
+                session_id=episode_data['session_id'],
+                status=EpisodeStatus(episode_data['status']),
+                created_at=float(episode_data['created_at']),
+                steps=steps,
+                metadata=metadata
+            )
+            
+        except Exception as e:
+            logger.error("Failed to get episode", error=str(e))
+            return None
