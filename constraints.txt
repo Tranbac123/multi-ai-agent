@@ -1,3 +1,6 @@
+# Dependency constraints for Multi-Tenant AIaaS Platform
+# This file ensures consistent dependency versions across environments
+
 # Core Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
