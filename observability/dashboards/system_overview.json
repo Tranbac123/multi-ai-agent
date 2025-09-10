@@ -1,0 +1,170 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "System Overview Dashboard",
+    "tags": ["system", "overview", "health"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=\"api-gateway\"}",
+            "legendFormat": "API Gateway",
+            "refId": "A"
+          },
+          {
+            "expr": "up{job=\"orchestrator\"}",
+            "legendFormat": "Orchestrator",
+            "refId": "B"
+          },
+          {
+            "expr": "up{job=\"router-service\"}",
+            "legendFormat": "Router Service",
+            "refId": "C"
+          },
+          {
+            "expr": "up{job=\"realtime\"}",
+            "legendFormat": "Realtime Service",
+            "refId": "D"
+          },
+          {
+            "expr": "up{job=\"analytics-service\"}",
+            "legendFormat": "Analytics Service",
+            "refId": "E"
+          },
+          {
+            "expr": "up{job=\"billing-service\"}",
+            "legendFormat": "Billing Service",
+            "refId": "F"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"api-gateway\"}[5m])",
+            "legendFormat": "API Gateway",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(router_requests_total[5m])",
+            "legendFormat": "Router Service",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Response Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, http_request_duration_seconds{job=\"api-gateway\"})",
+            "legendFormat": "API Gateway P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, http_request_duration_seconds{job=\"api-gateway\"})",
+            "legendFormat": "API Gateway P95",
+            "refId": "B"
+          },
+          {
+            "expr": "router_decision_latency_ms",
+            "legendFormat": "Router P50",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Latency (s/ms)",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"api-gateway\",status=~\"5..\"}[5m])",
+            "legendFormat": "API Gateway 5xx",
+            "refId": "A"
+          },
+          {
+            "expr": "router_misroute_rate",
+            "legendFormat": "Router Misroute",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Errors/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Resource Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "Memory Usage MB",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Usage",
+            "min": 0
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": []
+  }
+}

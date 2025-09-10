@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-from apps.analytics-service.core.analytics_engine import AnalyticsEngine, KPIMetrics
-from apps.analytics-service.core.dashboard_generator import DashboardGenerator
+from apps.analytics_service.core.analytics_engine import AnalyticsEngine, KPIMetrics
+from apps.analytics_service.core.dashboard_generator import DashboardGenerator
 
 # Configure structured logging
 structlog.configure(
