@@ -1,4 +1,4 @@
-"""Payment adapter with saga compensation."""
+"""Payment adapter with Saga compensation support."""
 
 import asyncio
 import time
@@ -8,8 +8,7 @@ from enum import Enum
 import structlog
 import redis.asyncio as redis
 
-from services.tools.base_adapter import BaseAdapter, AdapterConfig
-from services.tools.saga_adapter import SagaAdapter, SagaStep
+from .base_adapter import BaseAdapter, AdapterConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -21,187 +20,184 @@ class PaymentStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     REFUNDED = "refunded"
+    CANCELLED = "cancelled"
 
 
 @dataclass
 class PaymentRequest:
-    """Payment request."""
+    """Payment request structure."""
     amount: float
-    currency: str = "USD"
-    payment_method: str = "card"
-    customer_id: str = ""
-    order_id: str = ""
-    description: str = ""
+    currency: str
+    customer_id: str
+    payment_method_id: str
+    description: str
     metadata: Dict[str, Any] = None
 
 
 @dataclass
 class PaymentResult:
-    """Payment result."""
+    """Payment operation result."""
     payment_id: str
     status: PaymentStatus
     amount: float
     currency: str
+    customer_id: str
     processed_at: float
     transaction_id: Optional[str] = None
-    error: Optional[str] = None
+    error_message: Optional[str] = None
 
 
-class PaymentAdapter:
-    """Payment adapter with saga compensation."""
+class PaymentAdapter(BaseAdapter):
+    """Payment adapter with reliability patterns and Saga compensation."""
     
-    def __init__(
-        self,
-        name: str,
-        config: AdapterConfig,
-        redis_client: redis.Redis
-    ):
-        self.name = name
-        self.config = config
-        self.redis = redis_client
-        self.base_adapter = BaseAdapter(name, config, redis_client)
-        self.saga_adapter = SagaAdapter(name, config, redis_client)
+    def __init__(self, redis_client: redis.Redis, payment_config: Dict[str, Any]):
+        config = AdapterConfig(
+            timeout_ms=45000,  # Longer timeout for payment processing
+            max_retries=2,     # Fewer retries for payments
+            retry_delay_ms=2000,
+            circuit_breaker_threshold=3,  # Lower threshold for payments
+            circuit_breaker_timeout_ms=120000,  # 2 minutes
+            bulkhead_max_concurrent=5,  # Lower concurrency for payments
+            idempotency_ttl_seconds=7200,  # 2 hours for payments
+            saga_compensation_enabled=True,
+            saga_compensation_timeout_ms=120000
+        )
+        
+        super().__init__("payment_adapter", config, redis_client)
+        self.payment_config = payment_config
+        self.processed_payments: Dict[str, PaymentResult] = {}  # For compensation tracking
     
-    async def process_payment(
-        self,
-        request: PaymentRequest,
-        tenant_id: str,
-        user_id: str
-    ) -> PaymentResult:
-        """Process payment using base adapter."""
-        try:
-            # Generate payment ID
-            payment_id = f"payment_{int(time.time())}_{hash(request.customer_id)}"
+    async def process_payment(self, request: PaymentRequest) -> PaymentResult:
+        """Process payment with reliability patterns."""
+        async def _payment_operation():
+            # Simulate payment processing
+            await asyncio.sleep(0.2)  # Simulate payment gateway delay
             
-            # Mock payment processing
-            result = await self.base_adapter.call(
-                self._process_payment_operation,
-                request,
-                payment_id
-            )
+            # In production, this would integrate with payment gateways like Stripe, PayPal, etc.
+            payment_id = f"pay_{int(time.time() * 1000)}"
+            transaction_id = f"txn_{int(time.time() * 1000)}"
             
-            return result
+            # Simulate payment success/failure
+            success_rate = 0.95  # 95% success rate
+            import random
+            is_successful = random.random() < success_rate
             
-        except Exception as e:
-            logger.error("Failed to process payment", error=str(e), amount=request.amount, customer_id=request.customer_id)
-            raise
-    
-    async def process_payment_with_saga(
-        self,
-        request: PaymentRequest,
-        tenant_id: str,
-        user_id: str
-    ) -> PaymentResult:
-        """Process payment using saga pattern."""
-        try:
-            # Generate saga ID
-            saga_id = f"payment_saga_{int(time.time())}_{hash(request.customer_id)}"
-            
-            # Create saga steps
-            steps = [
-                SagaStep(
-                    step_id="process_payment",
-                    operation=self._process_payment_operation,
-                    compensate=self._compensate_payment_operation,
-                    args=(request,),
-                    kwargs={}
+            if is_successful:
+                result = PaymentResult(
+                    payment_id=payment_id,
+                    status=PaymentStatus.COMPLETED,
+                    amount=request.amount,
+                    currency=request.currency,
+                    customer_id=request.customer_id,
+                    processed_at=time.time(),
+                    transaction_id=transaction_id
                 )
-            ]
+                
+                # Store for potential compensation
+                self.processed_payments[payment_id] = result
+                
+                logger.info("Payment processed successfully", payment_id=payment_id, amount=request.amount, currency=request.currency)
+            else:
+                result = PaymentResult(
+                    payment_id=payment_id,
+                    status=PaymentStatus.FAILED,
+                    amount=request.amount,
+                    currency=request.currency,
+                    customer_id=request.customer_id,
+                    processed_at=time.time(),
+                    error_message="Payment gateway error"
+                )
+                
+                logger.warning("Payment failed", payment_id=payment_id, amount=request.amount, error=result.error_message)
             
-            # Execute saga
-            context = await self.saga_adapter.execute_saga(
-                saga_id=saga_id,
-                steps=steps,
-                tenant_id=tenant_id,
-                user_id=user_id
-            )
-            
-            # Get result from first step
-            if context.steps and context.steps[0].result:
-                return context.steps[0].result
-            
-            # If saga failed, raise exception
-            if context.status.value in ['failed', 'compensated']:
-                error_msg = context.steps[0].error if context.steps else "Unknown error"
-                raise Exception(f"Payment saga failed: {error_msg}")
-            
-            raise Exception("Payment saga completed but no result found")
-            
-        except Exception as e:
-            logger.error("Failed to process payment with saga", error=str(e), amount=request.amount, customer_id=request.customer_id)
-            raise
-    
-    async def _process_payment_operation(
-        self,
-        request: PaymentRequest,
-        payment_id: Optional[str] = None
-    ) -> PaymentResult:
-        """Process payment operation (mock implementation)."""
-        try:
-            if not payment_id:
-                payment_id = f"payment_{int(time.time())}_{hash(request.customer_id)}"
-            
-            # Mock payment processing delay
-            await asyncio.sleep(0.2)
-            
-            # Mock payment service response
-            result = PaymentResult(
-                payment_id=payment_id,
-                status=PaymentStatus.COMPLETED,
-                amount=request.amount,
-                currency=request.currency,
-                processed_at=time.time(),
-                transaction_id=f"txn_{int(time.time())}_{hash(payment_id)}"
-            )
-            
-            logger.info("Payment processed successfully", payment_id=payment_id, amount=request.amount, customer_id=request.customer_id)
             return result
-            
-        except Exception as e:
-            logger.error("Payment processing failed", error=str(e), amount=request.amount, customer_id=request.customer_id)
-            raise
+        
+        return await self.call(_payment_operation)
     
-    async def _compensate_payment_operation(
-        self,
-        result: PaymentResult,
-        request: PaymentRequest
-    ) -> None:
-        """Compensate payment operation (mock implementation)."""
-        try:
-            # Mock payment compensation (e.g., refund, void transaction)
-            logger.info("Compensating payment operation", payment_id=result.payment_id, amount=result.amount)
+    async def refund_payment(self, payment_id: str, amount: Optional[float] = None) -> PaymentResult:
+        """Refund payment with reliability patterns."""
+        async def _refund_operation():
+            # Simulate refund processing
+            await asyncio.sleep(0.15)  # Simulate refund processing delay
             
-            # Mock compensation delay
-            await asyncio.sleep(0.1)
+            # In production, this would call payment gateway refund API
+            refund_id = f"refund_{int(time.time() * 1000)}"
             
-            # In a real implementation, this might:
-            # - Refund the payment
-            # - Void the transaction
-            # - Update payment status
-            # - Send notification to customer
-            # - Log for manual review
+            # Find original payment
+            original_payment = None
+            for payment in self.processed_payments.values():
+                if payment.payment_id == payment_id:
+                    original_payment = payment
+                    break
             
-            logger.info("Payment operation compensated", payment_id=result.payment_id)
+            if not original_payment:
+                raise ValueError(f"Payment {payment_id} not found for refund")
             
-        except Exception as e:
-            logger.error("Payment compensation failed", error=str(e), payment_id=result.payment_id)
-            raise
+            refund_amount = amount or original_payment.amount
+            
+            result = PaymentResult(
+                payment_id=refund_id,
+                status=PaymentStatus.REFUNDED,
+                amount=refund_amount,
+                currency=original_payment.currency,
+                customer_id=original_payment.customer_id,
+                processed_at=time.time(),
+                transaction_id=f"refund_txn_{int(time.time() * 1000)}"
+            )
+            
+            logger.info("Payment refunded", payment_id=payment_id, refund_id=refund_id, amount=refund_amount)
+            return result
+        
+        return await self.call(_refund_operation)
+    
+    async def compensate_payment(self, payment_id: str) -> bool:
+        """Compensate for processed payment (refund)."""
+        async def _compensation_operation():
+            if payment_id in self.processed_payments:
+                payment = self.processed_payments[payment_id]
+                
+                if payment.status == PaymentStatus.COMPLETED:
+                    # Refund the payment
+                    refund_result = await self.refund_payment(payment_id)
+                    
+                    # Update original payment status
+                    payment.status = PaymentStatus.REFUNDED
+                    
+                    logger.info("Payment compensation executed (refunded)", payment_id=payment_id, refund_id=refund_result.payment_id)
+                    return True
+                else:
+                    logger.warning("Payment not completed, no compensation needed", payment_id=payment_id, status=payment.status.value)
+                    return True
+            else:
+                logger.warning("Payment not found for compensation", payment_id=payment_id)
+                return False
+        
+        return await self.compensate(_compensation_operation)
+    
+    async def get_payment_status(self, payment_id: str) -> Optional[PaymentResult]:
+        """Get payment status."""
+        return self.processed_payments.get(payment_id)
+    
+    async def get_processed_payments(self) -> List[PaymentResult]:
+        """Get list of processed payments for compensation tracking."""
+        return list(self.processed_payments.values())
     
     async def get_payment_metrics(self) -> Dict[str, Any]:
         """Get payment adapter metrics."""
-        try:
-            # Get base adapter metrics
-            base_metrics = await self.base_adapter.get_metrics()
-            
-            # Get saga metrics
-            saga_metrics = await self.saga_adapter.get_saga_metrics()
-            
-            return {
-                'adapter_name': self.name,
-                'base_metrics': base_metrics,
-                'saga_metrics': saga_metrics
-            }
-            
-        except Exception as e:
-            logger.error("Failed to get payment metrics", error=str(e))
-            return {'error': str(e)}
+        base_metrics = await self.get_metrics()
+        
+        # Calculate payment-specific metrics
+        total_amount = sum(p.amount for p in self.processed_payments.values() if p.status == PaymentStatus.COMPLETED)
+        successful_payments = len([p for p in self.processed_payments.values() if p.status == PaymentStatus.COMPLETED])
+        failed_payments = len([p for p in self.processed_payments.values() if p.status == PaymentStatus.FAILED])
+        refunded_payments = len([p for p in self.processed_payments.values() if p.status == PaymentStatus.REFUNDED])
+        
+        return {
+            **base_metrics,
+            "processed_payments_count": len(self.processed_payments),
+            "successful_payments": successful_payments,
+            "failed_payments": failed_payments,
+            "refunded_payments": refunded_payments,
+            "total_amount_processed": total_amount,
+            "payment_gateway": self.payment_config.get("gateway", "unknown")
+        }

@@ -1,4 +1,4 @@
-"""Email adapter with saga compensation."""
+"""Email adapter with Saga compensation support."""
 
 import asyncio
 import time
@@ -7,184 +7,126 @@ from dataclasses import dataclass
 import structlog
 import redis.asyncio as redis
 
-from services.tools.base_adapter import BaseAdapter, AdapterConfig
-from services.tools.saga_adapter import SagaAdapter, SagaStep
+from .base_adapter import BaseAdapter, AdapterConfig
 
 logger = structlog.get_logger(__name__)
 
 
 @dataclass
 class EmailMessage:
-    """Email message."""
+    """Email message structure."""
     to: str
     subject: str
     body: str
-    from_email: str = "noreply@example.com"
-    cc: List[str] = None
-    bcc: List[str] = None
+    html_body: Optional[str] = None
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
     attachments: List[Dict[str, Any]] = None
 
 
 @dataclass
 class EmailResult:
-    """Email result."""
+    """Email operation result."""
     message_id: str
     status: str
     sent_at: float
-    error: Optional[str] = None
+    recipient: str
+    subject: str
 
 
-class EmailAdapter:
-    """Email adapter with saga compensation."""
+class EmailAdapter(BaseAdapter):
+    """Email adapter with reliability patterns and Saga compensation."""
     
-    def __init__(
-        self,
-        name: str,
-        config: AdapterConfig,
-        redis_client: redis.Redis
-    ):
-        self.name = name
-        self.config = config
-        self.redis = redis_client
-        self.base_adapter = BaseAdapter(name, config, redis_client)
-        self.saga_adapter = SagaAdapter(name, config, redis_client)
+    def __init__(self, redis_client: redis.Redis, smtp_config: Dict[str, Any]):
+        config = AdapterConfig(
+            timeout_ms=30000,
+            max_retries=3,
+            retry_delay_ms=1000,
+            circuit_breaker_threshold=5,
+            circuit_breaker_timeout_ms=60000,
+            bulkhead_max_concurrent=10,
+            idempotency_ttl_seconds=3600,
+            saga_compensation_enabled=True,
+            saga_compensation_timeout_ms=60000
+        )
+        
+        super().__init__("email_adapter", config, redis_client)
+        self.smtp_config = smtp_config
+        self.sent_emails: Dict[str, EmailResult] = {}  # For compensation tracking
     
-    async def send_email(
-        self,
-        message: EmailMessage,
-        tenant_id: str,
-        user_id: str
-    ) -> EmailResult:
-        """Send email using base adapter."""
-        try:
-            # Generate message ID
-            message_id = f"email_{int(time.time())}_{hash(message.to)}"
+    async def send_email(self, message: EmailMessage) -> EmailResult:
+        """Send email with reliability patterns."""
+        async def _send_operation():
+            # Simulate email sending
+            await asyncio.sleep(0.1)  # Simulate network delay
             
-            # Mock email sending
-            result = await self.base_adapter.call(
-                self._send_email_operation,
-                message,
-                message_id
-            )
+            # In production, this would use actual SMTP
+            message_id = f"email_{int(time.time() * 1000)}"
             
-            return result
-            
-        except Exception as e:
-            logger.error("Failed to send email", error=str(e), to=message.to, subject=message.subject)
-            raise
-    
-    async def send_email_with_saga(
-        self,
-        message: EmailMessage,
-        tenant_id: str,
-        user_id: str
-    ) -> EmailResult:
-        """Send email using saga pattern."""
-        try:
-            # Generate saga ID
-            saga_id = f"email_saga_{int(time.time())}_{hash(message.to)}"
-            
-            # Create saga steps
-            steps = [
-                SagaStep(
-                    step_id="send_email",
-                    operation=self._send_email_operation,
-                    compensate=self._compensate_email_operation,
-                    args=(message,),
-                    kwargs={}
-                )
-            ]
-            
-            # Execute saga
-            context = await self.saga_adapter.execute_saga(
-                saga_id=saga_id,
-                steps=steps,
-                tenant_id=tenant_id,
-                user_id=user_id
-            )
-            
-            # Get result from first step
-            if context.steps and context.steps[0].result:
-                return context.steps[0].result
-            
-            # If saga failed, raise exception
-            if context.status.value in ['failed', 'compensated']:
-                error_msg = context.steps[0].error if context.steps else "Unknown error"
-                raise Exception(f"Email saga failed: {error_msg}")
-            
-            raise Exception("Email saga completed but no result found")
-            
-        except Exception as e:
-            logger.error("Failed to send email with saga", error=str(e), to=message.to, subject=message.subject)
-            raise
-    
-    async def _send_email_operation(
-        self,
-        message: EmailMessage,
-        message_id: Optional[str] = None
-    ) -> EmailResult:
-        """Send email operation (mock implementation)."""
-        try:
-            if not message_id:
-                message_id = f"email_{int(time.time())}_{hash(message.to)}"
-            
-            # Mock email sending delay
-            await asyncio.sleep(0.1)
-            
-            # Mock email service response
             result = EmailResult(
                 message_id=message_id,
                 status="sent",
-                sent_at=time.time()
+                sent_at=time.time(),
+                recipient=message.to,
+                subject=message.subject
             )
             
-            logger.info("Email sent successfully", message_id=message_id, to=message.to, subject=message.subject)
+            # Store for potential compensation
+            self.sent_emails[message_id] = result
+            
+            logger.info("Email sent", message_id=message_id, recipient=message.to, subject=message.subject)
             return result
-            
-        except Exception as e:
-            logger.error("Email sending failed", error=str(e), to=message.to, subject=message.subject)
-            raise
+        
+        return await self.call(_send_operation)
     
-    async def _compensate_email_operation(
-        self,
-        result: EmailResult,
-        message: EmailMessage
-    ) -> None:
-        """Compensate email operation (mock implementation)."""
-        try:
-            # Mock email compensation (e.g., send follow-up email, log for manual review)
-            logger.info("Compensating email operation", message_id=result.message_id, to=message.to)
-            
-            # Mock compensation delay
-            await asyncio.sleep(0.05)
-            
-            # In a real implementation, this might:
-            # - Send a follow-up email
-            # - Log the email for manual review
-            # - Update a database record
-            # - Send a notification to administrators
-            
-            logger.info("Email operation compensated", message_id=result.message_id)
-            
-        except Exception as e:
-            logger.error("Email compensation failed", error=str(e), message_id=result.message_id)
-            raise
+    async def send_bulk_email(self, messages: List[EmailMessage]) -> List[EmailResult]:
+        """Send bulk emails with reliability patterns."""
+        async def _bulk_send_operation():
+            results = []
+            for message in messages:
+                result = await self.send_email(message)
+                results.append(result)
+            return results
+        
+        return await self.call(_bulk_send_operation)
+    
+    async def compensate_send_email(self, message_id: str) -> bool:
+        """Compensate for sent email (mark as failed/unsent)."""
+        async def _compensation_operation():
+            if message_id in self.sent_emails:
+                # In production, this might involve:
+                # - Sending a follow-up email
+                # - Updating database records
+                # - Notifying administrators
+                
+                email_result = self.sent_emails[message_id]
+                email_result.status = "compensated"
+                
+                logger.info("Email compensation executed", message_id=message_id, recipient=email_result.recipient)
+                
+                # Remove from sent emails
+                del self.sent_emails[message_id]
+                
+                return True
+            else:
+                logger.warning("Email not found for compensation", message_id=message_id)
+                return False
+        
+        return await self.compensate(_compensation_operation)
+    
+    async def get_sent_emails(self) -> List[EmailResult]:
+        """Get list of sent emails for compensation tracking."""
+        return list(self.sent_emails.values())
     
     async def get_email_metrics(self) -> Dict[str, Any]:
         """Get email adapter metrics."""
-        try:
-            # Get base adapter metrics
-            base_metrics = await self.base_adapter.get_metrics()
-            
-            # Get saga metrics
-            saga_metrics = await self.saga_adapter.get_saga_metrics()
-            
-            return {
-                'adapter_name': self.name,
-                'base_metrics': base_metrics,
-                'saga_metrics': saga_metrics
+        base_metrics = await self.get_metrics()
+        
+        return {
+            **base_metrics,
+            "sent_emails_count": len(self.sent_emails),
+            "smtp_config": {
+                "host": self.smtp_config.get("host", "unknown"),
+                "port": self.smtp_config.get("port", "unknown")
             }
-            
-        except Exception as e:
-            logger.error("Failed to get email metrics", error=str(e))
-            return {'error': str(e)}
+        }

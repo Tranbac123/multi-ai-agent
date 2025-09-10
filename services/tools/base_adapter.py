@@ -1,9 +1,9 @@
-"""Base adapter with reliability enforcement patterns."""
+"""Base adapter with reliability enforcement patterns and Saga compensation."""
 
 import asyncio
 import time
 import uuid
-from typing import Dict, List, Any, Optional, Callable, TypeVar, Generic
+from typing import Dict, List, Any, Optional, Callable, TypeVar, Generic, Awaitable
 from dataclasses import dataclass
 from enum import Enum
 import structlog
@@ -31,6 +31,8 @@ class AdapterConfig:
     circuit_breaker_timeout_ms: int = 60000
     bulkhead_max_concurrent: int = 10
     idempotency_ttl_seconds: int = 3600
+    saga_compensation_enabled: bool = True
+    saga_compensation_timeout_ms: int = 60000
 
 
 @dataclass
@@ -325,3 +327,75 @@ class BaseAdapter(Generic[T]):
         self.circuit_breaker_failures = 0
         self.circuit_breaker_last_failure = 0
         logger.info("Adapter metrics reset", adapter=self.name)
+    
+    async def compensate(
+        self,
+        compensation_operation: Callable[..., Awaitable[Any]],
+        *args,
+        **kwargs
+    ) -> Any:
+        """Execute compensation operation for Saga pattern."""
+        if not self.config.saga_compensation_enabled:
+            logger.warning("Saga compensation disabled", adapter=self.name)
+            return None
+        
+        try:
+            logger.info("Starting compensation", adapter=self.name, operation=compensation_operation.__name__)
+            
+            # Execute compensation with timeout
+            result = await asyncio.wait_for(
+                compensation_operation(*args, **kwargs),
+                timeout=self.config.saga_compensation_timeout_ms / 1000.0
+            )
+            
+            logger.info("Compensation completed", adapter=self.name, operation=compensation_operation.__name__)
+            return result
+            
+        except asyncio.TimeoutError:
+            logger.error("Compensation timed out", adapter=self.name, operation=compensation_operation.__name__)
+            raise
+        except Exception as e:
+            logger.error("Compensation failed", adapter=self.name, operation=compensation_operation.__name__, error=str(e))
+            raise
+    
+    async def get_compensation_events(self, saga_id: str) -> List[Dict[str, Any]]:
+        """Get compensation events for a Saga."""
+        try:
+            pattern = f"write_ahead_event:*:{saga_id}:succeeded"
+            keys = await self.redis.keys(pattern)
+            
+            events = []
+            for key in keys:
+                event_data = await self.redis.get(key)
+                if event_data:
+                    import json
+                    event = json.loads(event_data)
+                    events.append(event)
+            
+            return events
+            
+        except Exception as e:
+            logger.error("Failed to get compensation events", adapter=self.name, saga_id=saga_id, error=str(e))
+            return []
+    
+    async def execute_compensation_chain(self, saga_id: str) -> Dict[str, Any]:
+        """Execute compensation chain for a Saga."""
+        try:
+            events = await self.get_compensation_events(saga_id)
+            
+            compensation_results = {}
+            for event in events:
+                if event.get('event_type') == 'tool.call.succeeded':
+                    # This would need to be implemented by specific adapters
+                    # For now, just log the event
+                    logger.info("Compensation event found", adapter=self.name, event=event)
+                    compensation_results[event['idempotency_key']] = {
+                        'status': 'pending',
+                        'event': event
+                    }
+            
+            return compensation_results
+            
+        except Exception as e:
+            logger.error("Failed to execute compensation chain", adapter=self.name, saga_id=saga_id, error=str(e))
+            return {}

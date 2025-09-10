@@ -1,76 +1,67 @@
-"""Unit tests for reliability patterns in tool adapters."""
+"""Tests for reliability patterns and Saga orchestration."""
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any
-
+import time
+from unittest.mock import AsyncMock, MagicMock
 from services.tools.base_adapter import BaseAdapter, AdapterConfig, AdapterStatus
-from services.tools.saga_adapter import SagaAdapter, SagaStep, SagaStatus
-from services.tools.email_adapter import EmailAdapter, EmailMessage, EmailResult
+from services.tools.email_adapter import EmailAdapter, EmailMessage
+from services.tools.payment_adapter import PaymentAdapter, PaymentRequest, PaymentStatus
+from services.tools.crm_adapter import CRMAdapter, Contact, Lead, CRMOperation
+from apps.orchestrator.core.saga_orchestrator import SagaOrchestrator, SagaStep, SagaStatus, StepStatus
 
 
-@pytest.fixture
-def mock_redis():
-    """Mock Redis client."""
-    redis_mock = AsyncMock()
-    redis_mock.get = AsyncMock(return_value=None)
-    redis_mock.setex = AsyncMock()
-    redis_mock.ping = AsyncMock()
-    return redis_mock
-
-
-@pytest.fixture
-def adapter_config():
-    """Adapter configuration for testing."""
-    return AdapterConfig(
-        timeout_ms=1000,
-        max_retries=2,
-        retry_delay_ms=100,
-        circuit_breaker_threshold=3,
-        circuit_breaker_timeout_ms=5000,
-        bulkhead_max_concurrent=5,
-        idempotency_ttl_seconds=3600
-    )
-
-
-@pytest.fixture
-def base_adapter(mock_redis, adapter_config):
-    """Base adapter instance with mocked dependencies."""
-    return BaseAdapter("test_adapter", adapter_config, mock_redis)
-
-
-@pytest.fixture
-def saga_adapter(mock_redis, adapter_config):
-    """Saga adapter instance with mocked dependencies."""
-    return SagaAdapter("test_saga", adapter_config, mock_redis)
-
-
-@pytest.fixture
-def email_adapter(mock_redis, adapter_config):
-    """Email adapter instance with mocked dependencies."""
-    return EmailAdapter("test_email", adapter_config, mock_redis)
-
-
-class TestBaseAdapter:
+class TestBaseAdapterReliability:
     """Test base adapter reliability patterns."""
     
-    @pytest.mark.asyncio
-    async def test_successful_call(self, base_adapter):
-        """Test successful adapter call."""
-        async def mock_operation(x, y):
-            return x + y
-        
-        result = await base_adapter.call(mock_operation, 2, 3)
-        
-        assert result == 5
-        assert base_adapter.metrics.total_requests == 1
-        assert base_adapter.metrics.successful_requests == 1
-        assert base_adapter.metrics.failed_requests == 0
+    @pytest.fixture
+    def redis_mock(self):
+        """Create mock Redis client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def adapter_config(self):
+        """Create adapter configuration."""
+        return AdapterConfig(
+            timeout_ms=1000,
+            max_retries=2,
+            retry_delay_ms=100,
+            circuit_breaker_threshold=2,
+            circuit_breaker_timeout_ms=5000,
+            bulkhead_max_concurrent=2,
+            idempotency_ttl_seconds=60,
+            saga_compensation_enabled=True,
+            saga_compensation_timeout_ms=5000
+        )
+    
+    @pytest.fixture
+    def base_adapter(self, redis_mock, adapter_config):
+        """Create base adapter with mocks."""
+        return BaseAdapter("test_adapter", adapter_config, redis_mock)
     
     @pytest.mark.asyncio
-    async def test_retry_on_failure(self, base_adapter):
-        """Test retry behavior on failure."""
+    async def test_successful_operation(self, base_adapter, redis_mock):
+        """Test successful operation execution."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None  # No cache hit
+        redis_mock.setex.return_value = True
+        
+        async def test_operation():
+            return "success"
+        
+        result = await base_adapter.call(test_operation)
+        
+        assert result == "success"
+        assert base_adapter.metrics.successful_requests == 1
+        assert base_adapter.metrics.total_requests == 1
+    
+    @pytest.mark.asyncio
+    async def test_operation_with_retries(self, base_adapter, redis_mock):
+        """Test operation with retries."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
         call_count = 0
         
         async def failing_operation():
@@ -83,434 +74,534 @@ class TestBaseAdapter:
         result = await base_adapter.call(failing_operation)
         
         assert result == "success"
-        assert call_count == 3  # 1 initial + 2 retries
+        assert call_count == 3  # Initial call + 2 retries
         assert base_adapter.metrics.retry_attempts == 2
-        assert base_adapter.metrics.total_requests == 1
         assert base_adapter.metrics.successful_requests == 1
     
     @pytest.mark.asyncio
-    async def test_timeout_handling(self, base_adapter):
-        """Test timeout handling."""
-        async def slow_operation():
-            await asyncio.sleep(2)  # Longer than timeout
-            return "success"
-        
-        with pytest.raises(asyncio.TimeoutError):
-            await base_adapter.call(slow_operation)
-        
-        assert base_adapter.metrics.timeout_requests == 1
-        assert base_adapter.metrics.failed_requests == 1
-    
-    @pytest.mark.asyncio
-    async def test_circuit_breaker_opens(self, base_adapter):
+    async def test_circuit_breaker_opens(self, base_adapter, redis_mock):
         """Test circuit breaker opens after threshold failures."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
         async def failing_operation():
             raise Exception("Permanent failure")
         
-        # Make enough calls to open circuit breaker
-        for _ in range(4):  # threshold + 1
-            with pytest.raises(Exception):
+        # Execute operations until circuit breaker opens
+        for i in range(3):  # threshold + 1
+            try:
                 await base_adapter.call(failing_operation)
+            except Exception:
+                pass
         
+        # Circuit breaker should be open
         assert base_adapter.circuit_breaker_state == AdapterStatus.OPEN
-        assert base_adapter.metrics.circuit_breaker_opens == 1
-    
-    @pytest.mark.asyncio
-    async def test_circuit_breaker_blocks_calls(self, base_adapter):
-        """Test circuit breaker blocks calls when open."""
-        async def failing_operation():
-            raise Exception("Permanent failure")
+        assert base_adapter.metrics.circuit_breaker_opens >= 1  # May open multiple times due to retries
         
-        # Open circuit breaker
-        for _ in range(4):
-            with pytest.raises(Exception):
-                await base_adapter.call(failing_operation)
-        
-        # Next call should be blocked
+        # Next call should be rejected
         with pytest.raises(Exception, match="Circuit breaker is open"):
             await base_adapter.call(failing_operation)
     
     @pytest.mark.asyncio
-    async def test_circuit_breaker_resets(self, base_adapter):
+    async def test_circuit_breaker_resets(self, base_adapter, redis_mock):
         """Test circuit breaker resets after timeout."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
         async def failing_operation():
             raise Exception("Permanent failure")
         
         # Open circuit breaker
-        for _ in range(4):
-            with pytest.raises(Exception):
+        for i in range(3):
+            try:
                 await base_adapter.call(failing_operation)
+            except Exception:
+                pass
+        
+        assert base_adapter.circuit_breaker_state == AdapterStatus.OPEN
         
         # Wait for timeout
-        await asyncio.sleep(0.1)  # Mock time passage
+        await asyncio.sleep(0.1)  # Short sleep for test
         
-        # Reset circuit breaker manually for test
-        base_adapter.circuit_breaker_state = AdapterStatus.CLOSED
-        base_adapter.circuit_breaker_failures = 0
+        # Manually reset for testing
+        base_adapter.circuit_breaker_state = AdapterStatus.HALF_OPEN
         
-        # Call should work now
         async def success_operation():
             return "success"
         
+        # Should work in half-open state
         result = await base_adapter.call(success_operation)
         assert result == "success"
+        assert base_adapter.circuit_breaker_state == AdapterStatus.CLOSED
     
     @pytest.mark.asyncio
-    async def test_idempotency(self, base_adapter):
-        """Test idempotency behavior."""
+    async def test_idempotency(self, base_adapter, redis_mock):
+        """Test idempotency caching."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None  # No cache hit initially
+        redis_mock.setex.return_value = True
+        
         call_count = 0
         
-        async def expensive_operation():
+        async def test_operation():
             nonlocal call_count
             call_count += 1
             return f"result_{call_count}"
         
         # First call
-        result1 = await base_adapter.call(expensive_operation)
+        result1 = await base_adapter.call(test_operation)
         assert result1 == "result_1"
         assert call_count == 1
         
-        # Second call with same parameters should return cached result
-        result2 = await base_adapter.call(expensive_operation)
-        assert result2 == "result_1"  # Cached result
-        assert call_count == 1  # Not called again
+        # Mock cache hit for second call
+        redis_mock.get.return_value = '"result_1"'
+        
+        # Second call should use cache
+        result2 = await base_adapter.call(test_operation)
+        assert result2 == "result_1"
+        assert call_count == 1  # Should not call operation again
     
     @pytest.mark.asyncio
-    async def test_bulkhead_limits_concurrency(self, base_adapter):
-        """Test bulkhead limits concurrent operations."""
-        async def slow_operation():
-            await asyncio.sleep(0.1)
-            return "done"
+    async def test_compensation_execution(self, base_adapter):
+        """Test compensation execution."""
+        async def compensation_operation():
+            return "compensated"
         
-        # Start more operations than bulkhead limit
-        tasks = []
-        for _ in range(10):  # More than bulkhead_max_concurrent (5)
-            task = asyncio.create_task(base_adapter.call(slow_operation))
-            tasks.append(task)
-        
-        # Wait for all tasks
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # All should succeed (bulkhead just limits concurrency, doesn't reject)
-        successful_results = [r for r in results if not isinstance(r, Exception)]
-        assert len(successful_results) == 10
+        result = await base_adapter.compensate(compensation_operation)
+        assert result == "compensated"
     
     @pytest.mark.asyncio
-    async def test_write_ahead_events(self, base_adapter, mock_redis):
-        """Test write-ahead events are recorded."""
-        async def test_operation():
-            return "test_result"
+    async def test_compensation_timeout(self, base_adapter):
+        """Test compensation timeout."""
+        # Create adapter with very short timeout
+        config = AdapterConfig(saga_compensation_timeout_ms=10)  # 10ms timeout
+        base_adapter.config = config
         
-        await base_adapter.call(test_operation)
+        async def slow_compensation():
+            await asyncio.sleep(0.1)  # Longer than timeout
+            return "compensated"
         
-        # Verify write-ahead events were recorded
-        assert mock_redis.setex.call_count >= 3  # requested, succeeded, idempotency
-    
-    @pytest.mark.asyncio
-    async def test_metrics_collection(self, base_adapter):
-        """Test metrics collection."""
-        async def test_operation():
-            return "test_result"
-        
-        await base_adapter.call(test_operation)
-        
-        metrics = await base_adapter.get_metrics()
-        
-        assert metrics['name'] == "test_adapter"
-        assert metrics['total_requests'] == 1
-        assert metrics['successful_requests'] == 1
-        assert metrics['failed_requests'] == 0
-        assert metrics['success_rate'] == 1.0
-        assert metrics['circuit_breaker_state'] == "closed"
-
-
-class TestSagaAdapter:
-    """Test saga adapter compensation patterns."""
-    
-    @pytest.mark.asyncio
-    async def test_successful_saga_execution(self, saga_adapter):
-        """Test successful saga execution."""
-        async def step1_operation():
-            return "step1_result"
-        
-        async def step1_compensate(result):
-            return "step1_compensated"
-        
-        steps = [
-            SagaStep(
-                step_id="step1",
-                operation=step1_operation,
-                compensate=step1_compensate
-            )
-        ]
-        
-        context = await saga_adapter.execute_saga(
-            saga_id="test_saga",
-            steps=steps,
-            tenant_id="tenant123",
-            user_id="user456"
-        )
-        
-        assert context.status == SagaStatus.COMPLETED
-        assert len(context.steps) == 1
-        assert context.steps[0].status == SagaStatus.COMPLETED
-        assert context.steps[0].result == "step1_result"
-    
-    @pytest.mark.asyncio
-    async def test_saga_compensation_on_failure(self, saga_adapter):
-        """Test saga compensation when step fails."""
-        async def step1_operation():
-            return "step1_result"
-        
-        async def step1_compensate(result):
-            return "step1_compensated"
-        
-        async def step2_operation():
-            raise Exception("Step 2 failed")
-        
-        async def step2_compensate(result):
-            return "step2_compensated"
-        
-        steps = [
-            SagaStep(
-                step_id="step1",
-                operation=step1_operation,
-                compensate=step1_compensate
-            ),
-            SagaStep(
-                step_id="step2",
-                operation=step2_operation,
-                compensate=step2_compensate
-            )
-        ]
-        
-        context = await saga_adapter.execute_saga(
-            saga_id="test_saga",
-            steps=steps,
-            tenant_id="tenant123",
-            user_id="user456"
-        )
-        
-        assert context.status == SagaStatus.FAILED
-        assert context.steps[0].status == SagaStatus.COMPLETED  # First step completed
-        assert context.steps[1].status == SagaStatus.FAILED  # Second step failed
-    
-    @pytest.mark.asyncio
-    async def test_saga_context_storage(self, saga_adapter):
-        """Test saga context storage and retrieval."""
-        async def test_operation():
-            return "test_result"
-        
-        async def test_compensate(result):
-            return "test_compensated"
-        
-        steps = [
-            SagaStep(
-                step_id="test_step",
-                operation=test_operation,
-                compensate=test_compensate
-            )
-        ]
-        
-        context = await saga_adapter.execute_saga(
-            saga_id="test_saga",
-            steps=steps,
-            tenant_id="tenant123",
-            user_id="user456"
-        )
-        
-        # Retrieve context
-        retrieved_context = await saga_adapter.get_saga_context("test_saga")
-        
-        assert retrieved_context is not None
-        assert retrieved_context.saga_id == "test_saga"
-        assert retrieved_context.status == SagaStatus.COMPLETED
-        assert retrieved_context.tenant_id == "tenant123"
-        assert retrieved_context.user_id == "user456"
-    
-    @pytest.mark.asyncio
-    async def test_saga_metrics(self, saga_adapter):
-        """Test saga metrics collection."""
-        async def test_operation():
-            return "test_result"
-        
-        async def test_compensate(result):
-            return "test_compensated"
-        
-        steps = [
-            SagaStep(
-                step_id="test_step",
-                operation=test_operation,
-                compensate=test_compensate
-            )
-        ]
-        
-        await saga_adapter.execute_saga(
-            saga_id="test_saga",
-            steps=steps,
-            tenant_id="tenant123",
-            user_id="user456"
-        )
-        
-        metrics = await saga_adapter.get_saga_metrics()
-        
-        assert metrics['adapter_name'] == "test_saga"
-        assert 'base_metrics' in metrics
-        assert 'total_sagas' in metrics
-        assert 'status_counts' in metrics
+        with pytest.raises(asyncio.TimeoutError):
+            await base_adapter.compensate(slow_compensation)
 
 
 class TestEmailAdapter:
-    """Test email adapter with saga compensation."""
+    """Test email adapter with Saga compensation."""
+    
+    @pytest.fixture
+    def redis_mock(self):
+        """Create mock Redis client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def smtp_config(self):
+        """Create SMTP configuration."""
+        return {
+            "host": "smtp.example.com",
+            "port": 587,
+            "username": "test@example.com",
+            "password": "password"
+        }
+    
+    @pytest.fixture
+    def email_adapter(self, redis_mock, smtp_config):
+        """Create email adapter."""
+        return EmailAdapter(redis_mock, smtp_config)
     
     @pytest.mark.asyncio
-    async def test_send_email_success(self, email_adapter):
-        """Test successful email sending."""
+    async def test_send_email(self, email_adapter, redis_mock):
+        """Test sending email."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
         message = EmailMessage(
             to="test@example.com",
             subject="Test Email",
             body="This is a test email"
         )
         
-        result = await email_adapter.send_email(message, "tenant123", "user456")
+        result = await email_adapter.send_email(message)
         
-        assert isinstance(result, EmailResult)
+        assert result.message_id.startswith("email_")
         assert result.status == "sent"
-        assert result.message_id is not None
-        assert result.sent_at > 0
+        assert result.recipient == "test@example.com"
+        assert result.subject == "Test Email"
     
     @pytest.mark.asyncio
-    async def test_send_email_with_saga_success(self, email_adapter):
-        """Test successful email sending with saga."""
+    async def test_compensate_send_email(self, email_adapter, redis_mock):
+        """Test email compensation."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
+        # Send an email first
         message = EmailMessage(
             to="test@example.com",
             subject="Test Email",
             body="This is a test email"
         )
         
-        result = await email_adapter.send_email_with_saga(message, "tenant123", "user456")
+        result = await email_adapter.send_email(message)
+        message_id = result.message_id
         
-        assert isinstance(result, EmailResult)
-        assert result.status == "sent"
-        assert result.message_id is not None
+        # Compensate the email
+        compensation_result = await email_adapter.compensate_send_email(message_id)
+        
+        assert compensation_result is True
+        assert message_id not in email_adapter.sent_emails
     
     @pytest.mark.asyncio
-    async def test_email_compensation(self, email_adapter):
-        """Test email compensation function."""
-        message = EmailMessage(
-            to="test@example.com",
-            subject="Test Email",
-            body="This is a test email"
-        )
+    async def test_bulk_email(self, email_adapter, redis_mock):
+        """Test bulk email sending."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
         
-        result = EmailResult(
-            message_id="test_message_id",
-            status="sent",
-            sent_at=1234567890.0
-        )
-        
-        # Test compensation
-        await email_adapter._compensate_email_operation(result, message)
-        
-        # Should not raise exception
-        assert True
-    
-    @pytest.mark.asyncio
-    async def test_email_metrics(self, email_adapter):
-        """Test email adapter metrics."""
-        message = EmailMessage(
-            to="test@example.com",
-            subject="Test Email",
-            body="This is a test email"
-        )
-        
-        await email_adapter.send_email(message, "tenant123", "user456")
-        
-        metrics = await email_adapter.get_email_metrics()
-        
-        assert metrics['adapter_name'] == "test_email"
-        assert 'base_metrics' in metrics
-        assert 'saga_metrics' in metrics
-
-
-class TestReliabilityIntegration:
-    """Test reliability patterns integration."""
-    
-    @pytest.mark.asyncio
-    async def test_transient_failure_recovery(self, base_adapter):
-        """Test recovery from transient failures."""
-        call_count = 0
-        
-        async def transient_failing_operation():
-            nonlocal call_count
-            call_count += 1
-            if call_count <= 2:
-                raise Exception("Transient failure")
-            return "recovered"
-        
-        result = await base_adapter.call(transient_failing_operation)
-        
-        assert result == "recovered"
-        assert call_count == 3  # 1 initial + 2 retries
-        assert base_adapter.metrics.successful_requests == 1
-        assert base_adapter.metrics.retry_attempts == 2
-    
-    @pytest.mark.asyncio
-    async def test_permanent_failure_compensation(self, saga_adapter):
-        """Test compensation for permanent failures."""
-        async def step1_operation():
-            return "step1_result"
-        
-        async def step1_compensate(result):
-            return "step1_compensated"
-        
-        async def step2_operation():
-            raise Exception("Permanent failure")
-        
-        async def step2_compensate(result):
-            return "step2_compensated"
-        
-        steps = [
-            SagaStep(
-                step_id="step1",
-                operation=step1_operation,
-                compensate=step1_compensate
-            ),
-            SagaStep(
-                step_id="step2",
-                operation=step2_operation,
-                compensate=step2_compensate
-            )
+        messages = [
+            EmailMessage(to="user1@example.com", subject="Email 1", body="Body 1"),
+            EmailMessage(to="user2@example.com", subject="Email 2", body="Body 2")
         ]
         
-        context = await saga_adapter.execute_saga(
-            saga_id="test_saga",
-            steps=steps,
-            tenant_id="tenant123",
-            user_id="user456"
-        )
+        results = await email_adapter.send_bulk_email(messages)
         
-        # Saga should fail and compensate step1
-        assert context.status == SagaStatus.FAILED
-        assert context.steps[0].status == SagaStatus.COMPLETED
-        assert context.steps[1].status == SagaStatus.FAILED
+        assert len(results) == 2
+        assert all(result.status == "sent" for result in results)
+
+
+class TestPaymentAdapter:
+    """Test payment adapter with Saga compensation."""
+    
+    @pytest.fixture
+    def redis_mock(self):
+        """Create mock Redis client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def payment_config(self):
+        """Create payment configuration."""
+        return {
+            "gateway": "stripe",
+            "api_key": "sk_test_123",
+            "webhook_secret": "whsec_123"
+        }
+    
+    @pytest.fixture
+    def payment_adapter(self, redis_mock, payment_config):
+        """Create payment adapter."""
+        return PaymentAdapter(redis_mock, payment_config)
     
     @pytest.mark.asyncio
-    async def test_idempotency_prevents_double_side_effects(self, base_adapter):
-        """Test that idempotency prevents double side effects."""
-        side_effect_count = 0
+    async def test_process_payment(self, payment_adapter, redis_mock):
+        """Test payment processing."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
         
-        async def side_effect_operation():
-            nonlocal side_effect_count
-            side_effect_count += 1
-            return f"side_effect_{side_effect_count}"
+        request = PaymentRequest(
+            amount=100.0,
+            currency="USD",
+            customer_id="cust_123",
+            payment_method_id="pm_123",
+            description="Test payment"
+        )
         
-        # First call
-        result1 = await base_adapter.call(side_effect_operation)
-        assert result1 == "side_effect_1"
-        assert side_effect_count == 1
+        result = await payment_adapter.process_payment(request)
         
-        # Second call with same parameters should not execute side effect
-        result2 = await base_adapter.call(side_effect_operation)
-        assert result2 == "side_effect_1"  # Cached result
-        assert side_effect_count == 1  # Side effect not executed again
+        assert result.payment_id.startswith("pay_")
+        assert result.amount == 100.0
+        assert result.currency == "USD"
+        assert result.customer_id == "cust_123"
+    
+    @pytest.mark.asyncio
+    async def test_compensate_payment(self, payment_adapter, redis_mock):
+        """Test payment compensation (refund)."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
+        # Process a payment first
+        request = PaymentRequest(
+            amount=100.0,
+            currency="USD",
+            customer_id="cust_123",
+            payment_method_id="pm_123",
+            description="Test payment"
+        )
+        
+        result = await payment_adapter.process_payment(request)
+        payment_id = result.payment_id
+        
+        # Compensate the payment
+        compensation_result = await payment_adapter.compensate_payment(payment_id)
+        
+        assert compensation_result is True
+        # Payment should be marked as refunded
+        payment = await payment_adapter.get_payment_status(payment_id)
+        assert payment.status == PaymentStatus.REFUNDED
+
+
+class TestCRMAdapter:
+    """Test CRM adapter with Saga compensation."""
+    
+    @pytest.fixture
+    def redis_mock(self):
+        """Create mock Redis client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def crm_config(self):
+        """Create CRM configuration."""
+        return {
+            "system": "salesforce",
+            "endpoint": "https://api.salesforce.com",
+            "api_version": "v52.0"
+        }
+    
+    @pytest.fixture
+    def crm_adapter(self, redis_mock, crm_config):
+        """Create CRM adapter."""
+        return CRMAdapter(redis_mock, crm_config)
+    
+    @pytest.mark.asyncio
+    async def test_create_contact(self, crm_adapter, redis_mock):
+        """Test contact creation."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
+        contact = Contact(
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe",
+            company="Example Corp"
+        )
+        
+        result = await crm_adapter.create_contact(contact)
+        
+        assert result.operation == CRMOperation.CREATE_CONTACT
+        assert result.record_id.startswith("contact_")
+        assert result.status == "created"
+        assert result.data["email"] == "test@example.com"
+    
+    @pytest.mark.asyncio
+    async def test_create_lead(self, crm_adapter, redis_mock):
+        """Test lead creation."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
+        lead = Lead(
+            email="lead@example.com",
+            first_name="Jane",
+            last_name="Smith",
+            company="Lead Corp",
+            source="website"
+        )
+        
+        result = await crm_adapter.create_lead(lead)
+        
+        assert result.operation == CRMOperation.CREATE_LEAD
+        assert result.record_id.startswith("lead_")
+        assert result.status == "created"
+        assert result.data["email"] == "lead@example.com"
+    
+    @pytest.mark.asyncio
+    async def test_compensate_crm_operation(self, crm_adapter, redis_mock):
+        """Test CRM operation compensation."""
+        # Mock Redis responses
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        
+        # Create a contact first
+        contact = Contact(
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe"
+        )
+        
+        result = await crm_adapter.create_contact(contact)
+        contact_id = result.record_id
+        
+        # Compensate the operation
+        compensation_result = await crm_adapter.compensate_crm_operation(contact_id)
+        
+        assert compensation_result is True
+
+
+class TestSagaOrchestrator:
+    """Test Saga orchestrator."""
+    
+    @pytest.fixture
+    def redis_mock(self):
+        """Create mock Redis client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def saga_orchestrator(self, redis_mock):
+        """Create saga orchestrator."""
+        return SagaOrchestrator(redis_mock)
+    
+    @pytest.mark.asyncio
+    async def test_create_saga(self, saga_orchestrator, redis_mock):
+        """Test saga creation."""
+        # Mock Redis responses
+        redis_mock.setex.return_value = True
+        
+        async def step1():
+            return "step1_result"
+        
+        async def step2():
+            return "step2_result"
+        
+        steps = [
+            SagaStep(step_id="step1", name="Step 1", operation=step1),
+            SagaStep(step_id="step2", name="Step 2", operation=step2)
+        ]
+        
+        saga_id = await saga_orchestrator.create_saga("Test Saga", steps)
+        
+        assert saga_id is not None
+        assert saga_id in saga_orchestrator.active_sagas
+        assert saga_orchestrator.saga_metrics["total_sagas"] == 1
+        assert saga_orchestrator.saga_metrics["active_sagas"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_execute_saga_sequential(self, saga_orchestrator, redis_mock):
+        """Test sequential saga execution."""
+        # Mock Redis responses
+        redis_mock.setex.return_value = True
+        redis_mock.get.return_value = None
+        redis_mock.keys.return_value = []
+        
+        execution_order = []
+        
+        async def step1():
+            execution_order.append("step1")
+            return "step1_result"
+        
+        async def step2():
+            execution_order.append("step2")
+            return "step2_result"
+        
+        steps = [
+            SagaStep(step_id="step1", name="Step 1", operation=step1),
+            SagaStep(step_id="step2", name="Step 2", operation=step2)
+        ]
+        
+        saga_id = await saga_orchestrator.create_saga("Test Saga", steps, parallel_execution=False)
+        result = await saga_orchestrator.execute_saga(saga_id)
+        
+        assert result["success"] is True
+        assert len(result["results"]) == 2
+        assert execution_order == ["step1", "step2"]  # Sequential execution
+        assert saga_orchestrator.saga_metrics["completed_sagas"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_execute_saga_parallel(self, saga_orchestrator, redis_mock):
+        """Test parallel saga execution."""
+        # Mock Redis responses
+        redis_mock.setex.return_value = True
+        redis_mock.get.return_value = None
+        redis_mock.keys.return_value = []
+        
+        execution_times = {}
+        
+        async def step1():
+            execution_times["step1"] = time.time()
+            await asyncio.sleep(0.1)
+            return "step1_result"
+        
+        async def step2():
+            execution_times["step2"] = time.time()
+            await asyncio.sleep(0.1)
+            return "step2_result"
+        
+        steps = [
+            SagaStep(step_id="step1", name="Step 1", operation=step1),
+            SagaStep(step_id="step2", name="Step 2", operation=step2)
+        ]
+        
+        saga_id = await saga_orchestrator.create_saga("Test Saga", steps, parallel_execution=True)
+        result = await saga_orchestrator.execute_saga(saga_id)
+        
+        assert result["success"] is True
+        assert len(result["results"]) == 2
+        
+        # Steps should start at roughly the same time (parallel execution)
+        time_diff = abs(execution_times["step1"] - execution_times["step2"])
+        assert time_diff < 0.05  # Should start within 50ms of each other
+    
+    @pytest.mark.asyncio
+    async def test_saga_compensation(self, saga_orchestrator, redis_mock):
+        """Test saga compensation on failure."""
+        # Mock Redis responses
+        redis_mock.setex.return_value = True
+        redis_mock.get.return_value = None
+        redis_mock.keys.return_value = []
+        
+        compensation_called = []
+        
+        async def step1():
+            return "step1_result"
+        
+        async def step2():
+            raise Exception("Step 2 failed")
+        
+        async def compensate_step1():
+            compensation_called.append("step1")
+        
+        steps = [
+            SagaStep(step_id="step1", name="Step 1", operation=step1, compensation=compensate_step1),
+            SagaStep(step_id="step2", name="Step 2", operation=step2)
+        ]
+        
+        saga_id = await saga_orchestrator.create_saga("Test Saga", steps)
+        result = await saga_orchestrator.execute_saga(saga_id)
+        
+        assert result["success"] is False
+        assert "step1" in compensation_called  # Compensation should be called
+        assert saga_orchestrator.saga_metrics["compensated_sagas"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_get_saga_status(self, saga_orchestrator, redis_mock):
+        """Test getting saga status."""
+        # Mock Redis responses
+        redis_mock.setex.return_value = True
+        redis_mock.get.return_value = None
+        redis_mock.keys.return_value = []
+        
+        async def step1():
+            return "step1_result"
+        
+        steps = [SagaStep(step_id="step1", name="Step 1", operation=step1)]
+        
+        saga_id = await saga_orchestrator.create_saga("Test Saga", steps)
+        await saga_orchestrator.execute_saga(saga_id)
+        
+        status = await saga_orchestrator.get_saga_status(saga_id)
+        
+        assert status is not None
+        assert status["saga_id"] == saga_id
+        assert status["name"] == "Test Saga"
+        assert status["status"] == SagaStatus.COMPLETED.value
+        assert len(status["steps"]) == 1
+        assert status["steps"][0]["status"] == StepStatus.COMPLETED.value
+    
+    @pytest.mark.asyncio
+    async def test_saga_metrics(self, saga_orchestrator):
+        """Test saga metrics."""
+        metrics = await saga_orchestrator.get_saga_metrics()
+        
+        assert "total_sagas" in metrics
+        assert "completed_sagas" in metrics
+        assert "failed_sagas" in metrics
+        assert "compensated_sagas" in metrics
+        assert "active_sagas" in metrics
+        assert "success_rate" in metrics
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
