@@ -1,25 +1,17 @@
-"""Router v2 service with feature store and bandit policy."""
+"""Router service v2 with calibrated bandit policy, early exit, and canary support."""
 
 import asyncio
 import time
-from contextlib import asynccontextmanager
-from typing import Dict, Any, Optional
-from uuid import UUID, uuid4
-
-import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any
 import structlog
-from opentelemetry import trace
+import redis.asyncio as redis
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+import uvicorn
 
-from libs.clients.database import get_db_session
-from libs.clients.auth import get_current_tenant
-from libs.clients.rate_limiter import RateLimiter
-from libs.clients.event_bus import EventBus, EventProducer
-from libs.utils.responses import success_response, error_response
-from .core.feature_store import FeatureStore
-from .core.bandit_policy import BanditPolicy, RoutingDecision
-from .core.llm_judge import LLMJudge
+from apps.router-service.core.router_v2 import RouterV2, RouterDecision
+from apps.router-service.core.feature_extractor import Tier
 
 # Configure structured logging
 structlog.configure(
@@ -41,284 +33,348 @@ structlog.configure(
 )
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer(__name__)
+
+# Pydantic models
+class RouteRequest(BaseModel):
+    """Request model for routing."""
+    message: str = Field(..., description="User message to route")
+    user_id: str = Field(..., description="User ID")
+    tenant_id: str = Field(..., description="Tenant ID")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    # Startup
-    logger.info("Starting Router v2 Service")
+class RouteResponse(BaseModel):
+    """Response model for routing."""
+    tier: str = Field(..., description="Selected tier (A, B, or C)")
+    confidence: float = Field(..., description="Confidence score (0.0 to 1.0)")
+    decision_time_ms: float = Field(..., description="Decision time in milliseconds")
+    features: Dict[str, Any] = Field(..., description="Extracted features")
+    escalation_info: Dict[str, Any] = Field(default_factory=dict, description="Escalation information")
+    canary_info: Dict[str, Any] = Field(default_factory=dict, description="Canary information")
+    bandit_info: Dict[str, Any] = Field(default_factory=dict, description="Bandit information")
+
+
+class OutcomeRequest(BaseModel):
+    """Request model for recording outcomes."""
+    user_id: str = Field(..., description="User ID")
+    tenant_id: str = Field(..., description="Tenant ID")
+    tier: str = Field(..., description="Tier used")
+    success: bool = Field(..., description="Whether the request was successful")
+    latency_ms: float = Field(..., description="Request latency in milliseconds")
+    quality_score: float = Field(default=0.0, description="Quality score (0.0 to 1.0)")
+
+
+class StatisticsResponse(BaseModel):
+    """Response model for statistics."""
+    tenant_id: str = Field(..., description="Tenant ID")
+    bandit_statistics: Dict[str, Any] = Field(..., description="Bandit statistics")
+    canary_status: Dict[str, Any] = Field(..., description="Canary status")
+    escalation_statistics: Dict[str, Any] = Field(..., description="Escalation statistics")
+    recent_metrics: Dict[str, Any] = Field(..., description="Recent metrics")
+
+
+# Global router instance
+router_v2: RouterV2 = None
+redis_client: redis.Redis = None
+
+# FastAPI app
+app = FastAPI(
+    title="Router Service v2",
+    description="Intelligent router with calibrated bandit policy, early exit, and canary support",
+    version="2.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+async def get_router() -> RouterV2:
+    """Get router instance."""
+    if router_v2 is None:
+        raise HTTPException(status_code=503, detail="Router not initialized")
+    return router_v2
+
+
+async def get_redis() -> redis.Redis:
+    """Get Redis client."""
+    if redis_client is None:
+        raise HTTPException(status_code=503, detail="Redis not initialized")
+    return redis_client
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    global router_v2, redis_client
     
-    # Initialize Redis client
-    import redis.asyncio as redis
-    app.state.redis = redis.from_url("redis://localhost:6379")
+    try:
+        # Initialize Redis client
+        redis_client = redis.Redis(
+            host="localhost",
+            port=6379,
+            db=0,
+            decode_responses=False,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            retry_on_timeout=True
+        )
+        
+        # Test Redis connection
+        await redis_client.ping()
+        logger.info("Redis connection established")
+        
+        # Initialize router v2
+        router_v2 = RouterV2(redis_client)
+        logger.info("Router v2 initialized")
+        
+    except Exception as e:
+        logger.error("Failed to initialize services", error=str(e))
+        raise
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    global redis_client
     
-    # Initialize components
-    app.state.feature_store = FeatureStore(app.state.redis)
-    app.state.bandit_policy = BanditPolicy(app.state.redis)
-    app.state.llm_judge = LLMJudge(api_key="your_openai_api_key_here")
-    app.state.rate_limiter = RateLimiter(app.state.redis)
-    app.state.event_bus = EventBus()
-    app.state.event_producer = EventProducer(app.state.event_bus)
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down Router v2 Service")
-    await app.state.redis.close()
+    if redis_client:
+        await redis_client.close()
+        logger.info("Redis connection closed")
 
 
-def create_app() -> FastAPI:
-    """Create FastAPI application."""
-    app = FastAPI(
-        title="Router v2 Service",
-        version="2.0.0",
-        description="Intelligent routing service with feature store and bandit policy",
-        lifespan=lifespan
-    )
-    
-    # Add middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Configure in production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    return app
-
-
-app = create_app()
-
-
-# API Routes
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "router-v2-service"}
+    try:
+        # Check Redis connection
+        if redis_client:
+            await redis_client.ping()
+        
+        return {
+            "status": "healthy",
+            "timestamp": time.time(),
+            "service": "router-service-v2"
+        }
+    except Exception as e:
+        logger.error("Health check failed", error=str(e))
+        raise HTTPException(status_code=503, detail="Service unhealthy")
 
 
-@app.post("/api/v1/decide")
-async def decide_route(
-    request: Dict[str, Any],
-    tenant_id: UUID = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session)
-):
-    """Make routing decision for request."""
+@app.post("/route", response_model=RouteResponse)
+async def route_request(
+    request: RouteRequest,
+    router: RouterV2 = Depends(get_router)
+) -> RouteResponse:
+    """Route a request using router v2."""
     try:
         start_time = time.time()
-        request_id = str(uuid4())
         
-        # Extract request text and context
-        request_text = request.get("text", "")
-        context = request.get("context", {})
-        
-        if not request_text:
-            raise HTTPException(status_code=400, detail="Request text is required")
-        
-        # Check rate limits
-        if not await app.state.rate_limiter.is_tenant_allowed(tenant_id):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
-        
-        # Extract features
-        features = await app.state.feature_store.extract_features(
-            request_text, context, tenant_id
-        )
-        
-        # Make routing decision
-        decision = await app.state.bandit_policy.decide_route(
-            features, tenant_id, request_id
-        )
-        
-        # Use LLM judge for borderline cases
-        if decision.policy_escalation or decision.confidence < 0.7:
-            judgment = await app.state.llm_judge.judge_routing_decision(
-                request_text, features, decision.tier, decision.confidence, tenant_id
-            )
-            
-            # Update decision based on judgment
-            if judgment.get("final_tier") != decision.tier:
-                decision.tier = judgment["final_tier"]
-                decision.confidence = judgment.get("confidence", decision.confidence)
-                decision.reasons.append(f"LLM judge override: {judgment.get('reasoning', '')}")
-        
-        # Store features for learning
-        await app.state.feature_store.store_features(request_id, features, tenant_id)
-        
-        # Publish routing event
-        await app.state.event_producer.publish(
-            "router.decision.made",
-            {
-                "request_id": request_id,
-                "tenant_id": str(tenant_id),
-                "tier": decision.tier,
-                "confidence": decision.confidence,
-                "expected_cost": decision.expected_cost,
-                "expected_latency": decision.expected_latency,
-                "processing_time": time.time() - start_time
-            }
-        )
-        
-        # Prepare response
-        response_data = {
-            "request_id": request_id,
-            "tier": decision.tier,
-            "confidence": decision.confidence,
-            "expected_cost_usd": decision.expected_cost,
-            "expected_latency_ms": decision.expected_latency,
-            "reasons": decision.reasons,
-            "policy_escalation": decision.policy_escalation,
-            "processing_time_ms": (time.time() - start_time) * 1000
+        # Convert request to dict
+        request_dict = {
+            'message': request.message,
+            'user_id': request.user_id,
+            'tenant_id': request.tenant_id,
+            **request.metadata
         }
         
-        logger.info("Routing decision made", 
-                   request_id=request_id, 
-                   tier=decision.tier, 
-                   confidence=decision.confidence,
-                   tenant_id=tenant_id)
-        
-        return success_response(data=response_data)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Routing decision failed", 
-                    tenant_id=tenant_id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Routing decision failed")
-
-
-@app.post("/api/v1/feedback")
-async def submit_feedback(
-    feedback: Dict[str, Any],
-    tenant_id: UUID = Depends(get_current_tenant)
-):
-    """Submit feedback for routing decision."""
-    try:
-        request_id = feedback.get("request_id")
-        tier = feedback.get("tier")
-        success = feedback.get("success", False)
-        latency_ms = feedback.get("latency_ms", 0)
-        actual_cost = feedback.get("actual_cost", 0)
-        
-        if not request_id or not tier:
-            raise HTTPException(status_code=400, detail="Request ID and tier are required")
-        
-        # Update bandit policy performance
-        await app.state.bandit_policy.update_performance(
-            tier, success, latency_ms, tenant_id
+        # Route request
+        decision: RouterDecision = await router.route_request(
+            request_dict, request.tenant_id, request.user_id
         )
         
-        # Publish feedback event
-        await app.state.event_producer.publish(
-            "router.feedback.received",
-            {
-                "request_id": request_id,
-                "tenant_id": str(tenant_id),
-                "tier": tier,
-                "success": success,
-                "latency_ms": latency_ms,
-                "actual_cost": actual_cost
+        # Convert features to dict
+        features_dict = {
+            'token_count': decision.features.token_count,
+            'schema_strictness': decision.features.schema_strictness,
+            'domain_flags': decision.features.domain_flags,
+            'novelty_score': decision.features.novelty_score,
+            'historical_failure_rate': decision.features.historical_failure_rate,
+            'user_tier': decision.features.user_tier,
+            'time_of_day': decision.features.time_of_day,
+            'day_of_week': decision.features.day_of_week,
+            'request_complexity': decision.features.request_complexity
+        }
+        
+        # Convert escalation info
+        escalation_info = {}
+        if decision.escalation_decision:
+            escalation_info = {
+                'should_escalate': decision.escalation_decision.should_escalate,
+                'reason': decision.escalation_decision.reason.value if decision.escalation_decision.reason else None,
+                'target_tier': decision.escalation_decision.target_tier.value if decision.escalation_decision.target_tier else None,
+                'early_exit_tier': decision.escalation_decision.early_exit_tier.value if decision.escalation_decision.early_exit_tier else None,
+                'early_exit_confidence': decision.escalation_decision.early_exit_confidence
             }
+        
+        # Convert canary info
+        canary_info = decision.canary_info or {}
+        
+        # Convert bandit info
+        bandit_info = decision.bandit_info or {}
+        
+        # Convert classifier info
+        classifier_info = decision.classifier_info or {}
+        
+        response = RouteResponse(
+            tier=decision.tier.value,
+            confidence=decision.confidence,
+            decision_time_ms=decision.decision_time_ms,
+            features=features_dict,
+            escalation_info=escalation_info,
+            canary_info=canary_info,
+            bandit_info=bandit_info
         )
         
-        logger.info("Feedback received", 
-                   request_id=request_id, 
-                   tier=tier, 
-                   success=success,
-                   tenant_id=tenant_id)
+        # Log routing decision
+        logger.info(
+            "Request routed",
+            tenant_id=request.tenant_id,
+            user_id=request.user_id,
+            tier=decision.tier.value,
+            confidence=decision.confidence,
+            decision_time_ms=decision.decision_time_ms,
+            canary=bool(decision.canary_info),
+            escalated=decision.escalation_decision.should_escalate if decision.escalation_decision else False
+        )
         
-        return success_response(data={"status": "feedback_received"})
+        return response
+        
+    except Exception as e:
+        logger.error("Routing failed", error=str(e), tenant_id=request.tenant_id, user_id=request.user_id)
+        raise HTTPException(status_code=500, detail=f"Routing failed: {str(e)}")
+
+
+@app.post("/outcome")
+async def record_outcome(
+    request: OutcomeRequest,
+    router: RouterV2 = Depends(get_router)
+):
+    """Record routing outcome for learning."""
+    try:
+        # Convert tier string to enum
+        try:
+            tier = Tier(request.tier.upper())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid tier: {request.tier}")
+        
+        # Record outcome
+        await router.record_outcome(
+            request.tenant_id,
+            request.user_id,
+            tier,
+            request.success,
+            request.latency_ms,
+            request.quality_score
+        )
+        
+        logger.info(
+            "Outcome recorded",
+            tenant_id=request.tenant_id,
+            user_id=request.user_id,
+            tier=request.tier,
+            success=request.success,
+            latency_ms=request.latency_ms,
+            quality_score=request.quality_score
+        )
+        
+        return {"status": "success", "message": "Outcome recorded"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Feedback submission failed", 
-                    tenant_id=tenant_id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Feedback submission failed")
+        logger.error("Failed to record outcome", error=str(e), tenant_id=request.tenant_id, user_id=request.user_id)
+        raise HTTPException(status_code=500, detail=f"Failed to record outcome: {str(e)}")
 
 
-@app.get("/api/v1/features/{request_id}")
-async def get_features(
-    request_id: str,
-    tenant_id: UUID = Depends(get_current_tenant)
+@app.get("/statistics/{tenant_id}", response_model=StatisticsResponse)
+async def get_statistics(
+    tenant_id: str,
+    router: RouterV2 = Depends(get_router)
+) -> StatisticsResponse:
+    """Get router statistics for tenant."""
+    try:
+        stats = await router.get_router_statistics(tenant_id)
+        
+        return StatisticsResponse(
+            tenant_id=stats['tenant_id'],
+            bandit_statistics=stats['bandit_statistics'],
+            canary_status=stats['canary_status'],
+            escalation_statistics=stats['escalation_statistics'],
+            recent_metrics=stats['recent_metrics']
+        )
+        
+    except Exception as e:
+        logger.error("Failed to get statistics", error=str(e), tenant_id=tenant_id)
+        raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
+
+
+@app.post("/calibrate/{tenant_id}")
+async def calibrate_models(
+    tenant_id: str,
+    router: RouterV2 = Depends(get_router)
 ):
-    """Get features for request."""
+    """Calibrate models for tenant."""
     try:
-        features = await app.state.feature_store.get_features(request_id)
+        await router.calibrate_models(tenant_id)
         
-        if not features:
-            raise HTTPException(status_code=404, detail="Features not found")
+        logger.info("Models calibrated", tenant_id=tenant_id)
         
-        return success_response(data=features)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Failed to get features", 
-                    request_id=request_id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to get features")
-
-
-@app.get("/api/v1/performance/{tenant_id}")
-async def get_performance_stats(tenant_id: UUID):
-    """Get performance statistics for tenant."""
-    try:
-        stats = {}
-        
-        # Get tier performance
-        for tier in ["SLM_A", "SLM_B", "LLM"]:
-            performance = await app.state.bandit_policy._get_tier_performance(tier, tenant_id)
-            stats[tier] = performance
-        
-        # Get judgment stats
-        judgment_stats = await app.state.llm_judge.get_judgment_stats(tenant_id)
-        stats["judgment_stats"] = judgment_stats
-        
-        return success_response(data=stats)
+        return {"status": "success", "message": "Models calibrated"}
         
     except Exception as e:
-        logger.error("Failed to get performance stats", 
-                    tenant_id=tenant_id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to get performance stats")
+        logger.error("Failed to calibrate models", error=str(e), tenant_id=tenant_id)
+        raise HTTPException(status_code=500, detail=f"Failed to calibrate models: {str(e)}")
 
 
-@app.post("/api/v1/canary/{tenant_id}")
-async def enable_canary_mode(
-    tenant_id: UUID,
-    enabled: bool = True
+@app.post("/reset/{tenant_id}")
+async def reset_learning(
+    tenant_id: str,
+    router: RouterV2 = Depends(get_router)
 ):
-    """Enable/disable canary mode for tenant."""
+    """Reset learning for tenant."""
     try:
-        canary_key = f"canary_mode:{tenant_id}"
+        await router.reset_learning(tenant_id)
         
-        if enabled:
-            await app.state.redis.set(canary_key, "true", ex=86400)  # 24 hours
-        else:
-            await app.state.redis.delete(canary_key)
+        logger.info("Learning reset", tenant_id=tenant_id)
         
-        logger.info("Canary mode updated", 
-                   tenant_id=tenant_id, 
-                   enabled=enabled)
-        
-        return success_response(data={"canary_enabled": enabled})
+        return {"status": "success", "message": "Learning reset"}
         
     except Exception as e:
-        logger.error("Failed to update canary mode", 
-                    tenant_id=tenant_id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to update canary mode")
+        logger.error("Failed to reset learning", error=str(e), tenant_id=tenant_id)
+        raise HTTPException(status_code=500, detail=f"Failed to reset learning: {str(e)}")
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get Prometheus metrics."""
+    try:
+        # Basic metrics for now
+        metrics = {
+            "router_requests_total": 0,
+            "router_decision_latency_ms": 0,
+            "router_misroute_rate": 0,
+            "tier_distribution": {"A": 0, "B": 0, "C": 0},
+            "expected_vs_actual_cost": 0
+        }
+        
+        return metrics
+        
+    except Exception as e:
+        logger.error("Failed to get metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
 
 
 if __name__ == "__main__":
     uvicorn.run(
-        "apps.router_service.main:app",
+        "main:app",
         host="0.0.0.0",
         port=8002,
-        reload=True
+        reload=True,
+        log_level="info"
     )

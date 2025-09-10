@@ -1,440 +1,380 @@
-"""Bandit policy for router decision making."""
+"""Bandit policy minimizing E[cost + λ·error] for router v2."""
 
 import asyncio
 import time
 import math
-import random
 from typing import Dict, List, Any, Optional, Tuple
+from dataclasses import dataclass
 import structlog
 import redis.asyncio as redis
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.calibration import CalibratedClassifierCV
+
+from apps.router-service.core.feature_extractor import RouterFeatures, Tier
 
 logger = structlog.get_logger(__name__)
 
 
+@dataclass
+class BanditArm:
+    """Bandit arm representing a tier."""
+    tier: Tier
+    pulls: int
+    rewards: float
+    costs: float
+    errors: int
+    last_updated: float
+
+
+@dataclass
+class BanditConfig:
+    """Bandit policy configuration."""
+    lambda_error: float  # Error penalty weight
+    exploration_rate: float  # Epsilon for epsilon-greedy
+    confidence_level: float  # UCB confidence level
+    min_pulls: int  # Minimum pulls before using UCB
+    cost_weights: Dict[Tier, float]  # Cost weights per tier
+
+
 class BanditPolicy:
-    """Bandit policy for minimizing cost + λ·error."""
+    """Bandit policy minimizing E[cost + λ·error]."""
     
-    def __init__(
-        self,
-        redis_client: redis.Redis,
-        lambda_error: float = 0.1,
-        exploration_rate: float = 0.1,
-        min_samples: int = 100
-    ):
+    def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
-        self.lambda_error = lambda_error
-        self.exploration_rate = exploration_rate
-        self.min_samples = min_samples
-        
-        # Agent tiers and their costs
-        self.tier_costs = {
-            'A': 0.01,  # Fast, cheap
-            'B': 0.05,  # Medium
-            'C': 0.20   # Slow, expensive but accurate
-        }
-        
-        # Initialize models for each tenant
-        self.models = {}
-        self.calibrated_models = {}
+        self.config = BanditConfig(
+            lambda_error=1.0,  # Error penalty weight
+            exploration_rate=0.1,  # 10% exploration
+            confidence_level=2.0,  # UCB confidence
+            min_pulls=10,  # Minimum pulls for UCB
+            cost_weights={
+                Tier.A: 0.1,  # Cheap
+                Tier.B: 0.5,  # Medium
+                Tier.C: 1.0   # Expensive
+            }
+        )
+        self.arms = {}
     
-    async def decide(
+    async def select_arm(
         self,
-        features: Dict[str, Any],
-        tenant_id: str,
-        user_id: Optional[str] = None
-    ) -> Tuple[str, float, str]:
-        """
-        Decide on agent tier using bandit policy.
-        
-        Returns:
-            (tier, confidence, reasoning)
-        """
+        features: RouterFeatures,
+        tenant_id: str
+    ) -> Tuple[Tier, float, Dict[str, Any]]:
+        """Select arm (tier) using bandit policy."""
         try:
-            # Get or create model for tenant
-            model = await self._get_tenant_model(tenant_id)
+            # Get or initialize arms for tenant
+            await self._ensure_arms_initialized(tenant_id)
             
-            # Extract feature vector
-            feature_vector = self._extract_feature_vector(features)
+            # Calculate expected values for each arm
+            arm_values = await self._calculate_arm_values(tenant_id, features)
             
-            # Check if we have enough samples for confident prediction
-            if await self._has_enough_samples(tenant_id):
-                # Use calibrated model for prediction
-                tier, confidence, reasoning = await self._predict_with_model(
-                    model, feature_vector, tenant_id
-                )
+            # Select arm using epsilon-greedy with UCB
+            selected_arm, selection_info = await self._select_arm_strategy(arm_values, tenant_id)
+            
+            # Update selection metrics
+            await self._update_selection_metrics(tenant_id, selected_arm, selection_info)
+            
+            return selected_arm, arm_values[selected_arm], selection_info
+            
+        except Exception as e:
+            logger.error("Bandit selection failed", error=str(e))
+            # Fallback to Tier B
+            return Tier.B, 0.5, {'strategy': 'fallback', 'reason': str(e)}
+    
+    async def update_arm(
+        self,
+        tenant_id: str,
+        tier: Tier,
+        reward: float,
+        cost: float,
+        error: bool = False
+    ) -> None:
+        """Update arm statistics after receiving feedback."""
+        try:
+            arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+            
+            # Get current arm data
+            arm_data = await self.redis.hgetall(arm_key)
+            
+            if arm_data:
+                # Update existing arm
+                pulls = int(arm_data['pulls']) + 1
+                rewards = float(arm_data['rewards']) + reward
+                costs = float(arm_data['costs']) + cost
+                errors = int(arm_data['errors']) + (1 if error else 0)
             else:
-                # Use exploration strategy
-                tier, confidence, reasoning = await self._explore_tier(
-                    feature_vector, tenant_id
-                )
+                # Initialize new arm
+                pulls = 1
+                rewards = reward
+                costs = cost
+                errors = 1 if error else 0
             
-            # Record decision for learning
-            await self._record_decision(
-                tenant_id, user_id, features, tier, confidence
-            )
+            # Update arm data
+            await self.redis.hset(arm_key, mapping={
+                'tier': tier.value,
+                'pulls': pulls,
+                'rewards': rewards,
+                'costs': costs,
+                'errors': errors,
+                'last_updated': time.time()
+            })
+            
+            # Set TTL
+            await self.redis.expire(arm_key, 86400 * 30)  # 30 days
             
             logger.info(
-                "Bandit decision made",
+                "Arm updated",
                 tenant_id=tenant_id,
-                user_id=user_id,
-                tier=tier,
-                confidence=confidence,
-                reasoning=reasoning
+                tier=tier.value,
+                pulls=pulls,
+                reward=reward,
+                cost=cost,
+                error=error
             )
-            
-            return tier, confidence, reasoning
             
         except Exception as e:
-            logger.error(
-                "Bandit decision failed",
-                error=str(e),
-                tenant_id=tenant_id,
-                user_id=user_id
-            )
-            # Fallback to tier A
-            return 'A', 0.5, "Fallback due to error"
+            logger.error("Failed to update arm", error=str(e))
     
-    async def _get_tenant_model(self, tenant_id: str) -> Any:
-        """Get or create model for tenant."""
-        if tenant_id not in self.models:
-            # Create new model
-            self.models[tenant_id] = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
-                random_state=42
-            )
-            
-            # Create calibrated model
-            self.calibrated_models[tenant_id] = CalibratedClassifierCV(
-                self.models[tenant_id],
-                method='isotonic',
-                cv=3
-            )
-            
-            # Load existing data if available
-            await self._load_tenant_data(tenant_id)
-        
-        return self.calibrated_models[tenant_id]
-    
-    async def _has_enough_samples(self, tenant_id: str) -> bool:
-        """Check if we have enough samples for confident prediction."""
+    async def _ensure_arms_initialized(self, tenant_id: str) -> None:
+        """Ensure all arms are initialized for tenant."""
         try:
-            samples_key = f"bandit_samples:{tenant_id}"
-            sample_count = await self.redis.scard(samples_key)
-            return sample_count >= self.min_samples
-        except Exception as e:
-            logger.error("Failed to check sample count", error=str(e))
-            return False
-    
-    async def _predict_with_model(
-        self,
-        model: Any,
-        feature_vector: np.ndarray,
-        tenant_id: str
-    ) -> Tuple[str, float, str]:
-        """Predict using trained model."""
-        try:
-            # Get prediction probabilities
-            probabilities = model.predict_proba([feature_vector])[0]
-            
-            # Get class labels
-            classes = model.classes_
-            
-            # Calculate expected cost for each tier
-            expected_costs = {}
-            for i, tier in enumerate(classes):
-                cost = self.tier_costs.get(tier, 1.0)
-                error_prob = 1 - probabilities[i]
-                expected_cost = cost + self.lambda_error * error_prob
-                expected_costs[tier] = expected_cost
-            
-            # Select tier with minimum expected cost
-            best_tier = min(expected_costs, key=expected_costs.get)
-            confidence = probabilities[classes.tolist().index(best_tier)]
-            
-            reasoning = f"Expected cost: {expected_costs[best_tier]:.3f}, " \
-                       f"Confidence: {confidence:.3f}"
-            
-            return best_tier, confidence, reasoning
-            
-        except Exception as e:
-            logger.error("Model prediction failed", error=str(e))
-            return 'A', 0.5, "Model prediction failed"
-    
-    async def _explore_tier(
-        self,
-        feature_vector: np.ndarray,
-        tenant_id: str
-    ) -> Tuple[str, float, str]:
-        """Explore tier selection when we don't have enough samples."""
-        try:
-            # Get historical performance for each tier
-            tier_performance = await self._get_tier_performance(tenant_id)
-            
-            # Calculate UCB (Upper Confidence Bound) for each tier
-            ucb_scores = {}
-            for tier in self.tier_costs.keys():
-                if tier in tier_performance:
-                    success_rate = tier_performance[tier]['success_rate']
-                    sample_count = tier_performance[tier]['sample_count']
-                    
-                    # UCB calculation
-                    if sample_count > 0:
-                        confidence_radius = math.sqrt(
-                            2 * math.log(sum(tier_performance[t]['sample_count'] 
-                                           for t in tier_performance)) / sample_count
-                        )
-                        ucb_score = success_rate + confidence_radius
-                    else:
-                        ucb_score = 1.0  # High exploration for untested tiers
-                else:
-                    ucb_score = 1.0  # High exploration for new tiers
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                arm_exists = await self.redis.exists(arm_key)
                 
-                ucb_scores[tier] = ucb_score
+                if not arm_exists:
+                    # Initialize arm with default values
+                    await self.redis.hset(arm_key, mapping={
+                        'tier': tier.value,
+                        'pulls': 0,
+                        'rewards': 0.0,
+                        'costs': 0.0,
+                        'errors': 0,
+                        'last_updated': time.time()
+                    })
+                    await self.redis.expire(arm_key, 86400 * 30)
+                    
+        except Exception as e:
+            logger.error("Failed to initialize arms", error=str(e))
+    
+    async def _calculate_arm_values(
+        self,
+        tenant_id: str,
+        features: RouterFeatures
+    ) -> Dict[Tier, float]:
+        """Calculate expected values for each arm."""
+        try:
+            arm_values = {}
             
-            # Select tier with highest UCB score
-            best_tier = max(ucb_scores, key=ucb_scores.get)
-            confidence = min(ucb_scores[best_tier], 1.0)
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                arm_data = await self.redis.hgetall(arm_key)
+                
+                if arm_data and int(arm_data['pulls']) > 0:
+                    # Calculate expected value
+                    pulls = int(arm_data['pulls'])
+                    rewards = float(arm_data['rewards'])
+                    costs = float(arm_data['costs'])
+                    errors = int(arm_data['errors'])
+                    
+                    # Expected reward
+                    expected_reward = rewards / pulls
+                    
+                    # Expected cost
+                    expected_cost = costs / pulls
+                    
+                    # Expected error rate
+                    expected_error_rate = errors / pulls
+                    
+                    # Calculate value: reward - cost - λ·error
+                    value = expected_reward - expected_cost - (self.config.lambda_error * expected_error_rate)
+                    
+                    arm_values[tier] = value
+                else:
+                    # Default value for unexplored arms
+                    arm_values[tier] = 0.0
             
-            reasoning = f"UCB exploration, UCB score: {ucb_scores[best_tier]:.3f}"
-            
-            return best_tier, confidence, reasoning
+            return arm_values
             
         except Exception as e:
-            logger.error("UCB exploration failed", error=str(e))
-            return 'A', 0.5, "UCB exploration failed"
+            logger.error("Failed to calculate arm values", error=str(e))
+            return {tier: 0.0 for tier in Tier}
     
-    async def _get_tier_performance(self, tenant_id: str) -> Dict[str, Dict[str, float]]:
-        """Get historical performance for each tier."""
+    async def _select_arm_strategy(
+        self,
+        arm_values: Dict[Tier, float],
+        tenant_id: str
+    ) -> Tuple[Tier, Dict[str, Any]]:
+        """Select arm using epsilon-greedy with UCB."""
         try:
-            performance_key = f"tier_performance:{tenant_id}"
-            performance_data = await self.redis.hgetall(performance_key)
+            # Get total pulls across all arms
+            total_pulls = await self._get_total_pulls(tenant_id)
             
-            tier_performance = {}
-            for tier in self.tier_costs.keys():
-                tier_key = f"{tier}_performance"
-                if tier_key in performance_data:
-                    import json
-                    tier_performance[tier] = json.loads(performance_data[tier_key])
+            # Check if we should explore or exploit
+            if total_pulls < self.config.min_pulls:
+                # Pure exploration for first few pulls
+                selected_arm = await self._select_random_arm()
+                selection_info = {
+                    'strategy': 'random_exploration',
+                    'total_pulls': total_pulls,
+                    'reason': 'insufficient_data'
+                }
+            else:
+                # Use epsilon-greedy with UCB
+                if await self._should_explore():
+                    # Exploration: select arm with highest UCB
+                    selected_arm, ucb_value = await self._select_ucb_arm(tenant_id, arm_values)
+                    selection_info = {
+                        'strategy': 'ucb_exploration',
+                        'ucb_value': ucb_value,
+                        'total_pulls': total_pulls
+                    }
                 else:
-                    tier_performance[tier] = {
-                        'success_rate': 0.5,
-                        'sample_count': 0,
-                        'avg_latency': 0.0
+                    # Exploitation: select arm with highest expected value
+                    selected_arm = max(arm_values.keys(), key=lambda t: arm_values[t])
+                    selection_info = {
+                        'strategy': 'exploitation',
+                        'expected_value': arm_values[selected_arm],
+                        'total_pulls': total_pulls
                     }
             
-            return tier_performance
+            return selected_arm, selection_info
             
         except Exception as e:
-            logger.error("Failed to get tier performance", error=str(e))
-            return {}
+            logger.error("Failed to select arm", error=str(e))
+            return Tier.B, {'strategy': 'fallback', 'reason': str(e)}
     
-    async def _record_decision(
+    async def _get_total_pulls(self, tenant_id: str) -> int:
+        """Get total pulls across all arms for tenant."""
+        try:
+            total_pulls = 0
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                arm_data = await self.redis.hgetall(arm_key)
+                if arm_data:
+                    total_pulls += int(arm_data['pulls'])
+            return total_pulls
+        except Exception:
+            return 0
+    
+    async def _select_random_arm(self) -> Tier:
+        """Select random arm for exploration."""
+        import random
+        return random.choice(list(Tier))
+    
+    async def _should_explore(self) -> bool:
+        """Determine if we should explore."""
+        import random
+        return random.random() < self.config.exploration_rate
+    
+    async def _select_ucb_arm(
         self,
         tenant_id: str,
-        user_id: Optional[str],
-        features: Dict[str, Any],
-        tier: str,
-        confidence: float
-    ) -> None:
-        """Record decision for learning."""
+        arm_values: Dict[Tier, float]
+    ) -> Tuple[Tier, float]:
+        """Select arm using Upper Confidence Bound."""
         try:
-            decision_data = {
+            total_pulls = await self._get_total_pulls(tenant_id)
+            best_arm = None
+            best_ucb = float('-inf')
+            
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                arm_data = await self.redis.hgetall(arm_key)
+                
+                if arm_data:
+                    pulls = int(arm_data['pulls'])
+                    if pulls > 0:
+                        # Calculate UCB
+                        expected_value = arm_values[tier]
+                        confidence_interval = self.config.confidence_level * math.sqrt(
+                            math.log(total_pulls) / pulls
+                        )
+                        ucb_value = expected_value + confidence_interval
+                        
+                        if ucb_value > best_ucb:
+                            best_ucb = ucb_value
+                            best_arm = tier
+            
+            if best_arm is None:
+                best_arm = Tier.B
+                best_ucb = 0.0
+            
+            return best_arm, best_ucb
+            
+        except Exception as e:
+            logger.error("Failed to select UCB arm", error=str(e))
+            return Tier.B, 0.0
+    
+    async def _update_selection_metrics(
+        self,
+        tenant_id: str,
+        selected_arm: Tier,
+        selection_info: Dict[str, Any]
+    ) -> None:
+        """Update selection metrics."""
+        try:
+            metrics_key = f"selection_metrics:{tenant_id}"
+            await self.redis.hincrby(metrics_key, 'total_selections', 1)
+            await self.redis.hincrby(metrics_key, f'selections_{selected_arm.value}', 1)
+            await self.redis.hincrby(metrics_key, f'strategy_{selection_info["strategy"]}', 1)
+            await self.redis.expire(metrics_key, 86400 * 7)  # 7 days TTL
+            
+        except Exception as e:
+            logger.error("Failed to update selection metrics", error=str(e))
+    
+    async def get_arm_statistics(self, tenant_id: str) -> Dict[str, Any]:
+        """Get arm statistics for tenant."""
+        try:
+            stats = {
                 'tenant_id': tenant_id,
-                'user_id': user_id,
-                'features': features,
-                'tier': tier,
-                'confidence': confidence,
-                'timestamp': time.time()
-            }
-            
-            # Store decision
-            decision_key = f"bandit_decisions:{tenant_id}"
-            await self.redis.lpush(decision_key, json.dumps(decision_data))
-            await self.redis.ltrim(decision_key, 0, 9999)  # Keep last 10k decisions
-            
-            # Add to samples for model training
-            samples_key = f"bandit_samples:{tenant_id}"
-            await self.redis.sadd(samples_key, json.dumps(decision_data))
-            
-        except Exception as e:
-            logger.error("Failed to record decision", error=str(e))
-    
-    async def update_performance(
-        self,
-        tenant_id: str,
-        tier: str,
-        success: bool,
-        latency: float
-    ) -> None:
-        """Update tier performance based on outcome."""
-        try:
-            performance_key = f"tier_performance:{tenant_id}"
-            tier_key = f"{tier}_performance"
-            
-            # Get current performance
-            current_data = await self.redis.hget(tier_key, tier_key)
-            if current_data:
-                import json
-                performance = json.loads(current_data)
-            else:
-                performance = {
-                    'success_rate': 0.5,
-                    'sample_count': 0,
-                    'avg_latency': 0.0
+                'arms': {},
+                'total_pulls': 0,
+                'config': {
+                    'lambda_error': self.config.lambda_error,
+                    'exploration_rate': self.config.exploration_rate,
+                    'confidence_level': self.config.confidence_level
                 }
-            
-            # Update performance
-            performance['sample_count'] += 1
-            performance['success_rate'] = (
-                (performance['success_rate'] * (performance['sample_count'] - 1) + 
-                 (1.0 if success else 0.0)) / performance['sample_count']
-            )
-            performance['avg_latency'] = (
-                (performance['avg_latency'] * (performance['sample_count'] - 1) + 
-                 latency) / performance['sample_count']
-            )
-            
-            # Store updated performance
-            await self.redis.hset(performance_key, tier_key, json.dumps(performance))
-            
-            logger.info(
-                "Tier performance updated",
-                tenant_id=tenant_id,
-                tier=tier,
-                success=success,
-                latency=latency,
-                new_success_rate=performance['success_rate']
-            )
-            
-        except Exception as e:
-            logger.error("Failed to update performance", error=str(e))
-    
-    async def retrain_model(self, tenant_id: str) -> bool:
-        """Retrain model with latest data."""
-        try:
-            if tenant_id not in self.models:
-                return False
-            
-            # Get training data
-            samples_key = f"bandit_samples:{tenant_id}"
-            samples = await self.redis.smembers(samples_key)
-            
-            if len(samples) < self.min_samples:
-                logger.warning("Not enough samples for retraining", tenant_id=tenant_id)
-                return False
-            
-            # Parse samples
-            X = []
-            y = []
-            for sample in samples:
-                try:
-                    import json
-                    sample_data = json.loads(sample)
-                    feature_vector = self._extract_feature_vector(sample_data['features'])
-                    X.append(feature_vector)
-                    y.append(sample_data['tier'])
-                except Exception as e:
-                    logger.error("Failed to parse sample", error=str(e))
-                    continue
-            
-            if len(X) < self.min_samples:
-                return False
-            
-            # Train model
-            X = np.array(X)
-            y = np.array(y)
-            
-            self.models[tenant_id].fit(X, y)
-            self.calibrated_models[tenant_id].fit(X, y)
-            
-            logger.info(
-                "Model retrained successfully",
-                tenant_id=tenant_id,
-                sample_count=len(X)
-            )
-            
-            return True
-            
-        except Exception as e:
-            logger.error("Model retraining failed", error=str(e))
-            return False
-    
-    def _extract_feature_vector(self, features: Dict[str, Any]) -> np.ndarray:
-        """Extract feature vector from features dict."""
-        # Define feature order for consistency
-        feature_order = [
-            'text_length', 'word_count', 'sentence_count', 'paragraph_count',
-            'char_count', 'digit_count', 'punctuation_count', 'uppercase_ratio',
-            'has_question', 'has_exclamation', 'has_currency', 'has_email',
-            'has_url', 'avg_word_length', 'unique_word_ratio',
-            'intent_order', 'intent_support', 'intent_product', 'intent_account',
-            'intent_shipping', 'sentiment_positive', 'sentiment_negative',
-            'urgency_high', 'technical_complexity', 'user_success_rate',
-            'tenant_success_rate', 'hour_of_day', 'day_of_week', 'is_weekend',
-            'is_business_hours', 'session_duration', 'session_message_count'
-        ]
-        
-        # Extract features in order
-        feature_vector = []
-        for feature_name in feature_order:
-            value = features.get(feature_name, 0)
-            if isinstance(value, bool):
-                value = 1.0 if value else 0.0
-            elif isinstance(value, str):
-                value = 0.0  # Skip string features for now
-            feature_vector.append(float(value))
-        
-        return np.array(feature_vector)
-    
-    async def _load_tenant_data(self, tenant_id: str) -> None:
-        """Load existing data for tenant."""
-        try:
-            # Load performance data
-            performance_key = f"tier_performance:{tenant_id}"
-            performance_data = await self.redis.hgetall(performance_key)
-            
-            # Load samples
-            samples_key = f"bandit_samples:{tenant_id}"
-            samples = await self.redis.smembers(samples_key)
-            
-            logger.info(
-                "Loaded tenant data",
-                tenant_id=tenant_id,
-                performance_entries=len(performance_data),
-                sample_count=len(samples)
-            )
-            
-        except Exception as e:
-            logger.error("Failed to load tenant data", error=str(e))
-    
-    async def get_bandit_stats(self, tenant_id: str) -> Dict[str, Any]:
-        """Get bandit statistics for tenant."""
-        try:
-            # Get tier performance
-            tier_performance = await self._get_tier_performance(tenant_id)
-            
-            # Get sample count
-            samples_key = f"bandit_samples:{tenant_id}"
-            sample_count = await self.redis.scard(samples_key)
-            
-            # Get decision count
-            decisions_key = f"bandit_decisions:{tenant_id}"
-            decision_count = await self.redis.llen(decisions_key)
-            
-            return {
-                'tenant_id': tenant_id,
-                'tier_performance': tier_performance,
-                'sample_count': sample_count,
-                'decision_count': decision_count,
-                'lambda_error': self.lambda_error,
-                'exploration_rate': self.exploration_rate,
-                'min_samples': self.min_samples
             }
             
+            total_pulls = 0
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                arm_data = await self.redis.hgetall(arm_key)
+                
+                if arm_data:
+                    pulls = int(arm_data['pulls'])
+                    rewards = float(arm_data['rewards'])
+                    costs = float(arm_data['costs'])
+                    errors = int(arm_data['errors'])
+                    
+                    stats['arms'][tier.value] = {
+                        'pulls': pulls,
+                        'rewards': rewards,
+                        'costs': costs,
+                        'errors': errors,
+                        'expected_reward': rewards / pulls if pulls > 0 else 0,
+                        'expected_cost': costs / pulls if pulls > 0 else 0,
+                        'error_rate': errors / pulls if pulls > 0 else 0
+                    }
+                    
+                    total_pulls += pulls
+            
+            stats['total_pulls'] = total_pulls
+            return stats
+            
         except Exception as e:
-            logger.error("Failed to get bandit stats", error=str(e))
-            return {'tenant_id': tenant_id, 'error': str(e)}
+            logger.error("Failed to get arm statistics", error=str(e))
+            return {'error': str(e)}
+    
+    async def reset_arms(self, tenant_id: str) -> None:
+        """Reset all arms for tenant."""
+        try:
+            for tier in Tier:
+                arm_key = f"bandit_arm:{tenant_id}:{tier.value}"
+                await self.redis.delete(arm_key)
+            
+            metrics_key = f"selection_metrics:{tenant_id}"
+            await self.redis.delete(metrics_key)
+            
+            logger.info("Arms reset", tenant_id=tenant_id)
+            
+        except Exception as e:
+            logger.error("Failed to reset arms", error=str(e))
