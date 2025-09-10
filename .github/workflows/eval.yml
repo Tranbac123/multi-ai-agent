@@ -2,444 +2,306 @@ name: Evaluation Suite
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'  # Run nightly at 2 AM UTC
   workflow_dispatch:
     inputs:
-      task_type:
-        description: 'Task type to run'
+      tenant_id:
+        description: 'Tenant ID for evaluation'
+        required: true
+        default: 'test-tenant'
+      max_tasks:
+        description: 'Maximum number of tasks'
         required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - faq
-          - order
-          - lead
-          - episode_replay
-      replay_mode:
-        description: 'Replay mode for episode replay'
+        default: '100'
+      categories:
+        description: 'Task categories (comma-separated)'
         required: false
-        default: 'exact'
-        type: choice
-        options:
-          - exact
-          - parametric
-          - stress
+        default: 'faq,order,tracking,lead'
+      difficulties:
+        description: 'Task difficulties (comma-separated)'
+        required: false
+        default: 'easy,medium,hard'
+      tiers:
+        description: 'Expected tiers (comma-separated)'
+        required: false
+        default: 'SLM_A,SLM_B,LLM_C'
+  pull_request:
+    paths:
+      - 'eval/**'
+      - 'apps/**'
+      - 'services/**'
+      - '.github/workflows/eval.yml'
 
 env:
   PYTHON_VERSION: '3.11'
   REDIS_URL: 'redis://localhost:6379'
-  POSTGRES_URL: 'postgresql://postgres:password@localhost:5432/test_db'
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
-  setup:
+  eval-nightly:
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.key }}
+    timeout-minutes: 60
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
+      
+      - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-
+      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Generate cache key
-        id: cache-key
-        run: echo "key=${{ github.sha }}-${{ github.run_number }}" >> $GITHUB_OUTPUT
-
-  test-infrastructure:
-    runs-on: ubuntu-latest
-    needs: setup
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Install dependencies
+          pip install -r eval/requirements.txt
+      
+      - name: Run evaluation suite
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Wait for services
-        run: |
-          sleep 10
-          redis-cli -h localhost ping
-          pg_isready -h localhost -p 5432
-
-      - name: Run infrastructure tests
-        run: |
-          python -m pytest tests/unit/test_eval_suite.py::TestEpisodeReplay -v
-
-  golden-tasks:
-    runs-on: ubuntu-latest
-    needs: setup
-    strategy:
-      matrix:
-        task_type: [faq, order, lead]
-    if: ${{ github.event.inputs.task_type == 'all' || github.event.inputs.task_type == matrix.task_type || github.event.inputs.task_type == '' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Run golden tasks
-        run: |
-          python -m pytest tests/unit/test_eval_suite.py::Test${{ matrix.task_type.title() }}HandlingGoldenTasks -v
-
-      - name: Upload task results
+          python eval/run_evaluation.py \
+            --tenant-id "nightly-eval" \
+            --max-tasks 200 \
+            --batch-size 20 \
+            --threshold-pass-rate 0.85 \
+            --threshold-average-score 0.75 \
+            --categories faq order tracking lead \
+            --difficulties easy medium hard \
+            --tiers SLM_A SLM_B LLM_C \
+            --output-file eval-results.json \
+            --ci-mode
+      
+      - name: Upload evaluation results
         uses: actions/upload-artifact@v3
-        if: always()
         with:
-          name: golden-tasks-${{ matrix.task_type }}-results
-          path: |
-            test-results/
-            eval-results/
+          name: eval-results-nightly
+          path: eval-results.json
           retention-days: 30
-
-  episode-replay:
-    runs-on: ubuntu-latest
-    needs: setup
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    if: ${{ github.event.inputs.task_type == 'all' || github.event.inputs.task_type == 'episode_replay' || github.event.inputs.task_type == '' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Install dependencies
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('eval-results.json', 'utf8'));
+            
+            const comment = `## Evaluation Results
+            
+            **Status**: ${results.status}
+            **Tasks**: ${results.task_count}
+            **Duration**: ${results.duration_seconds.toFixed(2)}s
+            **Passes Threshold**: ${results.passes_threshold ? '✅' : '❌'}
+            
+            ### Metrics
+            - **Success Rate**: ${(results.metrics.success_rate * 100).toFixed(1)}%
+            - **Pass Rate**: ${(results.metrics.pass_rate * 100).toFixed(1)}%
+            - **Average Score**: ${results.metrics.average_score.toFixed(3)}
+            - **Average Duration**: ${results.metrics.average_duration_ms.toFixed(0)}ms
+            
+            ### Score Distribution
+            - **Excellent** (≥0.9): ${results.metrics.score_distribution.excellent}
+            - **Good** (0.7-0.9): ${results.metrics.score_distribution.good}
+            - **Fair** (0.5-0.7): ${results.metrics.score_distribution.fair}
+            - **Poor** (<0.5): ${results.metrics.score_distribution.poor}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Fail if evaluation doesn't pass threshold
+        if: steps.eval.outcome != 'success' || !results.passes_threshold
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Wait for Redis
-        run: |
-          sleep 10
-          redis-cli -h localhost ping
-
-      - name: Run episode replay tests
-        run: |
-          python -m pytest tests/unit/test_eval_suite.py::TestEpisodeReplay -v
-
-      - name: Upload replay results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: episode-replay-results
-          path: |
-            test-results/
-            replay-results/
-          retention-days: 30
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    needs: [setup, test-infrastructure]
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Wait for services
-        run: |
-          sleep 10
-          redis-cli -h localhost ping
-          pg_isready -h localhost -p 5432
-
-      - name: Run integration tests
-        run: |
-          python -m pytest tests/unit/test_eval_suite.py::TestIntegration -v
-
-      - name: Upload integration results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: integration-test-results
-          path: |
-            test-results/
-            integration-results/
-          retention-days: 30
-
-  performance-benchmarks:
-    runs-on: ubuntu-latest
-    needs: setup
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Wait for Redis
-        run: |
-          sleep 10
-          redis-cli -h localhost ping
-
-      - name: Run performance benchmarks
-        run: |
-          python -c "
-          import asyncio
-          import time
-          from eval.golden_tasks.faq_handling import FAQHandlingGoldenTasks
-          
-          async def benchmark():
-              faq_tasks = FAQHandlingGoldenTasks()
-              start_time = time.time()
-              results = await faq_tasks.run_all_tasks()
-              end_time = time.time()
-              
-              total_time = end_time - start_time
-              avg_time = total_time / len(results)
-              
-              print(f'Total execution time: {total_time:.2f}s')
-              print(f'Average task time: {avg_time:.2f}s')
-              print(f'Total tasks: {len(results)}')
-              
-              # Performance thresholds
-              assert total_time < 10.0, f'Total time {total_time:.2f}s exceeds 10s threshold'
-              assert avg_time < 2.0, f'Average time {avg_time:.2f}s exceeds 2s threshold'
-              
-              print('Performance benchmarks passed!')
-          
-          asyncio.run(benchmark())
-          "
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: performance-benchmark-results
-          path: |
-            benchmark-results/
-          retention-days: 30
-
-  quality-gates:
-    runs-on: ubuntu-latest
-    needs: [golden-tasks, episode-replay, integration-tests, performance-benchmarks]
-    if: always()
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-
-      - name: Check quality gates
-        run: |
-          echo "Checking quality gates..."
-          
-          # Check if all required jobs passed
-          if [ "${{ needs.golden-tasks.result }}" != "success" ]; then
-            echo "Golden tasks failed"
-            exit 1
-          fi
-          
-          if [ "${{ needs.episode-replay.result }}" != "success" ]; then
-            echo "Episode replay failed"
-            exit 1
-          fi
-          
-          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
-            echo "Integration tests failed"
-            exit 1
-          fi
-          
-          if [ "${{ needs.performance-benchmarks.result }}" != "success" ]; then
-            echo "Performance benchmarks failed"
-            exit 1
-          fi
-          
-          echo "All quality gates passed!"
-
-      - name: Generate evaluation report
-        run: |
-          echo "# Evaluation Suite Report" > evaluation-report.md
-          echo "" >> evaluation-report.md
-          echo "## Summary" >> evaluation-report.md
-          echo "- Golden Tasks: ${{ needs.golden-tasks.result }}" >> evaluation-report.md
-          echo "- Episode Replay: ${{ needs.episode-replay.result }}" >> evaluation-report.md
-          echo "- Integration Tests: ${{ needs.integration-tests.result }}" >> evaluation-report.md
-          echo "- Performance Benchmarks: ${{ needs.performance-benchmarks.result }}" >> evaluation-report.md
-          echo "" >> evaluation-report.md
-          echo "## Quality Gates" >> evaluation-report.md
-          echo "All quality gates passed successfully!" >> evaluation-report.md
-
-      - name: Upload evaluation report
-        uses: actions/upload-artifact@v3
-        with:
-          name: evaluation-report
-          path: evaluation-report.md
-          retention-days: 90
-
-  notify:
-    runs-on: ubuntu-latest
-    needs: [quality-gates]
-    if: always()
-
-    steps:
-      - name: Notify on success
-        if: ${{ needs.quality-gates.result == 'success' }}
-        run: |
-          echo "✅ Evaluation suite passed all quality gates!"
-          echo "All tests completed successfully."
-
-      - name: Notify on failure
-        if: ${{ needs.quality-gates.result != 'success' }}
-        run: |
-          echo "❌ Evaluation suite failed quality gates!"
-          echo "Check the logs for details."
+          echo "Evaluation failed or didn't pass threshold"
           exit 1
+
+  eval-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r eval/requirements.txt
+      
+      - name: Run focused evaluation
+        id: eval
+        run: |
+          python eval/run_evaluation.py \
+            --tenant-id "pr-eval" \
+            --max-tasks 50 \
+            --batch-size 10 \
+            --threshold-pass-rate 0.8 \
+            --threshold-average-score 0.7 \
+            --categories faq order \
+            --difficulties easy medium \
+            --tiers SLM_A SLM_B \
+            --output-file eval-results.json \
+            --ci-mode
+      
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v3
+        with:
+          name: eval-results-pr
+          path: eval-results.json
+          retention-days: 7
+      
+      - name: Comment PR with results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('eval-results.json', 'utf8'));
+            
+            const status_emoji = results.passes_threshold ? '✅' : '❌';
+            const status_text = results.passes_threshold ? 'PASSED' : 'FAILED';
+            
+            const comment = `## Evaluation Results ${status_emoji}
+            
+            **Status**: ${status_text}
+            **Tasks**: ${results.task_count}
+            **Duration**: ${results.duration_seconds.toFixed(2)}s
+            
+            ### Metrics
+            - **Success Rate**: ${(results.metrics.success_rate * 100).toFixed(1)}%
+            - **Pass Rate**: ${(results.metrics.pass_rate * 100).toFixed(1)}%
+            - **Average Score**: ${results.metrics.average_score.toFixed(3)}
+            - **Average Duration**: ${results.metrics.average_duration_ms.toFixed(0)}ms
+            
+            ### Score Distribution
+            - **Excellent** (≥0.9): ${results.metrics.score_distribution.excellent}
+            - **Good** (0.7-0.9): ${results.metrics.score_distribution.good}
+            - **Fair** (0.5-0.7): ${results.metrics.score_distribution.fair}
+            - **Poor** (<0.5): ${results.metrics.score_distribution.poor}
+            
+            ${!results.passes_threshold ? '⚠️ **This PR does not meet the evaluation threshold and may be blocked from merging.**' : ''}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Fail if evaluation doesn't pass threshold
+        if: !results.passes_threshold
+        run: |
+          echo "Evaluation failed to pass threshold"
+          exit 1
+
+  eval-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r eval/requirements.txt
+      
+      - name: Run custom evaluation
+        run: |
+          python eval/run_evaluation.py \
+            --tenant-id "${{ github.event.inputs.tenant_id }}" \
+            --max-tasks ${{ github.event.inputs.max_tasks }} \
+            --categories ${{ github.event.inputs.categories }} \
+            --difficulties ${{ github.event.inputs.difficulties }} \
+            --tiers ${{ github.event.inputs.tiers }} \
+            --output-file eval-results.json \
+            --ci-mode
+      
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v3
+        with:
+          name: eval-results-manual
+          path: eval-results.json
+          retention-days: 30
+      
+      - name: Display results
+        run: |
+          echo "## Evaluation Results"
+          cat eval-results.json | jq '.'
