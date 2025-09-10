@@ -52,6 +52,11 @@ multi-ai-agent/
 │   ├── 📊 analytics-service/        # CQRS Analytics
 │   └── 💰 billing-service/          # Usage Metering
 │
+├── 📁 services/                      # SHARED SERVICES
+│   ├── 🤖 agents/                   # Agent Management
+│   ├── 🛠️  tools/                   # Tool Adapters
+│   └── 🧠 memory/                   # Memory & Knowledge
+│
 ├── ⚙️  configs/                      # CONFIGURATION
 │   └── 📋 workflows/               # YAML Workflow Definitions
 │       ├── 🎯 customer_support_workflow.yaml
@@ -70,7 +75,21 @@ multi-ai-agent/
 │   └── 🛠️  utils/                  # Utilities
 │
 ├── 📊 data-plane/                  # DATA LAYER
-│   └── 📁 migrations/              # Database Migrations
+│   ├── 📁 migrations/              # Database Migrations
+│   ├── 📁 events/                  # Event System
+│   └── 📁 storages/                # Storage Layer
+│
+├── 🎛️  control-plane/              # CONTROL PLANE
+│   ├── 🚩 feature_flags/           # Feature Flag Management
+│   ├── 📋 registries/              # Registry Management
+│   └── ⚙️  configs/                # Configuration Management
+│
+├── 📊 observability/               # OBSERVABILITY STACK
+│   ├── 🔍 otel/                    # OpenTelemetry
+│   ├── 📝 logging/                 # Structured Logging
+│   ├── 📈 dashboards/              # Grafana Dashboards
+│   ├── 📊 slo/                     # SLO Monitoring
+│   └── 📚 runbooks/                # Operational Runbooks
 │
 ├── 💻 web/                         # FRONTEND
 │   └── 📱 src/                     # React Components
@@ -82,10 +101,22 @@ multi-ai-agent/
 │   ├── 📦 consolidated/            # Consolidated Tests
 │   ├── 🔬 unit/                    # Unit Tests
 │   ├── 🔗 integration/             # Integration Tests
-│   └── 🎯 e2e/                     # End-to-End Tests
+│   ├── 🎯 e2e/                     # End-to-End Tests
+│   ├── 🌪️  chaos/                  # Chaos Engineering
+│   └── 📊 eval/                    # Evaluation Tests
 │
 ├── 📊 eval/                        # EVALUATION FRAMEWORK
-├── 📁 infra/                       # INFRASTRUCTURE
+│   ├── 📁 golden_tasks/            # Golden Test Tasks
+│   ├── 📁 judges/                  # Evaluation Judges
+│   └── 📁 reports/                 # Evaluation Reports
+│
+├── 🏗️  infra/                       # INFRASTRUCTURE
+│   ├── 🐳 docker/                  # Docker Configuration
+│   └── ☸️  k8s/                     # Kubernetes Configuration
+│       ├── 📦 helm/                # Helm Charts
+│       ├── 📈 autoscaling/         # KEDA/HPA Configuration
+│       └── 🏥 health/              # Health Check Configuration
+│
 ├── 📈 monitoring/                  # MONITORING STACK
 └── 📄 Documentation Files          # COMPREHENSIVE GUIDES
 ```

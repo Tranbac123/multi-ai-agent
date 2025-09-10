@@ -7,7 +7,8 @@ multi-ai-agent/
 ├── 📁 apps/                          # Microservices Architecture
 │   ├── 📁 api-gateway/              # Main API Gateway Service
 │   │   ├── 📄 main.py               # FastAPI application entry point
-│   │   └── 📄 websocket.py          # WebSocket support
+│   │   ├── 📄 websocket.py          # WebSocket support
+│   │   └── 📁 middleware/           # Middleware components
 │   ├── 📁 orchestrator/             # LangGraph Orchestrator Service
 │   │   ├── 📄 main.py               # Orchestrator service entry point
 │   │   └── 📁 core/                 # Core orchestrator components
@@ -40,6 +41,19 @@ multi-ai-agent/
 │       └── 📁 core/                 # Core billing components
 │           ├── 📄 usage_tracker.py  # Usage tracking
 │           └── 📄 billing_engine.py # Billing engine
+│
+├── 📁 services/                      # Shared Services
+│   ├── 📁 agents/                   # Agent Management
+│   │   └── 📄 agent_manager.py      # Agent management
+│   ├── 📁 tools/                    # Tool Adapters
+│   │   ├── 📄 base_adapter.py       # Base tool adapter
+│   │   ├── 📄 email_adapter.py      # Email tool adapter
+│   │   ├── 📄 payment_adapter.py    # Payment tool adapter
+│   │   ├── 📄 crm_adapter.py        # CRM tool adapter
+│   │   └── 📄 saga_adapter.py       # Saga pattern adapter
+│   └── 📁 memory/                   # Memory & Knowledge Service
+│       ├── 📄 knowledge_service.py  # Knowledge service
+│       └── 📄 memory_manager.py     # Memory management
 │
 ├── 📁 configs/                      # Configuration Management
 │   └── 📁 workflows/               # YAML Workflow Definitions
@@ -160,6 +174,19 @@ multi-ai-agent/
 │       ├── 📄 compose.dev.yml      # Development compose
 │       ├── 📄 Dockerfile.api-gateway # API Gateway Dockerfile
 │       └── 📄 Dockerfile.router-service # Router Service Dockerfile
+│
+├── 📁 observability/               # Observability Stack
+│   ├── 📁 otel/                    # OpenTelemetry
+│   │   └── 📄 tracing.py           # Distributed tracing
+│   ├── 📁 logging/                 # Structured Logging
+│   │   └── 📄 logger.py            # Logger configuration
+│   ├── 📁 dashboards/              # Grafana Dashboards
+│   │   ├── 📄 grafana_dashboards.py # Dashboard generator
+│   │   └── 📄 *.json               # Dashboard JSON files
+│   ├── 📁 slo/                     # SLO Monitoring
+│   │   └── 📄 slo_monitor.py       # SLO monitoring
+│   └── 📁 runbooks/                # Operational Runbooks
+│       └── 📄 RUNBOOKS.md          # Runbook documentation
 │
 ├── 📁 monitoring/                  # Monitoring Stack
 │   └── 📄 prometheus.yml           # Prometheus configuration

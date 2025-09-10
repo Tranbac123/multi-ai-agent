@@ -5,22 +5,27 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 ## Architecture Overview
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   API Gateway   │    │  Orchestrator   │
-│   (React)       │◄──►│   (FastAPI)     │◄──►│   (LangGraph)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │  Router Service │    │  YAML Workflows │
-                       │  (Intelligent)  │    │  (Declarative)  │
-                       └─────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   Event Bus     │    │   Database      │
-                       │   (NATS)        │    │  (PostgreSQL)   │
-                       └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   API Gateway   │    │  Orchestrator   │    │  Router Service │
+│   (React)       │◄──►│   (FastAPI)     │◄──►│   (LangGraph)   │◄──►│   (Router v2)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │                       │
+         │                       │                       │                       │
+         ▼                       ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Realtime      │    │   Ingestion     │    │   Analytics     │    │   Billing       │
+│   Service       │    │   Service       │    │   Service       │    │   Service       │
+│   (WebSocket)   │    │   (Document)    │    │   (CQRS)        │    │   (Usage)       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │                       │
+         │                       │                       │                       │
+         ▼                       ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Control       │    │   Event Bus     │    │   Database      │    │   Observability │
+│   Plane         │    │   (NATS)        │    │   (PostgreSQL)  │    │   (OTel)        │
+│   (Feature      │    │   (JetStream)   │    │   (RLS)         │    │   (Prometheus)  │
+│    Flags)       │    │   (DLQ)         │    │   (Multi-tenant)│    │   (Grafana)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ## Core Services
@@ -74,6 +79,7 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 - **Configs**: Environment-specific configuration and secrets
 - **Infrastructure**: Kubernetes, monitoring, security policies
 - **Data Plane**: Database migrations, event schemas, storage policies
+- **Observability**: Infrastructure, dashboards, alerting rules
 
 ### **Runtime** (Service Teams)
 
@@ -86,11 +92,22 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 - **Ingestion Service**: Document processing and knowledge indexing
 - **Analytics Service**: Metrics aggregation and reporting
 - **Billing Service**: Usage metering and invoice generation
+- **Services**: Agents, tools, memory management
 
-### **Observability** (Shared Responsibility)
+### **On-Call Map**
 
-**Platform Team**: Infrastructure, dashboards, alerting rules
-**Service Teams**: Service-specific metrics, health checks, runbooks
+| **Service** | **Primary** | **Secondary** | **Escalation** |
+|-------------|-------------|---------------|----------------|
+| API Gateway | Service Team | Platform Team | SRE Team |
+| Orchestrator | Service Team | Platform Team | SRE Team |
+| Router Service | Service Team | Platform Team | SRE Team |
+| Realtime Service | Service Team | Platform Team | SRE Team |
+| Ingestion Service | Service Team | Platform Team | SRE Team |
+| Analytics Service | Service Team | Platform Team | SRE Team |
+| Billing Service | Service Team | Platform Team | SRE Team |
+| Database | Platform Team | SRE Team | Database Team |
+| Event Bus | Platform Team | SRE Team | Infrastructure Team |
+| Observability | Platform Team | SRE Team | Infrastructure Team |
 
 ## Quick Start
 

@@ -234,3 +234,4 @@ class LeadCaptureGoldenTasks:
         except Exception as e:
             logger.error("Failed to run all tasks", error=str(e))
             return []
+    
