@@ -2,23 +2,31 @@
 
 import asyncio
 import time
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+import uuid
+from typing import Dict, Any, Optional, List, Callable, Awaitable
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, List, Optional, Callable
-from uuid import UUID, uuid4
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-class SagaStepStatus(Enum):
+class SagaStatus(Enum):
+    """Saga execution status."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    COMPENSATING = "compensating"
+    COMPENSATED = "compensated"
+    FAILED = "failed"
+
+
+class StepStatus(Enum):
     """Saga step status."""
     PENDING = "pending"
-    EXECUTING = "executing"
+    RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
-    COMPENSATING = "compensating"
     COMPENSATED = "compensated"
 
 
@@ -27,277 +35,321 @@ class SagaStep:
     """Saga step definition."""
     step_id: str
     name: str
-    execute_func: Callable
-    compensate_func: Callable
+    execute_func: Callable[..., Awaitable[Any]]
+    compensate_func: Optional[Callable[..., Awaitable[Any]]] = None
     timeout: float = 30.0
-    retry_attempts: int = 3
-    status: SagaStepStatus = SagaStepStatus.PENDING
+    retry_attempts: int = 0
+    max_retries: int = 3
+    status: StepStatus = StepStatus.PENDING
+    result: Optional[Any] = None
     error: Optional[str] = None
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
 
 
-class SagaOrchestrator:
-    """Saga orchestrator for managing distributed transactions."""
-    
-    def __init__(self, saga_id: str):
-        self.saga_id = saga_id
-        self.steps: List[SagaStep] = []
-        self.current_step_index = 0
-        self.status = SagaStepStatus.PENDING
-        self.created_at = time.time()
-        self.completed_at = None
-        self.error = None
-    
+@dataclass
+class Saga:
+    """Saga definition with steps and configuration."""
+    saga_id: str
+    name: str
+    steps: List[SagaStep] = field(default_factory=list)
+    timeout: float = 300.0  # 5 minutes
+    parallel_execution: bool = False
+    compensation_strategy: str = "reverse_order"
+    created_at: float = field(default_factory=time.time)
+    status: SagaStatus = SagaStatus.PENDING
+    error: Optional[str] = None
+
     def add_step(
         self,
         step_id: str,
         name: str,
-        execute_func: Callable,
-        compensate_func: Callable,
+        execute_func: Callable[..., Awaitable[Any]],
+        compensate_func: Optional[Callable[..., Awaitable[Any]]] = None,
         timeout: float = 30.0,
-        retry_attempts: int = 3
+        max_retries: int = 3,
     ):
-        """Add step to saga."""
+        """Add a step to the saga."""
         step = SagaStep(
             step_id=step_id,
             name=name,
             execute_func=execute_func,
             compensate_func=compensate_func,
             timeout=timeout,
-            retry_attempts=retry_attempts
+            max_retries=max_retries,
         )
         self.steps.append(step)
-    
-    async def execute(self) -> bool:
-        """Execute saga steps in order."""
+
+
+class SagaManager:
+    """Saga manager for distributed transactions."""
+
+    def __init__(self):
+        self.active_sagas: Dict[str, Saga] = {}
+        self.completed_sagas: Dict[str, Saga] = {}
+        self.saga_metrics = {
+            "total_sagas": 0,
+            "completed_sagas": 0,
+            "failed_sagas": 0,
+            "compensated_sagas": 0,
+            "active_sagas": 0,
+        }
+
+    def create_saga(self, saga_id: str, name: str) -> Saga:
+        """Create a new saga."""
+        saga = Saga(saga_id=saga_id, name=name)
+        self.active_sagas[saga_id] = saga
+        self.saga_metrics["total_sagas"] += 1
+        self.saga_metrics["active_sagas"] += 1
+        
+        logger.info("Saga created", saga_id=saga_id, name=name)
+        return saga
+
+    async def execute_saga(self, saga_id: str) -> bool:
+        """Execute a saga."""
+        saga = self.active_sagas.get(saga_id)
+        if not saga:
+            raise ValueError(f"Saga {saga_id} not found")
+
         try:
-            self.status = SagaStepStatus.EXECUTING
-            logger.info("Starting saga execution", saga_id=self.saga_id)
+            saga.status = SagaStatus.RUNNING
+            logger.info("Starting saga execution", saga_id=saga_id, name=saga.name)
+
+            if saga.parallel_execution:
+                success = await self._execute_saga_parallel(saga)
+            else:
+                success = await self._execute_saga_sequential(saga)
+
+            if success:
+                saga.status = SagaStatus.COMPLETED
+                self.completed_sagas[saga_id] = saga
+                del self.active_sagas[saga_id]
+                self.saga_metrics["completed_sagas"] += 1
+                self.saga_metrics["active_sagas"] -= 1
+                
+                logger.info("Saga completed successfully", saga_id=saga_id, name=saga.name)
+                return True
+            else:
+                # Execute compensation
+                await self._execute_compensation(saga)
+                
+                saga.status = SagaStatus.COMPENSATED
+                self.completed_sagas[saga_id] = saga
+                del self.active_sagas[saga_id]
+                self.saga_metrics["compensated_sagas"] += 1
+                self.saga_metrics["active_sagas"] -= 1
+                
+                logger.info("Saga compensated", saga_id=saga_id, name=saga.name)
+                return False
+
+        except Exception as e:
+            logger.error("Saga execution failed", saga_id=saga_id, error=str(e))
             
-            for i, step in enumerate(self.steps):
-                self.current_step_index = i
+            saga.status = SagaStatus.FAILED
+            saga.error = str(e)
+            self.completed_sagas[saga_id] = saga
+            del self.active_sagas[saga_id]
+            self.saga_metrics["failed_sagas"] += 1
+            self.saga_metrics["active_sagas"] -= 1
+            
+            return False
+
+    async def _execute_saga_sequential(self, saga: Saga) -> bool:
+        """Execute saga steps sequentially."""
+        for step in saga.steps:
+            try:
+                step.status = StepStatus.RUNNING
                 step.started_at = time.time()
-                step.status = SagaStepStatus.EXECUTING
                 
-                # Execute step with retry
-                success = await self._execute_step(step)
+                # Execute step with timeout and retry
+                result = await self._execute_step_with_retry(step)
                 
-                if not success:
-                    # Step failed, start compensation
-                    logger.error("Step failed, starting compensation", 
-                               saga_id=self.saga_id, 
-                               step_id=step.step_id)
-                    await self._compensate()
-                    return False
-                
-                step.status = SagaStepStatus.COMPLETED
+                step.result = result
+                step.status = StepStatus.COMPLETED
                 step.completed_at = time.time()
                 
-                logger.info("Step completed", 
-                           saga_id=self.saga_id, 
-                           step_id=step.step_id)
+                logger.info(
+                    "Saga step completed",
+                    saga_id=saga.saga_id,
+                    step_id=step.step_id,
+                    name=step.name,
+                )
+                
+            except Exception as e:
+                step.status = StepStatus.FAILED
+                step.error = str(e)
+                step.completed_at = time.time()
+                
+                logger.error(
+                    "Saga step failed",
+                    saga_id=saga.saga_id,
+                    step_id=step.step_id,
+                    name=step.name,
+                    error=str(e),
+                )
+                
+                return False
+        
+        return True
+
+    async def _execute_saga_parallel(self, saga: Saga) -> bool:
+        """Execute saga steps in parallel."""
+        try:
+            # Create tasks for all steps
+            tasks = []
+            for step in saga.steps:
+                step.status = StepStatus.RUNNING
+                step.started_at = time.time()
+                
+                task = asyncio.create_task(self._execute_step_with_retry(step))
+                tasks.append((step, task))
             
-            # All steps completed successfully
-            self.status = SagaStepStatus.COMPLETED
-            self.completed_at = time.time()
+            # Wait for all tasks to complete
+            for step, task in tasks:
+                try:
+                    result = await task
+                    step.result = result
+                    step.status = StepStatus.COMPLETED
+                    step.completed_at = time.time()
+                    
+                except Exception as e:
+                    step.status = StepStatus.FAILED
+                    step.error = str(e)
+                    step.completed_at = time.time()
+                    
+                    logger.error(
+                        "Saga step failed in parallel execution",
+                        saga_id=saga.saga_id,
+                        step_id=step.step_id,
+                        error=str(e),
+                    )
+                    
+                    return False
             
-            logger.info("Saga completed successfully", saga_id=self.saga_id)
             return True
             
         except Exception as e:
-            logger.error("Saga execution failed", 
-                        saga_id=self.saga_id, 
-                        error=str(e))
-            self.error = str(e)
-            self.status = SagaStepStatus.FAILED
-            
-            # Start compensation
-            await self._compensate()
+            logger.error(
+                "Parallel saga execution failed",
+                saga_id=saga.saga_id,
+                error=str(e),
+            )
             return False
-    
-    async def _execute_step(self, step: SagaStep) -> bool:
-        """Execute single step with retry logic."""
-        for attempt in range(step.retry_attempts):
+
+    async def _execute_step_with_retry(self, step: SagaStep) -> Any:
+        """Execute a step with retry logic."""
+        last_exception = None
+        
+        for attempt in range(step.max_retries + 1):
             try:
-                # Execute step with timeout
                 result = await asyncio.wait_for(
-                    step.execute_func(),
-                    timeout=step.timeout
+                    step.execute_func(), timeout=step.timeout
                 )
-                
-                logger.debug("Step executed successfully", 
-                           saga_id=self.saga_id, 
-                           step_id=step.step_id, 
-                           attempt=attempt + 1)
-                return True
-                
-            except asyncio.TimeoutError:
-                logger.warning("Step execution timeout", 
-                             saga_id=self.saga_id, 
-                             step_id=step.step_id, 
-                             attempt=attempt + 1,
-                             timeout=step.timeout)
-                
-                if attempt == step.retry_attempts - 1:
-                    step.error = f"Timeout after {step.retry_attempts} attempts"
-                    return False
-                
-                # Wait before retry
-                await asyncio.sleep(1.0 * (attempt + 1))
+                return result
                 
             except Exception as e:
-                logger.warning("Step execution failed", 
-                             saga_id=self.saga_id, 
-                             step_id=step.step_id, 
-                             attempt=attempt + 1,
-                             error=str(e))
+                last_exception = e
+                step.retry_attempts += 1
                 
-                if attempt == step.retry_attempts - 1:
-                    step.error = str(e)
-                    return False
-                
-                # Wait before retry
-                await asyncio.sleep(1.0 * (attempt + 1))
+                if attempt < step.max_retries:
+                    delay = min(1000 * (2 ** attempt), 10000)  # Exponential backoff
+                    logger.warning(
+                        "Step failed, retrying",
+                        step_id=step.step_id,
+                        attempt=attempt,
+                        delay=delay,
+                        error=str(e),
+                    )
+                    await asyncio.sleep(delay / 1000.0)
+                else:
+                    logger.error(
+                        "Step failed after all retries",
+                        step_id=step.step_id,
+                        attempts=attempt,
+                        error=str(e),
+                    )
         
-        return False
-    
-    async def _compensate(self):
-        """Compensate for failed saga by running compensation functions in reverse order."""
-        logger.info("Starting saga compensation", saga_id=self.saga_id)
-        self.status = SagaStepStatus.COMPENSATING
-        
-        # Compensate steps in reverse order
-        for i in range(self.current_step_index, -1, -1):
-            step = self.steps[i]
+        raise last_exception
+
+    async def _execute_compensation(self, saga: Saga) -> None:
+        """Execute compensation for a saga."""
+        try:
+            saga.status = SagaStatus.COMPENSATING
+            logger.info("Starting saga compensation", saga_id=saga.saga_id, name=saga.name)
             
-            if step.status == SagaStepStatus.COMPLETED:
-                try:
-                    step.status = SagaStepStatus.COMPENSATING
-                    await step.compensate_func()
-                    step.status = SagaStepStatus.COMPENSATED
-                    
-                    logger.info("Step compensated", 
-                               saga_id=self.saga_id, 
-                               step_id=step.step_id)
-                    
-                except Exception as e:
-                    logger.error("Step compensation failed", 
-                               saga_id=self.saga_id, 
-                               step_id=step.step_id, 
-                               error=str(e))
-                    # Continue with other compensations
-        
-        self.status = SagaStepStatus.COMPENSATED
-        logger.info("Saga compensation completed", saga_id=self.saga_id)
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get saga status and statistics."""
-        completed_steps = sum(1 for step in self.steps if step.status == SagaStepStatus.COMPLETED)
-        failed_steps = sum(1 for step in self.steps if step.status == SagaStepStatus.FAILED)
-        compensated_steps = sum(1 for step in self.steps if step.status == SagaStepStatus.COMPENSATED)
+            # Get completed steps in reverse order
+            completed_steps = [
+                step for step in saga.steps if step.status == StepStatus.COMPLETED
+            ]
+            
+            if saga.compensation_strategy == "reverse_order":
+                completed_steps.reverse()
+            
+            for step in completed_steps:
+                if step.compensate_func:
+                    try:
+                        await step.compensate_func()
+                        step.status = StepStatus.COMPENSATED
+                        
+                        logger.info(
+                            "Step compensation completed",
+                            saga_id=saga.saga_id,
+                            step_id=step.step_id,
+                            name=step.name,
+                        )
+                        
+                    except Exception as e:
+                        logger.error(
+                            "Step compensation failed",
+                            saga_id=saga.saga_id,
+                            step_id=step.step_id,
+                            name=step.name,
+                            error=str(e),
+                        )
+                        # Continue with other compensations even if one fails
+            
+            logger.info("Saga compensation completed", saga_id=saga.saga_id, name=saga.name)
+            
+        except Exception as e:
+            logger.error("Saga compensation failed", saga_id=saga.saga_id, error=str(e))
+            raise
+
+    def get_saga_status(self, saga_id: str) -> Optional[Dict[str, Any]]:
+        """Get saga status and details."""
+        saga = self.active_sagas.get(saga_id) or self.completed_sagas.get(saga_id)
+        if not saga:
+            return None
         
         return {
-            "saga_id": self.saga_id,
-            "status": self.status.value,
-            "total_steps": len(self.steps),
-            "completed_steps": completed_steps,
-            "failed_steps": failed_steps,
-            "compensated_steps": compensated_steps,
-            "current_step_index": self.current_step_index,
-            "created_at": self.created_at,
-            "completed_at": self.completed_at,
-            "error": self.error,
+            "saga_id": saga.saga_id,
+            "name": saga.name,
+            "status": saga.status.value,
+            "created_at": saga.created_at,
+            "error": saga.error,
             "steps": [
                 {
                     "step_id": step.step_id,
                     "name": step.name,
                     "status": step.status.value,
-                    "error": step.error,
                     "started_at": step.started_at,
-                    "completed_at": step.completed_at
+                    "completed_at": step.completed_at,
+                    "error": step.error,
                 }
-                for step in self.steps
-            ]
+                for step in saga.steps
+            ],
         }
 
-
-class SagaManager:
-    """Manager for multiple sagas."""
-    
-    def __init__(self):
-        self.active_sagas: Dict[str, SagaOrchestrator] = {}
-        self.completed_sagas: Dict[str, SagaOrchestrator] = {}
-    
-    def create_saga(self, saga_id: Optional[str] = None) -> SagaOrchestrator:
-        """Create new saga."""
-        if saga_id is None:
-            saga_id = str(uuid4())
-        
-        saga = SagaOrchestrator(saga_id)
-        self.active_sagas[saga_id] = saga
-        
-        logger.info("Saga created", saga_id=saga_id)
-        return saga
-    
-    async def execute_saga(self, saga_id: str) -> bool:
-        """Execute saga."""
-        if saga_id not in self.active_sagas:
-            raise ValueError(f"Saga {saga_id} not found")
-        
-        saga = self.active_sagas[saga_id]
-        success = await saga.execute()
-        
-        # Move to completed sagas
-        self.completed_sagas[saga_id] = saga
-        del self.active_sagas[saga_id]
-        
-        return success
-    
-    def get_saga(self, saga_id: str) -> Optional[SagaOrchestrator]:
-        """Get saga by ID."""
-        if saga_id in self.active_sagas:
-            return self.active_sagas[saga_id]
-        elif saga_id in self.completed_sagas:
-            return self.completed_sagas[saga_id]
-        return None
-    
-    def get_all_sagas(self) -> Dict[str, Dict[str, Any]]:
-        """Get status of all sagas."""
-        all_sagas = {}
-        
-        for saga_id, saga in self.active_sagas.items():
-            all_sagas[saga_id] = saga.get_status()
-        
-        for saga_id, saga in self.completed_sagas.items():
-            all_sagas[saga_id] = saga.get_status()
-        
-        return all_sagas
-    
-    def cleanup_old_sagas(self, max_age_hours: int = 24):
-        """Clean up old completed sagas."""
-        current_time = time.time()
-        max_age_seconds = max_age_hours * 3600
-        
-        to_remove = []
-        for saga_id, saga in self.completed_sagas.items():
-            if saga.completed_at and (current_time - saga.completed_at) > max_age_seconds:
-                to_remove.append(saga_id)
-        
-        for saga_id in to_remove:
-            del self.completed_sagas[saga_id]
-            logger.info("Old saga cleaned up", saga_id=saga_id)
+    def get_saga_metrics(self) -> Dict[str, Any]:
+        """Get saga manager metrics."""
+        return {
+            **self.saga_metrics,
+            "success_rate": (
+                self.saga_metrics["completed_sagas"] / self.saga_metrics["total_sagas"]
+                if self.saga_metrics["total_sagas"] > 0
+                else 0
+            ),
+        }
 
 
 # Global saga manager
 saga_manager = SagaManager()
-
-
-def saga_step(step_id: str, timeout: float = 30.0, retry_attempts: int = 3):
-    """Decorator for saga step functions."""
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            # This would be used in the context of a saga
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator

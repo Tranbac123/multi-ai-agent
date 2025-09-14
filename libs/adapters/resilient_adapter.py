@@ -1,358 +1,346 @@
-"""Resilient adapter with circuit breaker, retry, and saga patterns."""
+"""Resilient adapter with circuit breaker, retry, timeout, and bulkhead patterns."""
 
 import asyncio
 import time
-import random
-import uuid
-from typing import Dict, List, Any, Optional, Callable, TypeVar, Generic
+import functools
+from typing import Dict, Any, Optional, Callable, Awaitable, TypeVar, Union
 from enum import Enum
 import structlog
-import redis.asyncio as redis
 
 logger = structlog.get_logger(__name__)
 
 T = TypeVar('T')
 
 
-class CircuitState(Enum):
+class CircuitBreakerState(Enum):
     """Circuit breaker states."""
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
 
 
-class RetryStrategy(Enum):
-    """Retry strategies."""
-    FIXED = "fixed"
-    EXPONENTIAL = "exponential"
-    LINEAR = "linear"
+class ResilientAdapter:
+    """Resilient adapter with circuit breaker, retry, timeout, and bulkhead patterns."""
 
-
-class ResilientAdapter(Generic[T]):
-    """Resilient adapter with circuit breaker, retry, and saga patterns."""
-    
     def __init__(
         self,
         name: str,
-        redis_client: redis.Redis,
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
-        retry_strategy: RetryStrategy = RetryStrategy.EXPONENTIAL,
-        circuit_breaker_threshold: int = 5,
-        circuit_breaker_timeout: float = 60.0,
         timeout: float = 30.0,
-        bulkhead_size: int = 10
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+        circuit_breaker_config: Optional[Dict[str, Any]] = None,
+        bulkhead_size: int = 10,
     ):
         self.name = name
-        self.redis = redis_client
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.retry_strategy = retry_strategy
-        self.circuit_breaker_threshold = circuit_breaker_threshold
-        self.circuit_breaker_timeout = circuit_breaker_timeout
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.max_delay = max_delay
         self.bulkhead_size = bulkhead_size
         
+        # Circuit breaker configuration
+        self.circuit_breaker_config = circuit_breaker_config or {
+            "failure_threshold": 5,
+            "recovery_timeout": 60.0,
+        }
+        self.failure_threshold = self.circuit_breaker_config["failure_threshold"]
+        self.recovery_timeout = self.circuit_breaker_config["recovery_timeout"]
+        
         # Circuit breaker state
-        self.circuit_state = CircuitState.CLOSED
+        self.circuit_state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.last_failure_time = 0.0
+        self.next_attempt_time = 0.0
         
         # Bulkhead semaphore
         self.bulkhead_semaphore = asyncio.Semaphore(bulkhead_size)
         
-        # Saga state
-        self.saga_operations = []
-    
-    async def execute(
-        self,
-        operation: Callable[..., T],
-        *args,
-        idempotency_key: Optional[str] = None,
-        compensation: Optional[Callable[..., Any]] = None,
-        **kwargs
-    ) -> T:
-        """Execute operation with resilience patterns."""
-        operation_id = str(uuid.uuid4())
+        # Statistics
+        self.stats = {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "timeout_requests": 0,
+            "circuit_breaker_open": 0,
+            "retry_attempts": 0,
+            "bulkhead_rejections": 0,
+        }
+
+    async def execute(self, func: Callable[..., Awaitable[T]], *args, **kwargs) -> T:
+        """Execute function with resilience patterns."""
+        self.stats["total_requests"] += 1
+        
+        # Check circuit breaker
+        if not self._is_circuit_breaker_closed():
+            self.stats["circuit_breaker_open"] += 1
+            raise CircuitBreakerOpenError(f"Circuit breaker is open for {self.name}")
+        
+        # Acquire bulkhead semaphore
+        try:
+            await asyncio.wait_for(
+                self.bulkhead_semaphore.acquire(), timeout=1.0
+            )
+        except asyncio.TimeoutError:
+            self.stats["bulkhead_rejections"] += 1
+            raise BulkheadRejectError(f"Bulkhead is full for {self.name}")
         
         try:
-            # Check circuit breaker
-            if not await self._check_circuit_breaker():
-                raise CircuitBreakerOpenError(f"Circuit breaker is open for {self.name}")
+            # Execute with retry logic
+            result = await self._execute_with_retry(func, *args, **kwargs)
             
-            # Acquire bulkhead semaphore
-            async with self.bulkhead_semaphore:
-                # Check idempotency
-                if idempotency_key and await self._is_operation_completed(idempotency_key):
-                    return await self._get_cached_result(idempotency_key)
-                
-                # Execute with retry
-                result = await self._execute_with_retry(
-                    operation, operation_id, *args, **kwargs
-                )
-                
-                # Cache result for idempotency
-                if idempotency_key:
-                    await self._cache_result(idempotency_key, result)
-                
-                # Record success
-                await self._record_success()
-                
-                # Add to saga if compensation provided
-                if compensation:
-                    self.saga_operations.append({
-                        'operation_id': operation_id,
-                        'operation': operation,
-                        'compensation': compensation,
-                        'args': args,
-                        'kwargs': kwargs,
-                        'result': result
-                    })
-                
-                return result
-                
+            # Record success
+            self._record_success()
+            self.stats["successful_requests"] += 1
+            
+            return result
+            
         except Exception as e:
-            # Record failure
-            await self._record_failure()
-            logger.error(
-                "Operation failed",
-                operation_id=operation_id,
-                adapter_name=self.name,
-                error=str(e)
-            )
+            self._record_failure()
+            self.stats["failed_requests"] += 1
             raise
-    
+        finally:
+            self.bulkhead_semaphore.release()
+
     async def _execute_with_retry(
-        self,
-        operation: Callable[..., T],
-        operation_id: str,
-        *args,
-        **kwargs
+        self, func: Callable[..., Awaitable[T]], *args, **kwargs
     ) -> T:
-        """Execute operation with retry logic."""
+        """Execute function with retry logic."""
         last_exception = None
         
         for attempt in range(self.max_retries + 1):
             try:
                 # Execute with timeout
                 result = await asyncio.wait_for(
-                    operation(*args, **kwargs),
-                    timeout=self.timeout
+                    func(*args, **kwargs), timeout=self.timeout
                 )
-                
-                if attempt > 0:
-                    logger.info(
-                        "Operation succeeded after retry",
-                        operation_id=operation_id,
-                        attempt=attempt,
-                        adapter_name=self.name
-                    )
-                
                 return result
                 
             except asyncio.TimeoutError as e:
                 last_exception = e
-                logger.warning(
-                    "Operation timeout",
-                    operation_id=operation_id,
-                    attempt=attempt,
-                    adapter_name=self.name
-                )
+                self.stats["timeout_requests"] += 1
                 
+                if attempt < self.max_retries:
+                    delay = min(
+                        self.base_delay * (2 ** attempt), self.max_delay
+                    )
+                    logger.warning(
+                        "Request timed out, retrying",
+                        adapter=self.name,
+                        attempt=attempt,
+                        delay=delay,
+                    )
+                    self.stats["retry_attempts"] += 1
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(
+                        "Request timed out after all retries",
+                        adapter=self.name,
+                        attempts=attempt,
+                    )
+                    
             except Exception as e:
                 last_exception = e
-                logger.warning(
-                    "Operation failed",
-                    operation_id=operation_id,
-                    attempt=attempt,
-                    error=str(e),
-                    adapter_name=self.name
-                )
-            
-            # Don't retry on last attempt
-            if attempt < self.max_retries:
-                delay = self._calculate_retry_delay(attempt)
-                await asyncio.sleep(delay)
+                
+                if attempt < self.max_retries:
+                    delay = min(
+                        self.base_delay * (2 ** attempt), self.max_delay
+                    )
+                    logger.warning(
+                        "Request failed, retrying",
+                        adapter=self.name,
+                        attempt=attempt,
+                        delay=delay,
+                        error=str(e),
+                    )
+                    self.stats["retry_attempts"] += 1
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(
+                        "Request failed after all retries",
+                        adapter=self.name,
+                        attempts=attempt,
+                        error=str(e),
+                    )
         
-        # All retries failed
         raise last_exception
-    
-    def _calculate_retry_delay(self, attempt: int) -> float:
-        """Calculate retry delay based on strategy."""
-        if self.retry_strategy == RetryStrategy.FIXED:
-            return self.retry_delay
-        elif self.retry_strategy == RetryStrategy.EXPONENTIAL:
-            return self.retry_delay * (2 ** attempt) + random.uniform(0, 1)
-        elif self.retry_strategy == RetryStrategy.LINEAR:
-            return self.retry_delay * (attempt + 1)
-        else:
-            return self.retry_delay
-    
-    async def _check_circuit_breaker(self) -> bool:
-        """Check if circuit breaker allows execution."""
-        if self.circuit_state == CircuitState.CLOSED:
+
+    def _is_circuit_breaker_closed(self) -> bool:
+        """Check if circuit breaker is closed."""
+        current_time = time.time()
+        
+        if self.circuit_state == CircuitBreakerState.CLOSED:
             return True
-        elif self.circuit_state == CircuitState.OPEN:
-            # Check if timeout has passed
-            if time.time() - self.last_failure_time > self.circuit_breaker_timeout:
-                self.circuit_state = CircuitState.HALF_OPEN
+        elif self.circuit_state == CircuitBreakerState.OPEN:
+            if current_time >= self.next_attempt_time:
+                self.circuit_state = CircuitBreakerState.HALF_OPEN
+                logger.info(
+                    "Circuit breaker transitioning to half-open",
+                    adapter=self.name,
+                )
                 return True
             return False
-        elif self.circuit_state == CircuitState.HALF_OPEN:
+        elif self.circuit_state == CircuitBreakerState.HALF_OPEN:
             return True
-        else:
-            return False
-    
-    async def _record_success(self) -> None:
-        """Record successful operation."""
-        self.failure_count = 0
-        if self.circuit_state == CircuitState.HALF_OPEN:
-            self.circuit_state = CircuitState.CLOSED
-            logger.info(f"Circuit breaker closed for {self.name}")
-    
-    async def _record_failure(self) -> None:
-        """Record failed operation."""
-        self.failure_count += 1
-        self.last_failure_time = time.time()
         
-        if self.failure_count >= self.circuit_breaker_threshold:
-            self.circuit_state = CircuitState.OPEN
-            logger.warning(
-                f"Circuit breaker opened for {self.name}",
-                failure_count=self.failure_count
-            )
-    
-    async def _is_operation_completed(self, idempotency_key: str) -> bool:
-        """Check if operation was already completed."""
-        try:
-            result_key = f"idempotency:{self.name}:{idempotency_key}"
-            return await self.redis.exists(result_key)
-        except Exception as e:
-            logger.error("Failed to check idempotency", error=str(e))
-            return False
-    
-    async def _get_cached_result(self, idempotency_key: str) -> T:
-        """Get cached result for idempotent operation."""
-        try:
-            result_key = f"idempotency:{self.name}:{idempotency_key}"
-            result_data = await self.redis.get(result_key)
-            if result_data:
-                import json
-                return json.loads(result_data)
-            else:
-                raise ValueError("Cached result not found")
-        except Exception as e:
-            logger.error("Failed to get cached result", error=str(e))
-            raise
-    
-    async def _cache_result(self, idempotency_key: str, result: T) -> None:
-        """Cache result for idempotent operation."""
-        try:
-            result_key = f"idempotency:{self.name}:{idempotency_key}"
-            import json
-            await self.redis.setex(
-                result_key,
-                3600,  # 1 hour TTL
-                json.dumps(result, default=str)
-            )
-        except Exception as e:
-            logger.error("Failed to cache result", error=str(e))
-    
-    async def execute_saga(self) -> List[Any]:
-        """Execute saga with compensation on failure."""
-        results = []
-        
-        try:
-            # Execute all operations in order
-            for operation_data in self.saga_operations:
-                result = await operation_data['operation'](
-                    *operation_data['args'],
-                    **operation_data['kwargs']
-                )
-                results.append(result)
-            
-            # Clear saga operations on success
-            self.saga_operations.clear()
-            
+        return False
+
+    def _record_success(self):
+        """Record successful request."""
+        if self.circuit_state == CircuitBreakerState.HALF_OPEN:
+            self.circuit_state = CircuitBreakerState.CLOSED
+            self.failure_count = 0
             logger.info(
-                "Saga executed successfully",
-                adapter_name=self.name,
-                operations_count=len(results)
+                "Circuit breaker closed after successful request",
+                adapter=self.name,
             )
-            
-            return results
-            
-        except Exception as e:
-            logger.error(
-                "Saga execution failed, starting compensation",
-                error=str(e),
-                adapter_name=self.name
-            )
-            
-            # Execute compensation in reverse order
-            await self._execute_compensation()
-            
-            raise
-    
-    async def _execute_compensation(self) -> None:
-        """Execute compensation for failed saga."""
-        # Execute compensation in reverse order
-        for operation_data in reversed(self.saga_operations):
-            try:
-                await operation_data['compensation'](
-                    *operation_data['args'],
-                    **operation_data['kwargs']
-                )
-                logger.info(
-                    "Compensation executed",
-                    operation_id=operation_data['operation_id'],
-                    adapter_name=self.name
-                )
-            except Exception as e:
-                logger.error(
-                    "Compensation failed",
-                    operation_id=operation_data['operation_id'],
-                    error=str(e),
-                    adapter_name=self.name
-                )
+        elif self.circuit_state == CircuitBreakerState.CLOSED:
+            self.failure_count = max(0, self.failure_count - 1)
+
+    def _record_failure(self):
+        """Record failed request."""
+        current_time = time.time()
+        self.failure_count += 1
+        self.last_failure_time = current_time
         
-        # Clear saga operations
-        self.saga_operations.clear()
-    
-    async def get_stats(self) -> Dict[str, Any]:
+        if self.circuit_state == CircuitBreakerState.CLOSED:
+            if self.failure_count >= self.failure_threshold:
+                self.circuit_state = CircuitBreakerState.OPEN
+                self.next_attempt_time = current_time + self.recovery_timeout
+                logger.warning(
+                    "Circuit breaker opened due to failures",
+                    adapter=self.name,
+                    failure_count=self.failure_count,
+                    recovery_time=self.next_attempt_time,
+                )
+        elif self.circuit_state == CircuitBreakerState.HALF_OPEN:
+            self.circuit_state = CircuitBreakerState.OPEN
+            self.next_attempt_time = current_time + self.recovery_timeout
+            logger.warning(
+                "Circuit breaker reopened after failure in half-open state",
+                adapter=self.name,
+            )
+
+    def get_stats(self) -> Dict[str, Any]:
         """Get adapter statistics."""
         return {
-            'name': self.name,
-            'circuit_state': self.circuit_state.value,
-            'failure_count': self.failure_count,
-            'last_failure_time': self.last_failure_time,
-            'bulkhead_available': self.bulkhead_semaphore._value,
-            'bulkhead_size': self.bulkhead_size,
-            'saga_operations_count': len(self.saga_operations),
-            'max_retries': self.max_retries,
-            'retry_delay': self.retry_delay,
-            'retry_strategy': self.retry_strategy.value,
-            'timeout': self.timeout
+            **self.stats,
+            "circuit_breaker_state": self.circuit_state.value,
+            "failure_count": self.failure_count,
+            "bulkhead_available": self.bulkhead_semaphore._value,
+            "bulkhead_capacity": self.bulkhead_size,
         }
-    
-    async def reset_circuit_breaker(self) -> None:
-        """Reset circuit breaker to closed state."""
-        self.circuit_state = CircuitState.CLOSED
+
+    def reset_stats(self):
+        """Reset adapter statistics."""
+        self.stats = {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "timeout_requests": 0,
+            "circuit_breaker_open": 0,
+            "retry_attempts": 0,
+            "bulkhead_rejections": 0,
+        }
         self.failure_count = 0
-        self.last_failure_time = 0.0
-        logger.info(f"Circuit breaker reset for {self.name}")
+        self.circuit_state = CircuitBreakerState.CLOSED
 
 
 class CircuitBreakerOpenError(Exception):
-    """Exception raised when circuit breaker is open."""
+    """Raised when circuit breaker is open."""
     pass
 
 
-class BulkheadFullError(Exception):
-    """Exception raised when bulkhead is full."""
+class BulkheadRejectError(Exception):
+    """Raised when bulkhead is full."""
     pass
 
 
-class TimeoutError(Exception):
-    """Exception raised when operation times out."""
-    pass
+def resilient(
+    name: str,
+    timeout: float = 30.0,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    circuit_breaker_config: Optional[Dict[str, Any]] = None,
+    bulkhead_size: int = 10,
+):
+    """Decorator for resilient function execution."""
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        adapter = ResilientAdapter(
+            name=name,
+            timeout=timeout,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+            circuit_breaker_config=circuit_breaker_config,
+            bulkhead_size=bulkhead_size,
+        )
+        
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs) -> T:
+            return await adapter.execute(func, *args, **kwargs)
+        
+        wrapper._adapter = adapter
+        return wrapper
+    
+    return decorator
+
+
+# Global adapter manager
+resilient_adapter_manager = {
+    "adapters": {},
+    "stats": {
+        "total_adapters": 0,
+        "total_requests": 0,
+        "total_failures": 0,
+    }
+}
+
+
+def create_database_adapter(name: str) -> ResilientAdapter:
+    """Create database adapter with appropriate configuration."""
+    return ResilientAdapter(
+        name=name,
+        timeout=30.0,
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=10.0,
+        circuit_breaker_config={
+            "failure_threshold": 5,
+            "recovery_timeout": 60.0,
+        },
+        bulkhead_size=20,
+    )
+
+
+def create_api_adapter(name: str) -> ResilientAdapter:
+    """Create API adapter with appropriate configuration."""
+    return ResilientAdapter(
+        name=name,
+        timeout=45.0,
+        max_retries=3,
+        base_delay=2.0,
+        max_delay=30.0,
+        circuit_breaker_config={
+            "failure_threshold": 3,
+            "recovery_timeout": 120.0,
+        },
+        bulkhead_size=10,
+    )
+
+
+def create_llm_adapter(name: str) -> ResilientAdapter:
+    """Create LLM adapter with appropriate configuration."""
+    return ResilientAdapter(
+        name=name,
+        timeout=120.0,
+        max_retries=2,
+        base_delay=5.0,
+        max_delay=60.0,
+        circuit_breaker_config={
+            "failure_threshold": 3,
+            "recovery_timeout": 300.0,
+        },
+        bulkhead_size=5,
+    )
