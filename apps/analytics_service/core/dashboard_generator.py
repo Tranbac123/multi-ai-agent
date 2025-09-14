@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 @dataclass
 class DashboardPanel:
     """Grafana dashboard panel configuration."""
+
     title: str
     type: str
     targets: List[Dict[str, Any]]
@@ -18,7 +19,7 @@ class DashboardPanel:
 
 class GrafanaDashboardGenerator:
     """Generator for Grafana dashboards from analytics data."""
-    
+
     def __init__(self):
         self.base_dashboard = {
             "dashboard": {
@@ -27,17 +28,14 @@ class GrafanaDashboardGenerator:
                 "tags": ["ai-agent", "analytics", "monitoring"],
                 "timezone": "browser",
                 "panels": [],
-                "time": {
-                    "from": "now-1h",
-                    "to": "now"
-                },
+                "time": {"from": "now-1h", "to": "now"},
                 "refresh": "30s",
                 "schemaVersion": 30,
                 "version": 1,
-                "links": []
+                "links": [],
             }
         }
-    
+
     def generate_router_analytics_dashboard(self) -> Dict[str, Any]:
         """Generate router analytics dashboard."""
         dashboard = self.base_dashboard.copy()
@@ -50,10 +48,10 @@ class GrafanaDashboardGenerator:
             self._create_expected_vs_actual_latency_panel(),
             self._create_router_throughput_panel(),
             self._create_router_success_rate_panel(),
-            self._create_router_error_rate_panel()
+            self._create_router_error_rate_panel(),
         ]
         return dashboard
-    
+
     def generate_realtime_analytics_dashboard(self) -> Dict[str, Any]:
         """Generate realtime analytics dashboard."""
         dashboard = self.base_dashboard.copy()
@@ -64,10 +62,10 @@ class GrafanaDashboardGenerator:
             self._create_ws_send_errors_panel(),
             self._create_ws_message_throughput_panel(),
             self._create_ws_queue_size_panel(),
-            self._create_ws_connection_health_panel()
+            self._create_ws_connection_health_panel(),
         ]
         return dashboard
-    
+
     def generate_comprehensive_analytics_dashboard(self) -> Dict[str, Any]:
         """Generate comprehensive analytics dashboard."""
         dashboard = self.base_dashboard.copy()
@@ -76,28 +74,24 @@ class GrafanaDashboardGenerator:
             # Overview panels
             self._create_overview_metrics_panel(),
             self._create_slo_compliance_panel(),
-            
             # Router panels
             self._create_router_decision_latency_panel(),
             self._create_router_misroute_rate_panel(),
             self._create_tier_distribution_panel(),
-            
             # Realtime panels
             self._create_ws_active_connections_panel(),
             self._create_ws_backpressure_drops_panel(),
-            
             # Cost and performance panels
             self._create_expected_vs_actual_cost_panel(),
             self._create_expected_vs_actual_latency_panel(),
             self._create_cost_breakdown_panel(),
-            
             # Reliability panels
             self._create_error_rate_panel(),
             self._create_uptime_panel(),
-            self._create_circuit_breaker_panel()
+            self._create_circuit_breaker_panel(),
         ]
         return dashboard
-    
+
     def _create_router_decision_latency_panel(self) -> Dict[str, Any]:
         """Create router decision latency panel."""
         return {
@@ -109,18 +103,18 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "histogram_quantile(0.50, rate(router_decision_latency_ms_bucket[5m]))",
                     "legendFormat": "p50",
-                    "refId": "A"
+                    "refId": "A",
                 },
                 {
                     "expr": "histogram_quantile(0.95, rate(router_decision_latency_ms_bucket[5m]))",
                     "legendFormat": "p95",
-                    "refId": "B"
+                    "refId": "B",
                 },
                 {
                     "expr": "histogram_quantile(0.99, rate(router_decision_latency_ms_bucket[5m]))",
                     "legendFormat": "p99",
-                    "refId": "C"
-                }
+                    "refId": "C",
+                },
             ],
             "fieldConfig": {
                 "defaults": {
@@ -129,13 +123,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 50},
-                            {"color": "red", "value": 100}
+                            {"color": "red", "value": 100},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_router_misroute_rate_panel(self) -> Dict[str, Any]:
         """Create router misroute rate panel."""
         return {
@@ -147,7 +141,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(router_misroute_rate[5m])",
                     "legendFormat": "Misroute Rate",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -157,13 +151,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 0.05},
-                            {"color": "red", "value": 0.1}
+                            {"color": "red", "value": 0.1},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_tier_distribution_panel(self) -> Dict[str, Any]:
         """Create tier distribution panel."""
         return {
@@ -175,15 +169,15 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "sum by (tier) (rate(tier_distribution[5m]))",
                     "legendFormat": "{{tier}}",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "options": {
                 "pieType": "pie",
-                "displayLabels": ["name", "value", "percent"]
-            }
+                "displayLabels": ["name", "value", "percent"],
+            },
         }
-    
+
     def _create_expected_vs_actual_cost_panel(self) -> Dict[str, Any]:
         """Create expected vs actual cost panel."""
         return {
@@ -195,7 +189,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(expected_vs_actual_cost[5m])",
                     "legendFormat": "Cost Ratio",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -205,13 +199,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 1.1},
-                            {"color": "red", "value": 1.2}
+                            {"color": "red", "value": 1.2},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_expected_vs_actual_latency_panel(self) -> Dict[str, Any]:
         """Create expected vs actual latency panel."""
         return {
@@ -223,7 +217,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(expected_vs_actual_latency[5m])",
                     "legendFormat": "Latency Ratio",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -233,13 +227,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 1.1},
-                            {"color": "red", "value": 1.2}
+                            {"color": "red", "value": 1.2},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_ws_active_connections_panel(self) -> Dict[str, Any]:
         """Create WebSocket active connections panel."""
         return {
@@ -251,7 +245,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "ws_active_connections",
                     "legendFormat": "Active Connections",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -261,13 +255,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 1000},
-                            {"color": "red", "value": 2000}
+                            {"color": "red", "value": 2000},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_ws_backpressure_drops_panel(self) -> Dict[str, Any]:
         """Create WebSocket backpressure drops panel."""
         return {
@@ -279,7 +273,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(ws_backpressure_drops[5m])",
                     "legendFormat": "Drops/sec",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -289,13 +283,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 10},
-                            {"color": "red", "value": 50}
+                            {"color": "red", "value": 50},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_ws_send_errors_panel(self) -> Dict[str, Any]:
         """Create WebSocket send errors panel."""
         return {
@@ -307,7 +301,7 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(ws_send_errors[5m])",
                     "legendFormat": "Errors/sec",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
             "fieldConfig": {
@@ -317,13 +311,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "green", "value": None},
                             {"color": "yellow", "value": 5},
-                            {"color": "red", "value": 20}
+                            {"color": "red", "value": 20},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_overview_metrics_panel(self) -> Dict[str, Any]:
         """Create overview metrics panel."""
         return {
@@ -335,31 +329,27 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "sum(rate(total_requests[5m]))",
                     "legendFormat": "Total Requests/sec",
-                    "refId": "A"
+                    "refId": "A",
                 },
                 {
                     "expr": "sum(rate(successful_requests[5m]))",
                     "legendFormat": "Successful Requests/sec",
-                    "refId": "B"
+                    "refId": "B",
                 },
                 {
                     "expr": "sum(rate(failed_requests[5m]))",
                     "legendFormat": "Failed Requests/sec",
-                    "refId": "C"
+                    "refId": "C",
                 },
                 {
                     "expr": "sum(rate(total_cost[5m]))",
                     "legendFormat": "Total Cost/sec",
-                    "refId": "D"
-                }
+                    "refId": "D",
+                },
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def _create_slo_compliance_panel(self) -> Dict[str, Any]:
         """Create SLO compliance panel."""
         return {
@@ -371,18 +361,18 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "latency_slo_compliance",
                     "legendFormat": "Latency SLO",
-                    "refId": "A"
+                    "refId": "A",
                 },
                 {
                     "expr": "availability_slo_compliance",
                     "legendFormat": "Availability SLO",
-                    "refId": "B"
+                    "refId": "B",
                 },
                 {
                     "expr": "cost_slo_compliance",
                     "legendFormat": "Cost SLO",
-                    "refId": "C"
-                }
+                    "refId": "C",
+                },
             ],
             "fieldConfig": {
                 "defaults": {
@@ -393,13 +383,13 @@ class GrafanaDashboardGenerator:
                         "steps": [
                             {"color": "red", "value": 0},
                             {"color": "yellow", "value": 0.8},
-                            {"color": "green", "value": 0.95}
+                            {"color": "green", "value": 0.95},
                         ]
-                    }
+                    },
                 }
-            }
+            },
         }
-    
+
     def _create_router_throughput_panel(self) -> Dict[str, Any]:
         """Create router throughput panel."""
         return {
@@ -411,16 +401,12 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(router_requests_total[5m])",
                     "legendFormat": "Requests/sec",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "reqps"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "reqps"}},
         }
-    
+
     def _create_router_success_rate_panel(self) -> Dict[str, Any]:
         """Create router success rate panel."""
         return {
@@ -432,18 +418,12 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(successful_requests[5m]) / rate(total_requests[5m])",
                     "legendFormat": "Success Rate",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "percentunit",
-                    "min": 0,
-                    "max": 1
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
         }
-    
+
     def _create_router_error_rate_panel(self) -> Dict[str, Any]:
         """Create router error rate panel."""
         return {
@@ -455,18 +435,12 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(failed_requests[5m]) / rate(total_requests[5m])",
                     "legendFormat": "Error Rate",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "percentunit",
-                    "min": 0,
-                    "max": 1
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
         }
-    
+
     def _create_ws_message_throughput_panel(self) -> Dict[str, Any]:
         """Create WebSocket message throughput panel."""
         return {
@@ -478,16 +452,12 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(ws_messages_sent[5m])",
                     "legendFormat": "Messages/sec",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def _create_ws_queue_size_panel(self) -> Dict[str, Any]:
         """Create WebSocket queue size panel."""
         return {
@@ -496,19 +466,11 @@ class GrafanaDashboardGenerator:
             "type": "timeseries",
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
             "targets": [
-                {
-                    "expr": "ws_queue_size",
-                    "legendFormat": "Queue Size",
-                    "refId": "A"
-                }
+                {"expr": "ws_queue_size", "legendFormat": "Queue Size", "refId": "A"}
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def _create_ws_connection_health_panel(self) -> Dict[str, Any]:
         """Create WebSocket connection health panel."""
         return {
@@ -520,21 +482,17 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "ws_connections_healthy",
                     "legendFormat": "Healthy Connections",
-                    "refId": "A"
+                    "refId": "A",
                 },
                 {
                     "expr": "ws_connections_unhealthy",
                     "legendFormat": "Unhealthy Connections",
-                    "refId": "B"
-                }
+                    "refId": "B",
+                },
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def _create_cost_breakdown_panel(self) -> Dict[str, Any]:
         """Create cost breakdown panel."""
         return {
@@ -546,26 +504,22 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(tier_a_cost[5m])",
                     "legendFormat": "Tier A Cost",
-                    "refId": "A"
+                    "refId": "A",
                 },
                 {
                     "expr": "rate(tier_b_cost[5m])",
                     "legendFormat": "Tier B Cost",
-                    "refId": "B"
+                    "refId": "B",
                 },
                 {
                     "expr": "rate(tier_c_cost[5m])",
                     "legendFormat": "Tier C Cost",
-                    "refId": "C"
-                }
+                    "refId": "C",
+                },
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "currencyUSD"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
         }
-    
+
     def _create_error_rate_panel(self) -> Dict[str, Any]:
         """Create error rate panel."""
         return {
@@ -577,16 +531,12 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "rate(system_errors_total[5m])",
                     "legendFormat": "Error Rate",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def _create_uptime_panel(self) -> Dict[str, Any]:
         """Create uptime panel."""
         return {
@@ -595,21 +545,11 @@ class GrafanaDashboardGenerator:
             "type": "stat",
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
             "targets": [
-                {
-                    "expr": "system_uptime",
-                    "legendFormat": "Uptime",
-                    "refId": "A"
-                }
+                {"expr": "system_uptime", "legendFormat": "Uptime", "refId": "A"}
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "percentunit",
-                    "min": 0,
-                    "max": 1
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
         }
-    
+
     def _create_circuit_breaker_panel(self) -> Dict[str, Any]:
         """Create circuit breaker panel."""
         return {
@@ -621,37 +561,42 @@ class GrafanaDashboardGenerator:
                 {
                     "expr": "circuit_breaker_state",
                     "legendFormat": "Circuit Breaker State",
-                    "refId": "A"
+                    "refId": "A",
                 }
             ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "short"
-                }
-            }
+            "fieldConfig": {"defaults": {"unit": "short"}},
         }
-    
+
     def save_dashboard_to_file(self, dashboard: Dict[str, Any], filename: str) -> None:
         """Save dashboard to JSON file."""
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(dashboard, f, indent=2)
-    
-    def generate_all_dashboards(self, output_dir: str = "observability/dashboards") -> None:
+
+    def generate_all_dashboards(
+        self, output_dir: str = "observability/dashboards"
+    ) -> None:
         """Generate all dashboards and save to files."""
         import os
+
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Generate and save dashboards
         router_dashboard = self.generate_router_analytics_dashboard()
-        self.save_dashboard_to_file(router_dashboard, f"{output_dir}/router_analytics.json")
-        
+        self.save_dashboard_to_file(
+            router_dashboard, f"{output_dir}/router_analytics.json"
+        )
+
         realtime_dashboard = self.generate_realtime_analytics_dashboard()
-        self.save_dashboard_to_file(realtime_dashboard, f"{output_dir}/realtime_analytics.json")
-        
+        self.save_dashboard_to_file(
+            realtime_dashboard, f"{output_dir}/realtime_analytics.json"
+        )
+
         comprehensive_dashboard = self.generate_comprehensive_analytics_dashboard()
-        self.save_dashboard_to_file(comprehensive_dashboard, f"{output_dir}/comprehensive_analytics.json")
-        
+        self.save_dashboard_to_file(
+            comprehensive_dashboard, f"{output_dir}/comprehensive_analytics.json"
+        )
+
         print(f"Generated dashboards in {output_dir}/")
         print("- router_analytics.json")
-        print("- realtime_analytics.json") 
+        print("- realtime_analytics.json")
         print("- comprehensive_analytics.json")
