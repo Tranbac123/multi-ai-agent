@@ -9,6 +9,7 @@ from decimal import Decimal
 
 class UserRole(str, Enum):
     """User roles in the system."""
+
     ADMIN = "admin"
     AGENT = "agent"
     VIEWER = "viewer"
@@ -16,6 +17,7 @@ class UserRole(str, Enum):
 
 class OrderStatus(str, Enum):
     """Order status enumeration."""
+
     DRAFT = "draft"
     PENDING = "pending"
     PAID = "paid"
@@ -25,6 +27,7 @@ class OrderStatus(str, Enum):
 
 class UserProfile(BaseModel):
     """User profile information."""
+
     id: int
     email: str
     first_name: Optional[str] = None
@@ -48,11 +51,12 @@ class UserProfile(BaseModel):
         elif self.last_name:
             return self.last_name
         else:
-            return self.email.split('@')[0]
+            return self.email.split("@")[0]
 
 
 class CustomerProfile(BaseModel):
     """Customer profile information."""
+
     id: int
     name: str
     email: str
@@ -64,6 +68,7 @@ class CustomerProfile(BaseModel):
 
 class ProductInfo(BaseModel):
     """Product information."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -77,6 +82,7 @@ class ProductInfo(BaseModel):
 
 class OrderItem(BaseModel):
     """Order item information."""
+
     id: int
     product_id: int
     product: Optional[ProductInfo] = None
@@ -87,6 +93,7 @@ class OrderItem(BaseModel):
 
 class OrderInfo(BaseModel):
     """Order information."""
+
     id: int
     customer_id: int
     customer: Optional[CustomerProfile] = None
@@ -102,6 +109,7 @@ class OrderInfo(BaseModel):
 
 class ServicePackage(BaseModel):
     """Service package information."""
+
     id: int
     name: str
     description: str
@@ -116,6 +124,7 @@ class ServicePackage(BaseModel):
 
 class UserSubscription(BaseModel):
     """User subscription information."""
+
     id: int
     user_id: int
     package_id: int
@@ -129,6 +138,7 @@ class UserSubscription(BaseModel):
 
 class MessageInfo(BaseModel):
     """Message information."""
+
     id: int
     session_id: str
     customer_id: Optional[int] = None
@@ -140,6 +150,7 @@ class MessageInfo(BaseModel):
 
 class FAQEntry(BaseModel):
     """FAQ entry information."""
+
     id: int
     question: str
     answer: str
@@ -151,6 +162,7 @@ class FAQEntry(BaseModel):
 
 class LeadInfo(BaseModel):
     """Lead information."""
+
     id: int
     name: str
     email: str
@@ -165,6 +177,7 @@ class LeadInfo(BaseModel):
 
 class AuditLog(BaseModel):
     """Audit log entry."""
+
     id: int
     user_id: Optional[int] = None
     action: str
@@ -179,6 +192,7 @@ class AuditLog(BaseModel):
 # Event-related models
 class AgentRun(BaseModel):
     """Agent run event data."""
+
     id: str
     tenant_id: str
     agent_id: str
@@ -198,6 +212,7 @@ class AgentRun(BaseModel):
 
 class ToolCall(BaseModel):
     """Tool call event data."""
+
     id: str
     run_id: str
     tenant_id: str
@@ -214,6 +229,7 @@ class ToolCall(BaseModel):
 
 class DocumentIngestion(BaseModel):
     """Document ingestion event data."""
+
     id: str
     tenant_id: str
     user_id: Optional[str] = None
@@ -232,6 +248,7 @@ class DocumentIngestion(BaseModel):
 
 class UsageMetered(BaseModel):
     """Usage metering event data."""
+
     id: str
     tenant_id: str
     user_id: Optional[str] = None
@@ -246,6 +263,7 @@ class UsageMetered(BaseModel):
 
 class RouterDecision(BaseModel):
     """Router decision event data."""
+
     id: str
     tenant_id: str
     user_id: Optional[str] = None
@@ -260,6 +278,7 @@ class RouterDecision(BaseModel):
 
 class WebSocketMessage(BaseModel):
     """WebSocket message event data."""
+
     id: str
     tenant_id: str
     user_id: Optional[str] = None
@@ -272,6 +291,7 @@ class WebSocketMessage(BaseModel):
 
 class BillingEvent(BaseModel):
     """Billing event data."""
+
     id: str
     tenant_id: str
     event_type: str  # "usage_accumulated", "invoice_generated", "payment_processed"
@@ -284,6 +304,7 @@ class BillingEvent(BaseModel):
 
 class PermanentFailure(BaseModel):
     """Permanent failure record."""
+
     id: str
     tenant_id: str
     event_type: str
@@ -298,6 +319,7 @@ class PermanentFailure(BaseModel):
 
 class DLQProcessingError(BaseModel):
     """DLQ processing error record."""
+
     id: str
     tenant_id: str
     dlq_data: Dict[str, Any] = Field(default_factory=dict)

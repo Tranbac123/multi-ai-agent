@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class RouterDecisionRequest(BaseModel):
     """Router decision request."""
+
     message: str
     tenant_id: str
     user_id: Optional[str] = None
@@ -17,6 +18,7 @@ class RouterDecisionRequest(BaseModel):
 
 class RouterDecisionResponse(BaseModel):
     """Router decision response."""
+
     agent_id: str
     tier: str  # A, B, C
     confidence: float
@@ -29,6 +31,7 @@ class RouterDecisionResponse(BaseModel):
 
 class FeatureExtraction(BaseModel):
     """Feature extraction result."""
+
     token_count: int
     json_strictness: float
     domain_flags: Dict[str, bool]
@@ -40,6 +43,7 @@ class FeatureExtraction(BaseModel):
 
 class RouterMetrics(BaseModel):
     """Router performance metrics."""
+
     decision_latency_ms: float
     misroute_rate: float
     tier_distribution: Dict[str, int]

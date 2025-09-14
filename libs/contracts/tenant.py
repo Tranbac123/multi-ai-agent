@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class Tenant(BaseModel):
     """Tenant specification."""
+
     tenant_id: UUID = Field(default_factory=uuid4)
     name: str = Field(description="Tenant name")
     plan_id: UUID = Field(description="Plan identifier")
@@ -15,11 +16,14 @@ class Tenant(BaseModel):
     data_region: str = Field(default="us-east-1", description="Data region")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Tenant metadata")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Tenant metadata"
+    )
 
 
 class User(BaseModel):
     """User specification."""
+
     user_id: UUID = Field(default_factory=uuid4)
     tenant_id: UUID = Field(description="Tenant identifier")
     email: str = Field(description="User email")
@@ -27,11 +31,14 @@ class User(BaseModel):
     status: Literal["active", "inactive", "suspended"] = Field(default="active")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login_at: Optional[datetime] = Field(default=None, description="Last login time")
+    last_login_at: Optional[datetime] = Field(
+        default=None, description="Last login time"
+    )
 
 
 class APIKey(BaseModel):
     """API key specification."""
+
     key_id: UUID = Field(default_factory=uuid4)
     tenant_id: UUID = Field(description="Tenant identifier")
     key_hash: str = Field(description="Hashed API key")
@@ -44,6 +51,7 @@ class APIKey(BaseModel):
 
 class Plan(BaseModel):
     """Plan specification."""
+
     plan_id: UUID = Field(default_factory=uuid4)
     name: str = Field(description="Plan name")
     price_usd: float = Field(ge=0.0, description="Price in USD")
