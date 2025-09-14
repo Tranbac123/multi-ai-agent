@@ -2,6 +2,25 @@
 
 A production-grade, multi-tenant AI-as-a-Service platform providing intelligent customer support, workflow orchestration, and real-time analytics across multiple channels.
 
+## 📚 **Documentation**
+
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
+
+- **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Production-grade multi-agent platform overview
+- **[Visual Architecture](docs/VISUAL_ARCHITECTURE.md)** - Architecture diagrams and illustrations
+- **[Runtime Topology](docs/RUNTIME_TOPOLOGY.md)** - Ingress, autoscaling, DLQ, retries, Saga patterns
+- **[Test Topology](docs/TEST_TOPOLOGY.md)** - Test dependency mapping (MOCK vs LIVE per suite)
+- **[Workflows Index](docs/WORKFLOWS_INDEX.md)** - YAML workflow definitions and registry
+- **[API Contracts](docs/CONTRACTS.md)** - Request/response schemas and validation rules
+- **[CI/CD Pipeline](docs/CI_CD_PIPELINE.md)** - Pipeline configuration and quality gates
+- **[Production-Grade Testing](docs/testing/)** - 13 comprehensive test categories with 1000+ tests
+
+### **Quick Start Documentation**
+
+- **[Testing Overview](docs/testing/TESTING_OVERVIEW.md)** - Production-ready testing framework
+- **[Test Matrix](docs/testing/TEST_MATRIX.md)** - Risk-based test categorization and execution
+- **[Performance Profiles](docs/testing/PERF_PROFILES.md)** - Load testing and performance validation
+
 ## Architecture Overview
 
 ```

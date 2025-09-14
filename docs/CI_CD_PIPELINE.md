@@ -21,6 +21,30 @@ The Multi-Tenant AIaaS Platform includes a comprehensive GitHub Actions CI/CD pi
 └─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+## Quality Gates
+
+### **Merge Requirements**
+- **API Performance**: PR fails if p95 API > 500ms, p99 API > 1000ms
+- **WebSocket Performance**: PR fails if p95 WS > 100ms, p99 WS > 200ms
+- **Router Accuracy**: PR fails if misroute% > 5%
+- **Cost Control**: PR fails if cost/run > $0.01
+- **Error Rate**: PR fails if error rate > 0.1%
+- **Security**: PR fails if any critical security test fails
+- **Multi-tenant Isolation**: PR fails if any cross-tenant data access detected
+- **Coverage**: PR fails if line coverage < 85%
+
+### **Release Requirements**
+- **Full Test Suite**: All 13 test categories must pass
+- **Performance Baseline**: Performance regression < 10%
+- **Security Audit**: Clean security scan with no critical vulnerabilities
+- **Documentation**: All documentation must be up-to-date
+
+### **Production Deployment**
+- **Smoke Tests**: All smoke tests must pass
+- **Monitoring**: All monitoring systems must be active
+- **Rollback Plan**: Rollback plan must be ready
+- **Incident Response**: Incident response team must be on standby
+
 ## Pipeline Jobs
 
 ### 1. **Quality Checks** (`quality`)
@@ -31,10 +55,11 @@ The Multi-Tenant AIaaS Platform includes a comprehensive GitHub Actions CI/CD pi
   - **Black**: Code formatting
   - **isort**: Import sorting
   - **Ruff**: Linting and code analysis
-  - **MyPy**: Type checking
+  - **MyPy**: Type checking (strict mode)
   - **Bandit**: Security linting
   - **Safety**: Dependency vulnerability scanning
 - **Outputs**: Security reports as artifacts
+- **Quality Gates**: All checks must pass
 
 ### 2. **Unit Tests** (`test-unit`)
 
