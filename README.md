@@ -67,7 +67,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 The platform now includes **8 advanced enterprise capabilities**:
 
 1. **🌍 Data Residency & Regionalization** - Complete data sovereignty with regional provider selection
-2. **⚖️ Fairness & Isolation** - Per-tenant concurrency control with weighted fair queuing  
+2. **⚖️ Fairness & Isolation** - Per-tenant concurrency control with weighted fair queuing
 3. **💰 CostGuard** - Intelligent cost management with budget enforcement and drift detection
 4. **🔒 Privacy & DLP** - Advanced data protection with PII detection and field-level encryption
 5. **⚡ Tail-latency Control** - Request hedging and coordinated cancellation for optimal performance
