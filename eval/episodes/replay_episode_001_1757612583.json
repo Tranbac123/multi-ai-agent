@@ -1,0 +1,41 @@
+{
+  "episode_id": "replay_episode_001_1757612583",
+  "tenant_id": "tenant_001",
+  "session_id": "replay_session_001",
+  "config": {
+    "episode_id": "episode_001",
+    "model_version": "gpt-4",
+    "prompt_version": "v1.0",
+    "tool_versions": {
+      "tool1": "v1.0"
+    },
+    "router_config": {},
+    "tenant_config": {},
+    "timestamp": "2025-09-12T00:43:03.631855",
+    "metadata": {
+      "test": true
+    }
+  },
+  "steps": [
+    {
+      "step_id": "replay_step_001",
+      "step_type": "user_message",
+      "timestamp": "2025-09-11T17:43:03.632789+00:00",
+      "input_data": {
+        "message": "Hello"
+      },
+      "output_data": {},
+      "duration_ms": 0,
+      "success": false,
+      "error_message": "Unknown step type: user_message",
+      "metadata": {}
+    }
+  ],
+  "start_time": "2025-09-11T17:43:03.632672+00:00",
+  "end_time": "2025-09-11T17:43:03.632835+00:00",
+  "status": "completed",
+  "total_duration_ms": 0,
+  "success_count": 0,
+  "failure_count": 1,
+  "metadata": {}
+}

@@ -1,0 +1,66 @@
+{
+  "episode_id": "replay_48e59d80-bc9e-42db-a4c2-5d3031cf2164_1757612823",
+  "tenant_id": "tenant_001",
+  "session_id": "replay_session_001",
+  "config": {
+    "episode_id": "48e59d80-bc9e-42db-a4c2-5d3031cf2164",
+    "model_version": "gpt-4",
+    "prompt_version": "v1.0",
+    "tool_versions": {
+      "tool1": "v1.0"
+    },
+    "router_config": {},
+    "tenant_config": {},
+    "timestamp": "2025-09-12T00:47:03.656366",
+    "metadata": {
+      "test": true
+    }
+  },
+  "steps": [
+    {
+      "step_id": "replay_step_001",
+      "step_type": "user_message",
+      "timestamp": "2025-09-11T17:47:03.657865+00:00",
+      "input_data": {
+        "message": "I need help with my order"
+      },
+      "output_data": {},
+      "duration_ms": 0,
+      "success": false,
+      "error_message": "Unknown step type: user_message",
+      "metadata": {}
+    },
+    {
+      "step_id": "replay_step_002",
+      "step_type": "agent_response",
+      "timestamp": "2025-09-11T17:47:03.657912+00:00",
+      "input_data": {},
+      "output_data": {},
+      "duration_ms": 0,
+      "success": false,
+      "error_message": "Unknown step type: agent_response",
+      "metadata": {}
+    },
+    {
+      "step_id": "replay_step_003",
+      "step_type": "tool_call",
+      "timestamp": "2025-09-11T17:47:03.657956+00:00",
+      "input_data": {
+        "tool": "order_lookup",
+        "order_id": "12345"
+      },
+      "output_data": {},
+      "duration_ms": 0,
+      "success": true,
+      "error_message": null,
+      "metadata": {}
+    }
+  ],
+  "start_time": "2025-09-11T17:47:03.657730+00:00",
+  "end_time": "2025-09-11T17:47:03.657961+00:00",
+  "status": "completed",
+  "total_duration_ms": 0,
+  "success_count": 1,
+  "failure_count": 2,
+  "metadata": {}
+}

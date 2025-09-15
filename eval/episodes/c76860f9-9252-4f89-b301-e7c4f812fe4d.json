@@ -1,0 +1,68 @@
+{
+  "episode_id": "c76860f9-9252-4f89-b301-e7c4f812fe4d",
+  "tenant_id": "tenant_001",
+  "session_id": "session_001",
+  "config": {
+    "episode_id": "test_episode",
+    "model_version": "gpt-4",
+    "prompt_version": "v1.0",
+    "tool_versions": {
+      "tool1": "v1.0"
+    },
+    "router_config": {},
+    "tenant_config": {},
+    "timestamp": "2025-09-12T01:01:47.851026",
+    "metadata": {
+      "test": true
+    }
+  },
+  "steps": [
+    {
+      "step_id": "step_001",
+      "step_type": "user_message",
+      "timestamp": "2025-09-12T01:01:47.851010",
+      "input_data": {
+        "message": "I need help with my order"
+      },
+      "output_data": {},
+      "duration_ms": 100,
+      "success": true,
+      "error_message": null,
+      "metadata": {}
+    },
+    {
+      "step_id": "step_002",
+      "step_type": "agent_response",
+      "timestamp": "2025-09-12T01:01:47.851020",
+      "input_data": {},
+      "output_data": {
+        "response": "I can help you with that"
+      },
+      "duration_ms": 150,
+      "success": true,
+      "error_message": null,
+      "metadata": {}
+    },
+    {
+      "step_id": "step_003",
+      "step_type": "tool_call",
+      "timestamp": "2025-09-12T01:01:47.851022",
+      "input_data": {
+        "tool": "order_lookup",
+        "order_id": "12345"
+      },
+      "output_data": {},
+      "duration_ms": 200,
+      "success": true,
+      "error_message": null,
+      "metadata": {}
+    }
+  ],
+  "start_time": "2025-09-11T18:01:47.851057+00:00",
+  "end_time": "2025-09-11T18:01:47.851066+00:00",
+  "status": "completed",
+  "total_duration_ms": 450,
+  "success_count": 3,
+  "failure_count": 0,
+  "metadata": {}
+}

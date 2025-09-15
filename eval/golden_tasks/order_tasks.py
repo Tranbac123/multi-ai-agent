@@ -8,6 +8,7 @@ from uuid import UUID
 @dataclass
 class GoldenTask:
     """Golden task definition."""
+
     task_id: str
     category: str
     input_text: str
@@ -32,8 +33,8 @@ ORDER_TASKS = [
             "difficulty": "medium",
             "domain": "ecommerce",
             "expected_tier": "SLM_B",
-            "expected_actions": ["check_inventory", "calculate_price", "create_order"]
-        }
+            "expected_actions": ["check_inventory", "calculate_price", "create_order"],
+        },
     ),
     GoldenTask(
         task_id="order_002",
@@ -47,8 +48,8 @@ ORDER_TASKS = [
             "difficulty": "easy",
             "domain": "ecommerce",
             "expected_tier": "SLM_A",
-            "expected_actions": ["lookup_order", "provide_status"]
-        }
+            "expected_actions": ["lookup_order", "provide_status"],
+        },
     ),
     GoldenTask(
         task_id="order_003",
@@ -62,8 +63,8 @@ ORDER_TASKS = [
             "difficulty": "medium",
             "domain": "ecommerce",
             "expected_tier": "SLM_B",
-            "expected_actions": ["verify_order", "cancel_order", "process_refund"]
-        }
+            "expected_actions": ["verify_order", "cancel_order", "process_refund"],
+        },
     ),
     GoldenTask(
         task_id="order_004",
@@ -77,8 +78,8 @@ ORDER_TASKS = [
             "difficulty": "medium",
             "domain": "ecommerce",
             "expected_tier": "SLM_B",
-            "expected_actions": ["check_modification_eligibility", "update_address"]
-        }
+            "expected_actions": ["check_modification_eligibility", "update_address"],
+        },
     ),
     GoldenTask(
         task_id="order_005",
@@ -92,8 +93,12 @@ ORDER_TASKS = [
             "difficulty": "medium",
             "domain": "ecommerce",
             "expected_tier": "SLM_B",
-            "expected_actions": ["check_return_policy", "initiate_return", "generate_return_label"]
-        }
+            "expected_actions": [
+                "check_return_policy",
+                "initiate_return",
+                "generate_return_label",
+            ],
+        },
     ),
     GoldenTask(
         task_id="order_006",
@@ -107,8 +112,8 @@ ORDER_TASKS = [
             "difficulty": "easy",
             "domain": "shipping",
             "expected_tier": "SLM_A",
-            "expected_actions": ["lookup_shipping_info"]
-        }
+            "expected_actions": ["lookup_shipping_info"],
+        },
     ),
     GoldenTask(
         task_id="order_007",
@@ -122,8 +127,12 @@ ORDER_TASKS = [
             "difficulty": "hard",
             "domain": "ecommerce",
             "expected_tier": "LLM",
-            "expected_actions": ["lookup_multiple_orders", "aggregate_status", "present_summary"]
-        }
+            "expected_actions": [
+                "lookup_multiple_orders",
+                "aggregate_status",
+                "present_summary",
+            ],
+        },
     ),
     GoldenTask(
         task_id="order_008",
@@ -137,9 +146,13 @@ ORDER_TASKS = [
             "difficulty": "medium",
             "domain": "ecommerce",
             "expected_tier": "SLM_B",
-            "expected_actions": ["lookup_order_history", "identify_items", "create_new_order"]
-        }
-    )
+            "expected_actions": [
+                "lookup_order_history",
+                "identify_items",
+                "create_new_order",
+            ],
+        },
+    ),
 ]
 
 
@@ -158,7 +171,9 @@ def get_order_task_by_id(task_id: str) -> GoldenTask:
 
 def get_order_tasks_by_difficulty(difficulty: str) -> List[GoldenTask]:
     """Get order tasks by difficulty level."""
-    return [task for task in ORDER_TASKS if task.metadata.get("difficulty") == difficulty]
+    return [
+        task for task in ORDER_TASKS if task.metadata.get("difficulty") == difficulty
+    ]
 
 
 def get_order_tasks_by_domain(domain: str) -> List[GoldenTask]:

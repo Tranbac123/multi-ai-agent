@@ -12,6 +12,7 @@ logger = structlog.get_logger(__name__)
 
 class TaskStatus(Enum):
     """Task status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -22,6 +23,7 @@ class TaskStatus(Enum):
 @dataclass
 class GoldenTask:
     """Golden task definition."""
+
     task_id: str
     name: str
     description: str
@@ -35,6 +37,7 @@ class GoldenTask:
 @dataclass
 class TaskResult:
     """Task execution result."""
+
     task_id: str
     status: TaskStatus
     actual_output: Dict[str, Any]
@@ -45,10 +48,10 @@ class TaskResult:
 
 class OrderManagementGoldenTasks:
     """Golden tasks for order management evaluation."""
-    
+
     def __init__(self):
         self.tasks = self._initialize_order_tasks()
-    
+
     def _initialize_order_tasks(self) -> List[GoldenTask]:
         """Initialize order management golden tasks."""
         return [
@@ -60,24 +63,19 @@ class OrderManagementGoldenTasks:
                     "message": "I want to place an order for 2 units of Product A",
                     "user_id": "user_001",
                     "tenant_id": "tenant_001",
-                    "context": {
-                        "product": "Product A",
-                        "quantity": 2
-                    }
+                    "context": {"product": "Product A", "quantity": 2},
                 },
                 expected_output={
                     "order_id": "order_12345",
                     "status": "created",
                     "total_amount": 199.98,
-                    "items": [
-                        {"product": "Product A", "quantity": 2, "price": 99.99}
-                    ]
+                    "items": [{"product": "Product A", "quantity": 2, "price": 99.99}],
                 },
                 assertions=[
                     {"type": "contains", "field": "order_id", "value": "order_"},
                     {"type": "equals", "field": "status", "value": "created"},
-                    {"type": "greater_than", "field": "total_amount", "value": 0}
-                ]
+                    {"type": "greater_than", "field": "total_amount", "value": 0},
+                ],
             ),
             GoldenTask(
                 task_id="order_002",
@@ -87,52 +85,47 @@ class OrderManagementGoldenTasks:
                     "message": "I want to change the quantity to 3 units",
                     "user_id": "user_001",
                     "tenant_id": "tenant_001",
-                    "context": {
-                        "order_id": "order_12345",
-                        "new_quantity": 3
-                    }
+                    "context": {"order_id": "order_12345", "new_quantity": 3},
                 },
                 expected_output={
                     "order_id": "order_12345",
                     "status": "updated",
                     "total_amount": 299.97,
-                    "items": [
-                        {"product": "Product A", "quantity": 3, "price": 99.99}
-                    ]
+                    "items": [{"product": "Product A", "quantity": 3, "price": 99.99}],
                 },
                 assertions=[
                     {"type": "equals", "field": "order_id", "value": "order_12345"},
                     {"type": "equals", "field": "status", "value": "updated"},
-                    {"type": "equals", "field": "total_amount", "value": 299.97}
-                ]
-            )
+                    {"type": "equals", "field": "total_amount", "value": 299.97},
+                ],
+            ),
         ]
-    
+
     async def execute_task(self, task: GoldenTask) -> TaskResult:
         """Execute a golden task."""
         try:
             start_time = time.time()
-            
+
             # Mock task execution
             actual_output = await self._mock_task_execution(task)
-            
+
             execution_time = (time.time() - start_time) * 1000
-            
+
             # Run assertions
             assertion_results = await self._run_assertions(task, actual_output)
-            
+
             # Determine status
-            all_passed = all(result['passed'] for result in assertion_results)
+            all_passed = all(result["passed"] for result in assertion_results)
             status = TaskStatus.COMPLETED if all_passed else TaskStatus.FAILED
-            
+
             return TaskResult(
                 task_id=task.task_id,
                 status=status,
                 actual_output=actual_output,
                 execution_time_ms=execution_time,
-                assertion_results=assertion_results
+                assertion_results=assertion_results,
             )
-            
+
         except Exception as e:
             logger.error("Task execution failed", error=str(e), task_id=task.task_id)
             return TaskResult(
@@ -140,9 +133,9 @@ class OrderManagementGoldenTasks:
                 status=TaskStatus.FAILED,
                 actual_output={},
                 execution_time_ms=0,
-                error_message=str(e)
+                error_message=str(e),
             )
-    
+
     async def _mock_task_execution(self, task: GoldenTask) -> Dict[str, Any]:
         """Mock task execution."""
         try:
@@ -152,8 +145,10 @@ class OrderManagementGoldenTasks:
         except Exception as e:
             logger.error("Mock task execution failed", error=str(e))
             return {}
-    
-    async def _run_assertions(self, task: GoldenTask, actual_output: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+    async def _run_assertions(
+        self, task: GoldenTask, actual_output: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Run assertions on task output."""
         try:
             results = []
@@ -164,19 +159,21 @@ class OrderManagementGoldenTasks:
         except Exception as e:
             logger.error("Assertion evaluation failed", error=str(e))
             return []
-    
-    async def _evaluate_assertion(self, assertion: Dict[str, Any], actual_output: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _evaluate_assertion(
+        self, assertion: Dict[str, Any], actual_output: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Evaluate a single assertion."""
         try:
-            assertion_type = assertion['type']
-            field = assertion['field']
-            expected_value = assertion['value']
-            
+            assertion_type = assertion["type"]
+            field = assertion["field"]
+            expected_value = assertion["value"]
+
             actual_value = self._get_nested_value(actual_output, field)
-            
+
             passed = False
             message = ""
-            
+
             if assertion_type == "equals":
                 passed = actual_value == expected_value
                 message = f"Expected {expected_value}, got {actual_value}"
@@ -189,31 +186,31 @@ class OrderManagementGoldenTasks:
             else:
                 passed = False
                 message = f"Unknown assertion type: {assertion_type}"
-            
+
             return {
-                'type': assertion_type,
-                'field': field,
-                'expected': expected_value,
-                'actual': actual_value,
-                'passed': passed,
-                'message': message
+                "type": assertion_type,
+                "field": field,
+                "expected": expected_value,
+                "actual": actual_value,
+                "passed": passed,
+                "message": message,
             }
-            
+
         except Exception as e:
             logger.error("Assertion evaluation failed", error=str(e))
             return {
-                'type': assertion['type'],
-                'field': assertion['field'],
-                'expected': assertion['value'],
-                'actual': None,
-                'passed': False,
-                'message': f"Assertion error: {str(e)}"
+                "type": assertion["type"],
+                "field": assertion["field"],
+                "expected": assertion["value"],
+                "actual": None,
+                "passed": False,
+                "message": f"Assertion error: {str(e)}",
             }
-    
+
     def _get_nested_value(self, data: Dict[str, Any], field: str) -> Any:
         """Get nested value from dictionary."""
         try:
-            keys = field.split('.')
+            keys = field.split(".")
             value = data
             for key in keys:
                 if isinstance(value, dict) and key in value:
@@ -223,11 +220,11 @@ class OrderManagementGoldenTasks:
             return value
         except Exception:
             return None
-    
+
     async def get_all_tasks(self) -> List[GoldenTask]:
         """Get all golden tasks."""
         return self.tasks
-    
+
     async def run_all_tasks(self) -> List[TaskResult]:
         """Run all golden tasks."""
         try:

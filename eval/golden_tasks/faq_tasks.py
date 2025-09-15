@@ -8,6 +8,7 @@ from uuid import UUID
 @dataclass
 class GoldenTask:
     """Golden task definition."""
+
     task_id: str
     category: str
     input_text: str
@@ -28,11 +29,7 @@ FAQ_TASKS = [
         expected_intent="business_hours",
         expected_confidence=0.9,
         expected_tools=["knowledge_base_tool"],
-        metadata={
-            "difficulty": "easy",
-            "domain": "general",
-            "expected_tier": "SLM_A"
-        }
+        metadata={"difficulty": "easy", "domain": "general", "expected_tier": "SLM_A"},
     ),
     GoldenTask(
         task_id="faq_002",
@@ -42,11 +39,7 @@ FAQ_TASKS = [
         expected_intent="password_reset",
         expected_confidence=0.95,
         expected_tools=["knowledge_base_tool"],
-        metadata={
-            "difficulty": "easy",
-            "domain": "account",
-            "expected_tier": "SLM_A"
-        }
+        metadata={"difficulty": "easy", "domain": "account", "expected_tier": "SLM_A"},
     ),
     GoldenTask(
         task_id="faq_003",
@@ -56,11 +49,7 @@ FAQ_TASKS = [
         expected_intent="refund_policy",
         expected_confidence=0.9,
         expected_tools=["knowledge_base_tool"],
-        metadata={
-            "difficulty": "easy",
-            "domain": "billing",
-            "expected_tier": "SLM_A"
-        }
+        metadata={"difficulty": "easy", "domain": "billing", "expected_tier": "SLM_A"},
     ),
     GoldenTask(
         task_id="faq_004",
@@ -73,8 +62,8 @@ FAQ_TASKS = [
         metadata={
             "difficulty": "medium",
             "domain": "technical",
-            "expected_tier": "SLM_B"
-        }
+            "expected_tier": "SLM_B",
+        },
     ),
     GoldenTask(
         task_id="faq_005",
@@ -87,9 +76,9 @@ FAQ_TASKS = [
         metadata={
             "difficulty": "medium",
             "domain": "security",
-            "expected_tier": "SLM_B"
-        }
-    )
+            "expected_tier": "SLM_B",
+        },
+    ),
 ]
 
 
