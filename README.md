@@ -253,6 +253,7 @@ cd multi-ai-agent
 ### **📚 Documentation**
 
 - **[📖 Complete Documentation](docs/README.md)** - Comprehensive documentation index with organized structure
+- **[🎯 Platform Features](docs/FEATURES.md)** - Complete features documentation with capabilities overview
 - **[🏗️ Architecture](docs/architecture/)** - System design, patterns, and topology
 - **[🚀 Deployment](docs/deployment/)** - Deployment guides and CI/CD pipeline
 - **[💻 Development](docs/development/)** - Development guides and workflows

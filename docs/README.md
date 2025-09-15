@@ -4,6 +4,11 @@ Welcome to the comprehensive documentation for the Multi-Tenant AIaaS Platform -
 
 ## 📚 **Documentation Structure**
 
+### **🎯 Platform Features**
+Complete features and capabilities documentation:
+
+- **[Complete Features Documentation](FEATURES.md)** - Comprehensive overview of all platform features, capabilities, and use cases
+
 ### **🏗️ Architecture**
 Core system architecture and design documentation:
 
