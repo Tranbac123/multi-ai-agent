@@ -1,0 +1,133 @@
+# Pre-commit hooks configuration for code quality enforcement
+repos:
+  # Black - Python code formatter
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: [--line-length=100]
+
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # MyPy - Static type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-all]
+        args: [--ignore-missing-imports, --strict]
+
+  # isort - Import sorter
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=100]
+
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File checks
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+
+      # Python checks
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-docstring-first
+
+      # Security checks
+      - id: detect-private-key
+
+      # Git checks
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Security scanning with Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-r, ., -f, json, -o, reports/security/bandit-report.json]
+        exclude: ^tests/
+
+  # Pytest - Run tests on commit
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest-unit
+        entry: pytest
+        args: [tests/unit/, -v, --tb=short]
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # Custom hooks
+  - repo: local
+    hooks:
+      # Check for TODO/FIXME comments
+      - id: check-todos
+        name: Check for TODO/FIXME
+        entry: bash
+        args:
+          [-c, 'grep -r "TODO\|FIXME" --include="*.py" . && exit 1 || exit 0']
+        language: system
+        exclude: ^tests/
+
+      # Check for hardcoded secrets
+      - id: check-secrets
+        name: Check for hardcoded secrets
+        entry: bash
+        args:
+          [
+            -c,
+            'grep -r "password\|secret\|key\|token" --include="*.py" . | grep -v "test" && exit 1 || exit 0',
+          ]
+        language: system
+        exclude: ^tests/
+
+      # Check test coverage threshold
+      - id: check-coverage
+        name: Check test coverage
+        entry: bash
+        args: [-c, "python -m pytest tests/unit/ --cov=. --cov-fail-under=80"]
+        language: system
+        pass_filenames: false
+
+  # Documentation checks
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args: [--convention=google]
+
+  # License header check
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: insert-license
+        args: [--license-filepath=LICENSE_HEADER.txt]
+        exclude: ^tests/
+
+# Configuration
+default_language_version:
+  python: python3.11
+
+# Minimum pre-commit version
+minimum_pre_commit_version: 3.0.0

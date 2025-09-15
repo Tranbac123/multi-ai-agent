@@ -70,6 +70,19 @@ class PaymentAdapter(BaseAdapter):
     async def process_payment(self, request: PaymentRequest) -> PaymentResult:
         """Process payment with reliability patterns."""
         async def _payment_operation():
+            # Validate payment request
+            if request.amount <= 0:
+                payment_id = f"pay_{int(time.time() * 1000)}"
+                return PaymentResult(
+                    payment_id=payment_id,
+                    status=PaymentStatus.FAILED,
+                    amount=request.amount,
+                    currency=request.currency,
+                    customer_id=request.customer_id,
+                    processed_at=time.time(),
+                    error_message="Invalid amount: must be greater than 0"
+                )
+            
             # Simulate payment processing
             await asyncio.sleep(0.2)  # Simulate payment gateway delay
             

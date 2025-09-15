@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from libs.clients.database_rls import TenantAwareDatabaseClient, initialize_database_client
-from data_plane.migrations.005_multi_tenant_rls import upgrade, downgrade
+from data_plane.migrations.migration_005_multi_tenant_rls import upgrade, downgrade
 
 
 class TestRLSIsolation:

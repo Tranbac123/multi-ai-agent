@@ -11,7 +11,7 @@ def success_response(data: Any, message: str = "Success") -> dict:
         "success": True,
         "message": message,
         "data": data,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -25,8 +25,8 @@ def error_response(error_spec: ErrorSpec, trace_id: Optional[str] = None) -> dic
             "retriable": error_spec.retriable,
             "diagnostics": error_spec.diagnostics,
             "context": error_spec.context,
-            "created_at": error_spec.created_at.isoformat()
+            "created_at": error_spec.created_at.isoformat(),
         },
         "trace_id": trace_id,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }

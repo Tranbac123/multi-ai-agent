@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/realtime/core/connection_manager.py
+# hypothesis_version: 6.138.15
+
+[3600, 'Broadcast to tenant', 'Broadcast to user', 'Session not found', 'active_connections', 'connected_at', 'last_activity', 'ping', 'session_id', 'tenant_connections', 'tenant_id', 'total_tenants', 'total_users', 'type', 'user_connections', 'user_id']

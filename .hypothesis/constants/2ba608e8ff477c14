@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/eval/golden_tasks/order_management.py
+# hypothesis_version: 6.138.15
+
+[0.1, 99.99, 199.98, 299.97, 1000, '.', 'Create Order', 'Product A', 'Update Order', 'actual', 'completed', 'contains', 'context', 'created', 'equals', 'expected', 'failed', 'field', 'greater_than', 'items', 'message', 'new_quantity', 'order_', 'order_001', 'order_002', 'order_12345', 'order_id', 'passed', 'pending', 'price', 'product', 'quantity', 'running', 'status', 'tenant_001', 'tenant_id', 'timeout', 'total_amount', 'type', 'updated', 'user_001', 'user_id', 'value']

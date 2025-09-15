@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/infra/k8s/health/health_checker.py
+# hypothesis_version: 6.138.15
+
+[0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 150, 1000, 3600, '-liveness', '-readiness', '/api/v1/chat', '/api/v1/websocket', '/billing', '/dashboard', '/health', '/kpi', '/outcome', '/route', '/tools', '/usage', '/websocket', '/workflow', 'API Gateway is alive', 'API Gateway is ready', 'Health check failed', 'analytics-service', 'api-gateway', 'api-gateway-liveness', 'billing-service', 'cpu_usage', 'database', 'degraded', 'dependencies', 'details', 'endpoints', 'error', 'healthy', 'liveness', 'memory_usage', 'message', 'name', 'nats', 'orchestrator', 'readiness', 'realtime', 'realtime-liveness', 'realtime-readiness', 'redis', 'response_time_ms', 'router-service', 'services', 'status', 'timestamp', 'total_checks', 'unhealthy', 'unknown', 'uptime']

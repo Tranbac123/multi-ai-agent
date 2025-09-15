@@ -59,7 +59,7 @@ class SecurityAuditor:
             details={
                 "action": action,
                 "resource": resource,
-                **details or {}
+                **details
             }
         )
     

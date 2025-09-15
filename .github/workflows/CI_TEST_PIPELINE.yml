@@ -1,0 +1,386 @@
+name: CI Test Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.11"
+  TEST_MODE: "MOCK"
+  TEST_SEED: "42"
+  TEST_TIMEOUT: "300"
+
+jobs:
+  # Stage 1: Fast Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+
+      - name: Run unit tests
+        run: |
+          make test-unit TEST_MODE=MOCK
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+
+  # Stage 2: Contract & Integration Tests
+  contract-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: unit-tests
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      nats:
+        image: nats:2.9
+        options: >-
+          --health-cmd "nats server check jetstream"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run contract tests
+        run: |
+          make test-contract TEST_MODE=GOLDEN
+
+      - name: Run integration tests
+        run: |
+          make test-integration TEST_MODE=GOLDEN
+
+  # Stage 3: Security & RAG Tests
+  security-rag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: contract-integration
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install bandit safety
+
+      - name: Run security tests
+        run: |
+          make test-security TEST_MODE=LIVE_SMOKE
+
+      - name: Run RAG tests
+        run: |
+          make test-rag TEST_MODE=LIVE_SMOKE
+
+      - name: Security scan
+        run: |
+          bandit -r . -f json -o bandit-report.json
+          safety check --json --output safety-report.json
+
+  # Stage 4: E2E Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: security-rag
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Start test stack
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30
+
+      - name: Run E2E tests
+        run: |
+          make test-e2e TEST_MODE=LIVE_SMOKE
+
+      - name: Stop test stack
+        run: |
+          docker-compose -f docker-compose.test.yml down
+
+  # Stage 5: Performance Tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: e2e-tests
+    if: github.event_name == 'push' || contains(github.event.head_commit.message, '[perf]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install locust
+
+      - name: Start test stack
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30
+
+      - name: Run performance tests
+        run: |
+          make perf TEST_MODE=LIVE_SMOKE
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-reports
+          path: |
+            perf/reports/
+            perf/baselines/
+
+      - name: Stop test stack
+        run: |
+          docker-compose -f docker-compose.test.yml down
+
+  # Stage 6: Observability Tests
+  observability-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: e2e-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run observability tests
+        run: |
+          make test-observability TEST_MODE=LIVE_SMOKE
+
+  # Stage 7: Adversarial Tests
+  adversarial-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: observability-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run adversarial tests
+        run: |
+          make test-adversarial TEST_MODE=MOCK
+
+  # Stage 8: Quality Gates
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      [
+        unit-tests,
+        contract-integration,
+        security-rag,
+        e2e-tests,
+        observability-tests,
+        adversarial-tests,
+      ]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run quality gates
+        run: |
+          make quality-gates
+
+      - name: Check test results
+        run: |
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Contract/Integration: ${{ needs.contract-integration.result }}"
+          echo "Security/RAG: ${{ needs.security-rag.result }}"
+          echo "E2E Tests: ${{ needs.e2e-tests.result }}"
+          echo "Observability: ${{ needs.observability-tests.result }}"
+          echo "Adversarial: ${{ needs.adversarial-tests.result }}"
+
+          # Fail if any required tests failed
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.contract-integration.result }}" != "success" ]] || \
+             [[ "${{ needs.security-rag.result }}" != "success" ]] || \
+             [[ "${{ needs.e2e-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.observability-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.adversarial-tests.result }}" != "success" ]]; then
+            echo "One or more test stages failed"
+            exit 1
+          fi
+
+  # Path-based Test Selection
+  test-impact-analysis:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run test impact analysis
+        run: |
+          make test-impact CHANGED_FILES="${{ github.event.pull_request.head.sha }}"
+
+      - name: Comment PR with test results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const testResults = fs.readFileSync('test-impact-results.json', 'utf8');
+            const results = JSON.parse(testResults);
+
+            const comment = `## Test Impact Analysis
+
+            **Changed Files**: ${results.changed_files.length}
+            **Affected Test Suites**: ${results.affected_suites.length}
+            **Estimated Runtime**: ${results.estimated_runtime}s
+
+            ### Affected Suites:
+            ${results.affected_suites.map(suite => `- ${suite}`).join('\n')}
+
+            ### Recommended Tests:
+            ${results.recommended_tests.map(test => `- ${test}`).join('\n')}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Artifacts Collection
+  collect-artifacts:
+    runs-on: ubuntu-latest
+    needs: [quality-gates]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Collect test artifacts
+        run: |
+          mkdir -p artifacts
+
+          # Collect coverage reports
+          if [ -f coverage.xml ]; then
+            cp coverage.xml artifacts/
+          fi
+
+          # Collect security reports
+          if [ -f bandit-report.json ]; then
+            cp bandit-report.json artifacts/
+          fi
+
+          if [ -f safety-report.json ]; then
+            cp safety-report.json artifacts/
+          fi
+
+          # Collect performance reports
+          if [ -d perf/reports ]; then
+            cp -r perf/reports artifacts/
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-artifacts-${{ github.run_number }}
+          path: artifacts/
+          retention-days: 30

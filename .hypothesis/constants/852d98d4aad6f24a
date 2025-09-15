@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/services/tools/payment_adapter.py
+# hypothesis_version: 6.138.15
+
+[0.15, 0.2, 0.95, 2000, 7200, 45000, 120000, 'Payment failed', 'Payment refunded', 'cancelled', 'completed', 'failed', 'failed_payments', 'gateway', 'payment_adapter', 'payment_gateway', 'pending', 'processing', 'refunded', 'refunded_payments', 'successful_payments', 'unknown']

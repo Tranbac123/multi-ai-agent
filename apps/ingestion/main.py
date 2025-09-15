@@ -32,7 +32,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -49,16 +49,16 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     logger.info("Starting Ingestion Service")
-    
+
     # Initialize services
     app.state.document_processor = DocumentProcessor()
     app.state.embedding_service = EmbeddingService()
     app.state.vector_indexer = VectorIndexer()
     app.state.event_bus = EventBus()
     app.state.event_producer = EventProducer(app.state.event_bus)
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Ingestion Service")
 
@@ -69,9 +69,9 @@ def create_app() -> FastAPI:
         title="Ingestion Service",
         version="2.0.0",
         description="Document processing and knowledge indexing service",
-        lifespan=lifespan
+        lifespan=lifespan,
     )
-    
+
     # Add middleware
     app.add_middleware(
         CORSMiddleware,
@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     return app
 
 
@@ -98,23 +98,23 @@ async def health_check():
 async def ingest_document(
     file: UploadFile = File(...),
     tenant_id: UUID = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Ingest document for processing."""
     try:
         # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
-        
+
         # Read file content
         content = await file.read()
-        
+
         # Process document
         doc_id = str(uuid4())
         result = await app.state.document_processor.process_document(
             doc_id, file.filename, content, tenant_id, db
         )
-        
+
         # Publish ingestion event
         await app.state.event_producer.publish(
             "ingest.doc.requested",
@@ -123,12 +123,12 @@ async def ingest_document(
                 "tenant_id": str(tenant_id),
                 "filename": file.filename,
                 "size": len(content),
-                "timestamp": time.time()
-            }
+                "timestamp": time.time(),
+            },
         )
-        
+
         return success_response(data=result)
-        
+
     except Exception as e:
         logger.error("Document ingestion failed", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to ingest document")
@@ -138,7 +138,7 @@ async def ingest_document(
 async def ingest_url(
     url: str,
     tenant_id: UUID = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Ingest content from URL."""
     try:
@@ -146,7 +146,7 @@ async def ingest_url(
         result = await app.state.document_processor.process_url(
             doc_id, url, tenant_id, db
         )
-        
+
         # Publish ingestion event
         await app.state.event_producer.publish(
             "ingest.doc.requested",
@@ -154,12 +154,12 @@ async def ingest_url(
                 "doc_id": doc_id,
                 "tenant_id": str(tenant_id),
                 "url": url,
-                "timestamp": time.time()
-            }
+                "timestamp": time.time(),
+            },
         )
-        
+
         return success_response(data=result)
-        
+
     except Exception as e:
         logger.error("URL ingestion failed", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to ingest URL")
@@ -170,7 +170,7 @@ async def get_documents(
     tenant_id: UUID,
     limit: int = 10,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Get documents for tenant."""
     try:
@@ -178,7 +178,7 @@ async def get_documents(
             tenant_id, limit, offset, db
         )
         return success_response(data=documents)
-        
+
     except Exception as e:
         logger.error("Failed to get documents", tenant_id=tenant_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to get documents")
@@ -188,22 +188,17 @@ async def get_documents(
 async def delete_document(
     doc_id: str,
     tenant_id: UUID = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Delete document."""
     try:
         await app.state.document_processor.delete_document(doc_id, tenant_id, db)
         return success_response(data={"status": "deleted"})
-        
+
     except Exception as e:
         logger.error("Failed to delete document", doc_id=doc_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to delete document")
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "apps.ingestion.main:app",
-        host="0.0.0.0",
-        port=8004,
-        reload=True
-    )
+    uvicorn.run("apps.ingestion.main:app", host="0.0.0.0", port=8004, reload=True)

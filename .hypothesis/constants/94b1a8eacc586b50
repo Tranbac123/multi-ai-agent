@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/observability/slo/slo_monitor.py
+# hypothesis_version: 6.138.15
+
+[0.0, 0.005, 0.01, 0.03, 0.05, 0.1, 0.5, 0.95, 0.96, 0.999, 0.9992, 0.9995, 0.9996, 0.9997, 0.9998, 0.9999, 1.0, 45.0, 50.0, 85.0, 100.0, 450.0, 500.0, 800.0, 1000.0, 86400, '30d', 'analytics-service', 'api-gateway', 'availability', 'billing-service', 'burn_rate', 'critical', 'current_value', 'decision_latency_p50', 'error', 'healthy', 'invoice_accuracy', 'message', 'metric', 'misroute_rate', 'orchestrator', 'p50_latency', 'p95_latency', 'query_latency_p95', 'realtime', 'router-service', 'service', 'services', 'status', 'target_value', 'timestamp', 'total_slos', 'unknown', 'warning']

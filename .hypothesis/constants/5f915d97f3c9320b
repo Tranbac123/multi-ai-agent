@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/libs/utils/exceptions.py
+# hypothesis_version: 6.138.15
+
+[401, 403, 422, 500, 'AUTHORIZATION_FAILED', 'Authorization failed', 'VALIDATION_FAIL', 'field']

@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/services/tools/base_adapter.py
+# hypothesis_version: 6.138.15
+
+[0.75, 1.25, 1000.0, 1000, 3600, 30000, 60000, 'Adapter call failed', 'Compensation failed', 'T', '__name__', 'adapter_name', 'args', 'bulkhead_rejections', 'closed', 'error', 'event', 'event_type', 'failed', 'failed_requests', 'half_open', 'idempotency_key', 'kwargs', 'name', 'open', 'operation', 'operation_name', 'pending', 'requested', 'result', 'retry_attempts', 'status', 'succeeded', 'success_rate', 'successful_requests', 'timeout_requests', 'timestamp', 'tool.call.succeeded', 'total_requests']

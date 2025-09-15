@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/router_service/core/early_exit_escalation.py
+# hypothesis_version: 6.138.15
+
+[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 100, 150, 86400, 'all_reasons', 'billing', 'can_exit', 'complexity_threshold', 'confidence', 'confidence_threshold', 'customer_support', 'enterprise', 'enterprise_complex', 'error', 'escalated_tier', 'escalation_reasons', 'high_risk', 'latency', 'low_confidence', 'max_complexity', 'max_token_count', 'min_strictness', 'no_data', 'novel_request', 'novelty_threshold', 'original_tier', 'reason', 'require_validation', 'risk_threshold', 'sales', 'should_escalate', 'success', 'success_rate', 'target_tier', 'technical', 'tenant_id', 'tier', 'timestamp', 'total_escalations', 'true']

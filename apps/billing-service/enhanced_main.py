@@ -12,10 +12,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
-from apps.billing-service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
-from apps.billing-service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus
-from apps.billing-service.core.webhook_aggregator import WebhookAggregator, WebhookEvent, WebhookEventType
-from apps.billing-service.core.invoice_preview import InvoicePreviewService, InvoicePreview, QuotaStatus
+from apps.billing_service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
+from apps.billing_service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus
+from apps.billing_service.core.webhook_aggregator import WebhookAggregator, WebhookEvent, WebhookEventType
+from apps.billing_service.core.invoice_preview import InvoicePreviewService, InvoicePreview, QuotaStatus
 
 logger = structlog.get_logger(__name__)
 

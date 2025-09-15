@@ -14,7 +14,7 @@ logger = structlog.get_logger(__name__)
 
 class DatabaseClient:
     """Database client with tenant isolation support."""
-    
+
     def __init__(self, database_url: str):
         self.database_url = database_url
         self.engine = create_async_engine(
@@ -24,13 +24,13 @@ class DatabaseClient:
             pool_recycle=300,
         )
         self.session_factory = async_sessionmaker(
-            self.engine, 
-            expire_on_commit=False,
-            class_=AsyncSession
+            self.engine, expire_on_commit=False, class_=AsyncSession
         )
-    
+
     @asynccontextmanager
-    async def get_session(self, tenant_id: Optional[UUID] = None) -> AsyncGenerator[AsyncSession, None]:
+    async def get_session(
+        self, tenant_id: Optional[UUID] = None
+    ) -> AsyncGenerator[AsyncSession, None]:
         """Get database session with optional tenant isolation."""
         async with self.session_factory() as session:
             try:
@@ -38,20 +38,22 @@ class DatabaseClient:
                     # Set tenant context for RLS
                     await session.execute(
                         text("SELECT set_tenant_context(:tenant_id)"),
-                        {"tenant_id": str(tenant_id)}
+                        {"tenant_id": str(tenant_id)},
                     )
                     logger.debug("Tenant context set", tenant_id=tenant_id)
-                
+
                 yield session
                 await session.commit()
-                
+
             except Exception as e:
                 await session.rollback()
-                logger.error("Database session error", tenant_id=tenant_id, error=str(e))
+                logger.error(
+                    "Database session error", tenant_id=tenant_id, error=str(e)
+                )
                 raise
             finally:
                 await session.close()
-    
+
     async def close(self):
         """Close database engine."""
         await self.engine.dispose()
@@ -69,11 +71,15 @@ def initialize_database(database_url: str):
 
 
 @asynccontextmanager
-async def get_db_session(tenant_id: Optional[UUID] = None) -> AsyncGenerator[AsyncSession, None]:
+async def get_db_session(
+    tenant_id: Optional[UUID] = None,
+) -> AsyncGenerator[AsyncSession, None]:
     """Get database session with tenant isolation."""
     if _db_client is None:
-        raise RuntimeError("Database client not initialized. Call initialize_database() first.")
-    
+        raise RuntimeError(
+            "Database client not initialized. Call initialize_database() first."
+        )
+
     async with _db_client.get_session(tenant_id) as session:
         yield session
 
@@ -88,21 +94,21 @@ async def get_db_session_dependency() -> AsyncGenerator[AsyncSession, None]:
 
 class TenantContextMiddleware:
     """Middleware to set tenant context in database sessions."""
-    
+
     def __init__(self, app):
         self.app = app
-    
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             # Extract tenant_id from request headers or JWT
             tenant_id = self._extract_tenant_id(scope)
-            
+
             # Add tenant_id to request state
             scope["state"] = scope.get("state", {})
             scope["state"]["tenant_id"] = tenant_id
-        
+
         await self.app(scope, receive, send)
-    
+
     def _extract_tenant_id(self, scope) -> Optional[UUID]:
         """Extract tenant_id from request headers or JWT."""
         # This would typically extract from JWT token or header

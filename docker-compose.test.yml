@@ -1,140 +1,143 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16
+  # PostgreSQL database for testing
+  postgres-test:
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: test_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - test-network
 
-  redis:
-    image: redis:7
+  # Redis cache for testing
+  redis-test:
+    image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - test-network
 
-  nats:
-    image: nats:2.9
-    command: ["--jetstream"]
+  # NATS message bus for testing
+  nats-test:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"]
     ports:
-      - "4222:4222"
+      - "4223:4222"  # NATS client port
+      - "8223:8222"  # NATS monitoring port
+    volumes:
+      - nats_test_data:/data
     healthcheck:
-      test: ["CMD", "nats", "server", "check", "jetstream"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8222/varz"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - test-network
 
-  api-gateway:
-    build:
-      context: .
-      dockerfile: apps/api-gateway/Dockerfile
+  # Vector database for RAG testing (using Qdrant)
+  qdrant-test:
+    image: qdrant/qdrant:v1.7.3
     ports:
-      - "8000:8000"
+      - "6334:6333"  # Qdrant REST API
+      - "6335:6334"  # Qdrant gRPC API
+    volumes:
+      - qdrant_test_data:/qdrant/storage
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
 
-  orchestrator:
+  # Test runner service
+  test-runner:
     build:
       context: .
-      dockerfile: apps/orchestrator/Dockerfile
+      dockerfile: Dockerfile.test
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      TEST_MODE: ${TEST_MODE:-MOCK}
+      TEST_DATABASE_URL: postgresql://test_user:test_password@postgres-test:5432/test_db
+      TEST_REDIS_URL: redis://redis-test:6379/0
+      TEST_NATS_URL: nats://nats-test:4222
+      TEST_QDRANT_URL: http://qdrant-test:6333
+      TEST_TEMPERATURE: ${TEST_TEMPERATURE:-0.0}
+      TEST_SEED: ${TEST_SEED:-42}
+      PYTHONPATH: /app
+    volumes:
+      - .:/app
+      - test_results:/app/test-results
+      - test_fixtures:/app/tests/_fixtures
     depends_on:
-      postgres:
+      postgres-test:
         condition: service_healthy
-      redis:
+      redis-test:
         condition: service_healthy
-      nats:
+      nats-test:
         condition: service_healthy
+      qdrant-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - test
 
-  router-service:
-    build:
-      context: .
-      dockerfile: apps/router-service/Dockerfile
+  # Performance testing with Locust
+  locust-test:
+    image: locustio/locust:2.17.0
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests/performance:/mnt/locust
+    command: ["-f", "/mnt/locust/locustfile.py", "--host", "http://api-gateway:8000"]
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      LOCUST_WEB_HOST: "0.0.0.0"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
+      - test-runner
+    networks:
+      - test-network
+    profiles:
+      - performance
 
-  realtime:
-    build:
-      context: .
-      dockerfile: apps/realtime/Dockerfile
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  nats_test_data:
+    driver: local
+  qdrant_test_data:
+    driver: local
+  test_results:
+    driver: local
+  test_fixtures:
+    driver: local
 
-  ingestion:
-    build:
-      context: .
-      dockerfile: apps/ingestion/Dockerfile
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
-
-  billing-service:
-    build:
-      context: .
-      dockerfile: apps/billing-service/Dockerfile
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

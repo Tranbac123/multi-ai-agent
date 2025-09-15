@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    postgresql-client \
+    redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements files
+COPY requirements.txt requirements-ci.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-ci.txt
+
+# Copy test configuration
+COPY pytest.ini ./
+
+# Copy application code
+COPY . .
+
+# Create test directories
+RUN mkdir -p /app/test-results
+RUN mkdir -p /app/tests/_fixtures/cassettes
+RUN mkdir -p /app/tests/_fixtures/golden
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV TEST_MODE=MOCK
+
+# Default command for running tests
+CMD ["pytest", "tests/", "-v", "--tb=short", "--junitxml=/app/test-results/junit.xml"]

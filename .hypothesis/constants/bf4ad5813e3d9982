@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/realtime/core/backpressure_handler.py
+# hypothesis_version: 6.138.15
+
+[0.001, 1000, 3600, 9999, 'active_connections', 'active_queues', 'backpressure_events', 'details', 'drop_policy', 'event_type', 'event_types', 'events_per_minute', 'final', 'intermediate', 'max_queue_size', 'message', 'messages_dropped', 'messages_sent', 'newest', 'oldest', 'ping', 'queue_overflows', 'redis_queues', 'session_id', 'tenant_events', 'tenant_id', 'time_window_seconds', 'timestamp', 'total_events', 'total_redis_messages', 'total_redis_queues', 'type', 'unknown', 'ws_queue:*', 'ws_send_errors']

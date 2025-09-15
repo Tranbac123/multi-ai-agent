@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/router_service/core/bandit_policy.py
+# hypothesis_version: 6.138.15
+
+[0.0, 0.1, 0.5, 1.0, 2.0, 86400, '-inf', 'Arm updated', 'Arms reset', 'Failed to reset arms', 'Failed to select arm', 'Failed to update arm', 'arms', 'confidence_level', 'config', 'costs', 'error', 'error_rate', 'errors', 'expected_cost', 'expected_reward', 'expected_value', 'exploitation', 'exploration_rate', 'fallback', 'insufficient_data', 'lambda_error', 'last_updated', 'pulls', 'random_exploration', 'reason', 'rewards', 'strategy', 'tenant_id', 'tier', 'total_pulls', 'total_selections', 'ucb_exploration', 'ucb_value']

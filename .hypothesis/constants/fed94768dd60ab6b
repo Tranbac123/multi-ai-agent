@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/infra/k8s/autoscaling/keda_scalers.py
+# hypothesis_version: 6.138.15
+
+[0.0, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 20.0, 300, 'Scaler initialized', 'cooldown', 'cpu', 'current_replicas', 'current_value', 'custom', 'error', 'ingestion-nats', 'last_scaled', 'max_replicas', 'max_replicas_reached', 'memory', 'min_replicas', 'min_replicas_reached', 'nats_queue', 'none', 'orchestrator-nats', 'prometheus', 'realtime-cpu', 'redis_queue', 'router-service-cpu', 'scale_decision', 'scale_decisions', 'scale_down', 'scale_up', 'scaler_name', 'scaler_type', 'scalers', 'target_value', 'total_scalers']

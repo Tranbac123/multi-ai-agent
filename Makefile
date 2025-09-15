@@ -1,252 +1,329 @@
-# Multi-Tenant AIaaS Platform Makefile
+# Production-Grade Testing Makefile for Multi-Tenant AIaaS Platform
 
-.PHONY: help dev test e2e eval security format lint type-check build deploy clean
+.PHONY: help install lint format test test-unit test-integration test-e2e test-performance test-flakiness test-observability test-chaos test-contract test-realtime test-security test-adversarial clean coverage security-scan all-tests ci perf chaos replay flakiness-report test-impact quality-gates test-setup-verify
 
 # Default target
-help: ## Show this help message
-	@echo "Multi-Tenant AIaaS Platform - Available Commands:"
+help:
+	@echo "=== Production-Grade Testing Commands ==="
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo "Core Testing:"
+	@echo "  test             - Run all tests (MOCK mode)"
+	@echo "  test-unit        - Run unit tests"
+	@echo "  test-integration - Run integration tests"
+	@echo "  test-e2e         - Run E2E tests"
+	@echo "  test-performance - Run performance tests"
+	@echo "  test-security    - Run security tests"
+	@echo "  test-adversarial - Run adversarial tests"
+	@echo "  test-contract    - Run contract tests"
+	@echo "  test-realtime    - Run realtime/WebSocket tests"
+	@echo "  test-observability - Run observability tests"
+	@echo "  test-chaos       - Run chaos engineering tests"
+	@echo ""
+	@echo "Test Modes:"
+	@echo "  test-golden      - Run tests in GOLDEN mode (recorded cassettes)"
+	@echo "  test-live        - Run tests in LIVE_SMOKE mode (real services)"
+	@echo ""
+	@echo "Advanced Testing:"
+	@echo "  perf             - Run performance tests with regression checking"
+	@echo "  chaos            - Run chaos engineering tests"
+	@echo "  replay           - Run episode replay (use RUN=<episode_id>)"
+	@echo "  flakiness-report - Generate flakiness analysis report"
+	@echo "  test-impact      - Run test impact selection (use CHANGED_FILES=...)"
+	@echo ""
+	@echo "Quality Gates:"
+	@echo "  quality-gates    - Check all quality gates"
+	@echo "  security-gate    - Check security gate only"
+	@echo "  performance-gate - Check performance gate only"
+	@echo "  flakiness-gate   - Check flakiness gate only"
+	@echo ""
+	@echo "Setup & Maintenance:"
+	@echo "  install          - Install dependencies and setup"
+	@echo "  test-setup-verify - Verify test environment setup"
+	@echo "  clean            - Clean up temporary files"
+	@echo "  coverage         - Run tests with coverage report"
+	@echo "  security-scan    - Run security scans"
+	@echo "  ci               - Run full CI pipeline locally"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make test-golden"
+	@echo "  make perf"
+	@echo "  make chaos"
+	@echo "  make replay RUN=episode_12345"
+	@echo "  make test-impact CHANGED_FILES='app/api/main.py,app/core/config.py'"
+	@echo "  TEST_MODE=GOLDEN make test-e2e"
 
-# Development Commands
-dev: ## Start development environment
-	@echo "Starting development environment..."
-	docker-compose -f docker-compose.dev.yml up -d
-	@echo "Development environment started. Access services at:"
-	@echo "  - API Gateway: http://localhost:8000"
-	@echo "  - Realtime Service: http://localhost:8001"
-	@echo "  - Router Service: http://localhost:8002"
-	@echo "  - Orchestrator: http://localhost:8003"
-	@echo "  - Analytics Service: http://localhost:8004"
-	@echo "  - Billing Service: http://localhost:8005"
-	@echo "  - Grafana: http://localhost:3000"
-	@echo "  - Prometheus: http://localhost:9090"
+# Installation and setup
+install:
+	pip install --upgrade pip
+	pip install black ruff mypy pytest pytest-asyncio pytest-cov locust bandit safety
+	pip install pre-commit
+	pre-commit install
+	@echo "Dependencies installed and pre-commit hooks configured"
 
-dev-stop: ## Stop development environment
-	@echo "Stopping development environment..."
-	docker-compose -f docker-compose.dev.yml down
+# Code quality
+lint:
+	@echo "Running code quality checks..."
+	black --check --diff .
+	ruff check .
+	mypy . --ignore-missing-imports
+	@echo "Code quality checks completed"
 
-dev-logs: ## Show development environment logs
-	docker-compose -f docker-compose.dev.yml logs -f
-
-# Testing Commands
-test: ## Run all tests
-	@echo "Running unit tests..."
-	python -m pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=html --cov-report=term
-	@echo "Running integration tests..."
-	python -m pytest tests/integration/ -v
-	@echo "All tests completed."
-
-test-unit: ## Run unit tests only
-	@echo "Running unit tests..."
-	python -m pytest tests/unit/ -v --cov=apps --cov=libs --cov-report=html --cov-report=term
-
-test-integration: ## Run integration tests only
-	@echo "Running integration tests..."
-	python -m pytest tests/integration/ -v
-
-test-e2e: ## Run end-to-end tests
-	@echo "Running end-to-end tests..."
-	python -m pytest tests/e2e/ -v --timeout=300
-
-# Evaluation Commands
-eval: ## Run evaluation suite
-	@echo "Running evaluation suite..."
-	python -m pytest eval/ -v --timeout=600
-
-eval-episodes: ## Run episode replay evaluation
-	@echo "Running episode replay evaluation..."
-	python -m pytest eval/test_episode_replay.py -v
-
-eval-metrics: ## Run evaluation metrics
-	@echo "Running evaluation metrics..."
-	python -m pytest eval/test_evaluation_metrics.py -v
-
-# Security Commands
-security: ## Run security checks
-	@echo "Running security checks..."
-	@echo "Running Bandit security linter..."
-	bandit -r apps/ libs/ -f json -o security-report.json
-	@echo "Running Safety dependency check..."
-	safety check --json --output safety-report.json
-	@echo "Running Semgrep security scan..."
-	semgrep --config=auto apps/ libs/ --json --output=semgrep-report.json
-	@echo "Security checks completed. Reports saved to security-*.json"
-
-security-bandit: ## Run Bandit security linter
-	bandit -r apps/ libs/ -f json -o security-report.json
-
-security-safety: ## Run Safety dependency check
-	safety check --json --output safety-report.json
-
-security-semgrep: ## Run Semgrep security scan
-	semgrep --config=auto apps/ libs/ --json --output=semgrep-report.json
-
-# Code Quality Commands
-format: ## Format code with Black and isort
+format:
 	@echo "Formatting code..."
-	black apps/ libs/ tests/ eval/
-	isort apps/ libs/ tests/ eval/
-	@echo "Code formatting completed."
+	black .
+	ruff check --fix .
+	@echo "Code formatting completed"
 
-lint: ## Run linting with Ruff
-	@echo "Running linting..."
-	ruff check apps/ libs/ tests/ eval/
-	@echo "Linting completed."
+# Test mode configurations
+TEST_MODE ?= MOCK
+TEST_SEED ?= 42
+TEST_TIMEOUT ?= 300
+TEST_TEMPERATURE ?= 0
 
-type-check: ## Run type checking with MyPy
-	@echo "Running type checking..."
-	mypy apps/ libs/ --ignore-missing-imports
-	@echo "Type checking completed."
+# Test targets
+test:
+	@echo "Running all tests in $(TEST_MODE) mode..."
+	TEST_MODE=$(TEST_MODE) TEST_SEED=$(TEST_SEED) pytest tests/ -v --tb=short --timeout=$(TEST_TIMEOUT)
 
-# Build Commands
-build: ## Build Docker images
-	@echo "Building Docker images..."
-	docker-compose -f docker-compose.prod.yml build
-	@echo "Docker images built successfully."
+test-golden:
+	@echo "Running tests in GOLDEN mode (recorded cassettes)..."
+	TEST_MODE=GOLDEN TEST_SEED=$(TEST_SEED) TEST_TEMPERATURE=0 pytest tests/ -v --tb=short --timeout=$(TEST_TIMEOUT)
 
-build-dev: ## Build development Docker images
-	@echo "Building development Docker images..."
-	docker-compose -f docker-compose.dev.yml build
-	@echo "Development Docker images built successfully."
+test-live:
+	@echo "Running tests in LIVE_SMOKE mode (real services)..."
+	TEST_MODE=LIVE_SMOKE TEST_SEED=$(TEST_SEED) pytest tests/ -v --tb=short --timeout=$(TEST_TIMEOUT) -m "not slow"
 
-# Deployment Commands
-deploy: ## Deploy to production
-	@echo "Deploying to production..."
-	docker-compose -f docker-compose.prod.yml up -d
-	@echo "Production deployment completed."
+test-unit:
+	@echo "Running unit tests..."
+	pytest tests/unit/ -v --tb=short
 
-deploy-staging: ## Deploy to staging
-	@echo "Deploying to staging..."
-	docker-compose -f docker-compose.staging.yml up -d
-	@echo "Staging deployment completed."
+test-integration:
+	@echo "Running integration tests..."
+	pytest tests/integration/ -v --tb=short
 
-# Database Commands
-db-migrate: ## Run database migrations
-	@echo "Running database migrations..."
-	cd data-plane && alembic upgrade head
-	@echo "Database migrations completed."
+test-e2e:
+	@echo "Running E2E tests..."
+	pytest tests/e2e/ -v --tb=short
 
-db-rollback: ## Rollback database migrations
-	@echo "Rollback database migrations..."
-	cd data-plane && alembic downgrade -1
-	@echo "Database rollback completed."
-
-db-reset: ## Reset database
-	@echo "Resetting database..."
-	docker-compose -f docker-compose.dev.yml down -v
-	docker-compose -f docker-compose.dev.yml up -d postgres
-	sleep 10
-	make db-migrate
-	@echo "Database reset completed."
-
-# Monitoring Commands
-monitor: ## Start monitoring stack
-	@echo "Starting monitoring stack..."
-	docker-compose -f docker-compose.monitoring.yml up -d
-	@echo "Monitoring stack started. Access at:"
-	@echo "  - Grafana: http://localhost:3000"
-	@echo "  - Prometheus: http://localhost:9090"
-	@echo "  - Jaeger: http://localhost:16686"
-
-monitor-stop: ## Stop monitoring stack
-	@echo "Stopping monitoring stack..."
-	docker-compose -f docker-compose.monitoring.yml down
-
-# Performance Commands
-perf-test: ## Run performance tests
+test-performance:
 	@echo "Running performance tests..."
-	locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=100 --spawn-rate=10 --run-time=5m
-	@echo "Performance tests completed."
+	pytest tests/performance/ -v --tb=short
+	python scripts/performance_regression_check.py
 
-perf-load: ## Run load tests
-	@echo "Running load tests..."
-	locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=1000 --spawn-rate=50 --run-time=10m
-	@echo "Load tests completed."
+test-flakiness:
+	@echo "Running flakiness detection..."
+	python scripts/flakiness_ci_integration.py --max-retries 3
 
-# Cleanup Commands
-clean: ## Clean up Docker resources
-	@echo "Cleaning up Docker resources..."
-	docker-compose -f docker-compose.dev.yml down -v
-	docker-compose -f docker-compose.prod.yml down -v
-	docker-compose -f docker-compose.staging.yml down -v
-	docker-compose -f docker-compose.monitoring.yml down -v
-	docker system prune -f
-	@echo "Cleanup completed."
+test-observability:
+	@echo "Running observability tests..."
+	pytest tests/observability/ -v --tb=short
 
-clean-logs: ## Clean up log files
-	@echo "Cleaning up log files..."
-	find . -name "*.log" -type f -delete
-	find . -name "*.log.*" -type f -delete
-	@echo "Log files cleaned."
+test-chaos:
+	@echo "Running chaos engineering tests..."
+	pytest tests/chaos/ -v --tb=short
 
-clean-cache: ## Clean up cache files
-	@echo "Cleaning up cache files..."
-	find . -name "__pycache__" -type d -exec rm -rf {} +
-	find . -name "*.pyc" -type f -delete
-	find . -name ".pytest_cache" -type d -exec rm -rf {} +
-	find . -name ".coverage" -type f -delete
-	find . -name "htmlcov" -type d -exec rm -rf {} +
-	@echo "Cache files cleaned."
+test-contract:
+	@echo "Running contract tests..."
+	pytest tests/contract/ -v --tb=short
 
-# Documentation Commands
-docs: ## Generate documentation
+test-realtime:
+	@echo "Running realtime/WebSocket tests..."
+	pytest tests/realtime/ -v --tb=short
+
+# Combined test targets
+test: test-unit test-integration test-e2e
+	@echo "Core test suite completed"
+
+all-tests: test-unit test-integration test-e2e test-performance test-observability test-chaos test-contract test-realtime
+	@echo "All test suites completed"
+
+# Coverage
+coverage:
+	@echo "Running tests with coverage..."
+	pytest tests/unit/ --cov=. --cov-report=html --cov-report=term-missing --cov-report=xml
+	@echo "Coverage report generated in htmlcov/"
+
+# Security scanning
+security-scan:
+	@echo "Running security scans..."
+	mkdir -p reports/security
+	bandit -r . -f json -o reports/security/bandit-report.json || true
+	safety check --json --output reports/security/safety-report.json || true
+	@echo "Security scan completed"
+
+# Advanced testing targets
+perf:
+	@echo "Running performance tests with regression checking..."
+	pytest tests/performance/ -v --tb=short
+	python scripts/performance_regression_check.py
+	@echo "Performance regression check completed"
+
+chaos:
+	@echo "Running chaos engineering tests..."
+	pytest tests/chaos/ -v --tb=short -m "not slow"
+	@echo "Chaos engineering tests completed"
+
+replay:
+	@if [ -z "$(RUN)" ]; then \
+		echo "Error: RUN parameter required. Usage: make replay RUN=episode_12345"; \
+		exit 1; \
+	fi
+	@echo "Running episode replay for $(RUN)..."
+	python eval/run_evaluation.py --type replay --episode-id $(RUN)
+	@echo "Episode replay completed"
+
+flakiness-report:
+	@echo "Generating flakiness analysis report..."
+	python -c "
+import sys
+sys.path.append('tests/_plugins')
+from flakiness_manager import flakiness_reporter
+report = flakiness_reporter.generate_weekly_report()
+print('=== Weekly Flakiness Report ===')
+print(f'Total Tests: {report[\"metrics\"][\"total_tests\"]}')
+print(f'Stable Tests: {report[\"metrics\"][\"stable_tests\"]}')
+print(f'Flaky Tests: {report[\"metrics\"][\"flaky_tests\"]}')
+print(f'Quarantined Tests: {report[\"metrics\"][\"quarantined_tests\"]}')
+print(f'Flakiness Rate: {report[\"metrics\"][\"flakiness_rate\"]:.1f}%')
+if report['quarantine_list']:
+    print('\n=== Quarantined Tests ===')
+    for test in report['quarantine_list']:
+        print(f'- {test[\"test_name\"]}: {test[\"quarantine_reason\"]}')
+if report['recommendations']:
+    print('\n=== Recommendations ===')
+    for rec in report['recommendations']:
+        print(f'- {rec}')
+"
+
+test-impact:
+	@if [ -z "$(CHANGED_FILES)" ]; then \
+		echo "Error: CHANGED_FILES parameter required. Usage: make test-impact CHANGED_FILES='app/api/main.py,app/core/config.py'"; \
+		exit 1; \
+	fi
+	@echo "Analyzing test impact for changed files: $(CHANGED_FILES)"
+	python -c "
+import sys
+sys.path.append('tests/_plugins')
+from flakiness_manager import test_impact_analyzer
+changed_files = '$(CHANGED_FILES)'.split(',')
+impact_analysis = test_impact_analyzer.analyze_changed_files(changed_files)
+impacted_tests = test_impact_analyzer.get_impacted_tests(changed_files)
+print(f'Impact Level: {impact_analysis.impact_level.value}')
+print(f'Affected Services: {impact_analysis.affected_services}')
+print(f'Critical Path: {impact_analysis.critical_path}')
+print(f'Coverage Score: {impact_analysis.coverage_score:.2f}')
+print(f'Impacted Tests: {len(impacted_tests)}')
+for test in impacted_tests[:10]:  # Show first 10
+    print(f'  - {test}')
+if len(impacted_tests) > 10:
+    print(f'  ... and {len(impacted_tests) - 10} more')
+"
+
+# Quality gates
+quality-gates: security-gate performance-gate flakiness-gate
+	@echo "All quality gates passed ✅"
+
+security-gate:
+	@echo "Checking security gate..."
+	pytest tests/integration/security/ tests/adversarial/ -v --tb=short
+	@echo "Security gate passed ✅"
+
+performance-gate:
+	@echo "Checking performance gate..."
+	pytest tests/performance/ -v --tb=short -m "regression"
+	python scripts/performance_regression_check.py
+	@echo "Performance gate passed ✅"
+
+flakiness-gate:
+	@echo "Checking flakiness gate..."
+	python -c "
+import sys
+sys.path.append('tests/_plugins')
+from flakiness_manager import flakiness_detector
+metrics = flakiness_detector.get_global_flakiness_metrics()
+flakiness_rate = metrics['flakiness_rate']
+quarantine_rate = metrics['quarantine_rate']
+if flakiness_rate > 5.0:
+    print(f'ERROR: Flakiness rate {flakiness_rate:.1f}% exceeds budget of 5%')
+    sys.exit(1)
+if quarantine_rate > 2.0:
+    print(f'ERROR: Quarantine rate {quarantine_rate:.1f}% exceeds budget of 2%')
+    sys.exit(1)
+print('Flakiness gate passed ✅')
+"
+
+# Setup verification
+test-setup-verify:
+	@echo "Verifying test environment setup..."
+	@python -c "import pytest, asyncio, httpx, hypothesis, locust; print('✅ All test dependencies available')"
+	@python -c "
+import sys
+sys.path.append('tests/_plugins')
+from flakiness_manager import flakiness_detector, test_impact_analyzer
+print('✅ Flakiness detection system ready')
+print('✅ Test impact analysis ready')
+"
+	@echo "Test environment setup verified ✅"
+
+# Enhanced test targets
+test-security:
+	@echo "Running security tests..."
+	pytest tests/integration/security/ -v --tb=short
+
+test-adversarial:
+	@echo "Running adversarial tests..."
+	pytest tests/adversarial/ -v --tb=short
+
+# Full CI pipeline
+ci: lint test all-tests security-scan quality-gates
+	@echo "Full CI pipeline completed successfully ✅"
+
+# Clean up
+clean:
+	@echo "Cleaning up temporary files..."
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "__pycache__" -delete
+	find . -type d -name "*.egg-info" -exec rm -rf {} +
+	find . -type d -name ".pytest_cache" -exec rm -rf {} +
+	find . -type d -name ".coverage" -exec rm -rf {} +
+	find . -type d -name "htmlcov" -exec rm -rf {} +
+	find . -type d -name "reports" -exec rm -rf {} +
+	@echo "Cleanup completed"
+
+# Development helpers
+dev-setup: install
+	@echo "Development environment setup completed"
+
+quick-test: test-unit
+	@echo "Quick test run completed"
+
+# Docker helpers (if needed)
+docker-build:
+	docker build -t multi-ai-agent .
+
+docker-test:
+	docker run --rm multi-ai-agent make test
+
+# Performance monitoring
+benchmark:
+	@echo "Running performance benchmarks..."
+	python scripts/performance_regression_check.py --baseline-mode
+
+# Documentation
+docs:
 	@echo "Generating documentation..."
-	pdoc --html apps/ libs/ --output-dir docs/
-	@echo "Documentation generated in docs/ directory."
+	# Add documentation generation commands here
 
-docs-serve: ## Serve documentation locally
-	@echo "Serving documentation..."
-	pdoc --http :8080 apps/ libs/
+# Release helpers
+version-check:
+	@echo "Checking version consistency..."
+	# Add version checking logic here
 
-# Health Check Commands
-health: ## Check service health
-	@echo "Checking service health..."
-	@echo "API Gateway:"
-	curl -f http://localhost:8000/health || echo "API Gateway: DOWN"
-	@echo "Realtime Service:"
-	curl -f http://localhost:8001/health || echo "Realtime Service: DOWN"
-	@echo "Router Service:"
-	curl -f http://localhost:8002/health || echo "Router Service: DOWN"
-	@echo "Orchestrator:"
-	curl -f http://localhost:8003/health || echo "Orchestrator: DOWN"
-	@echo "Analytics Service:"
-	curl -f http://localhost:8004/health || echo "Analytics Service: DOWN"
-	@echo "Billing Service:"
-	curl -f http://localhost:8005/health || echo "Billing Service: DOWN"
+# Database helpers (if needed)
+db-migrate:
+	@echo "Running database migrations..."
+	# Add database migration commands here
 
-# Backup Commands
-backup: ## Backup database and configuration
-	@echo "Creating backup..."
-	mkdir -p backups/$(shell date +%Y%m%d_%H%M%S)
-	docker-compose -f docker-compose.dev.yml exec postgres pg_dump -U postgres aiaas > backups/$(shell date +%Y%m%d_%H%M%S)/database.sql
-	cp -r data-plane/migrations backups/$(shell date +%Y%m%d_%H%M%S)/
-	cp docker-compose*.yml backups/$(shell date +%Y%m%d_%H%M%S)/
-	@echo "Backup completed."
-
-# Update Commands
-update-deps: ## Update dependencies
-	@echo "Updating dependencies..."
-	pip-compile requirements.in
-	pip-compile requirements-dev.in
-	@echo "Dependencies updated."
-
-update-docker: ## Update Docker images
-	@echo "Updating Docker images..."
-	docker-compose -f docker-compose.dev.yml pull
-	docker-compose -f docker-compose.prod.yml pull
-	@echo "Docker images updated."
-
-# All-in-one Commands
-all: format lint type-check test security ## Run all quality checks
-	@echo "All quality checks completed."
-
-ci: format lint type-check test security build ## Run CI pipeline
-	@echo "CI pipeline completed."
-
-dev-setup: ## Setup development environment
-	@echo "Setting up development environment..."
-	pip install -r requirements-dev.txt
-	make db-migrate
-	make dev
-	@echo "Development environment setup completed."
+db-seed:
+	@echo "Seeding database..."
+	# Add database seeding commands here

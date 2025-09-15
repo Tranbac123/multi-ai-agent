@@ -8,6 +8,7 @@ from enum import Enum
 
 class EventType(str, Enum):
     """Event type enumeration."""
+
     AGENT_RUN = "agent_run"
     TOOL_CALL = "tool_call"
     INGEST_DOC = "ingest_doc"
@@ -20,6 +21,7 @@ class EventType(str, Enum):
 
 class AgentRunEvent(BaseModel):
     """Agent run event data."""
+
     run_id: str
     tenant_id: UUID
     agent_id: str
@@ -39,6 +41,7 @@ class AgentRunEvent(BaseModel):
 
 class ToolCallEvent(BaseModel):
     """Tool call event data."""
+
     call_id: str
     run_id: str
     tenant_id: UUID
@@ -55,6 +58,7 @@ class ToolCallEvent(BaseModel):
 
 class IngestDocEvent(BaseModel):
     """Document ingestion event data."""
+
     doc_id: str
     tenant_id: UUID
     user_id: Optional[UUID] = None
@@ -73,6 +77,7 @@ class IngestDocEvent(BaseModel):
 
 class UsageMeteredEvent(BaseModel):
     """Usage metering event data."""
+
     usage_id: str
     tenant_id: UUID
     user_id: Optional[UUID] = None
@@ -87,6 +92,7 @@ class UsageMeteredEvent(BaseModel):
 
 class RouterDecisionEvent(BaseModel):
     """Router decision event data."""
+
     decision_id: str
     tenant_id: UUID
     user_id: Optional[UUID] = None
@@ -101,6 +107,7 @@ class RouterDecisionEvent(BaseModel):
 
 class WebSocketMessageEvent(BaseModel):
     """WebSocket message event data."""
+
     message_id: str
     tenant_id: UUID
     user_id: Optional[UUID] = None
@@ -113,6 +120,7 @@ class WebSocketMessageEvent(BaseModel):
 
 class BillingEvent(BaseModel):
     """Billing event data."""
+
     billing_id: str
     tenant_id: UUID
     event_type: str  # "usage_accumulated", "invoice_generated", "payment_processed"
@@ -125,6 +133,7 @@ class BillingEvent(BaseModel):
 
 class AuditLogEvent(BaseModel):
     """Audit log event data."""
+
     log_id: str
     tenant_id: UUID
     user_id: Optional[UUID] = None
@@ -148,5 +157,5 @@ EVENT_MODELS = {
     EventType.ROUTER_DECISION: RouterDecisionEvent,
     EventType.WEBSOCKET_MESSAGE: WebSocketMessageEvent,
     EventType.BILLING_EVENT: BillingEvent,
-    EventType.AUDIT_LOG: AuditLogEvent
+    EventType.AUDIT_LOG: AuditLogEvent,
 }

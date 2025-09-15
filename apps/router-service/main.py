@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-from apps.router-service.core.router_v2 import RouterV2, RouterDecision
-from apps.router-service.core.feature_extractor import Tier
+from apps.router_service.core.router_v2 import RouterV2, RouterDecision
+from apps.router_service.core.feature_extractor import Tier
 
 # Configure structured logging
 structlog.configure(

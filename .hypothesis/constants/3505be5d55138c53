@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/router_service/core/router_v2.py
+# hypothesis_version: 6.138.15
+
+[0.0, 0.1, 0.5, 0.7, 0.9, 1.0, 1000, 86400, 'Learning reset', 'Models calibrated', 'Router v2 failed', 'average_complexity', 'average_failure_rate', 'average_novelty', 'bandit_statistics', 'canary_status', 'confidence', 'decision_latency_ms', 'early_exit', 'error', 'escalated', 'failed_requests', 'features', 'metrics', 'misroute_rate', 'no_data', 'predicted_tier', 'recent_metrics', 'router_misroute_rate', 'successful_requests', 'tenant_id', 'tier_distribution', 'time_window_minutes', 'total_complexity', 'total_decision_time', 'total_decisions', 'total_failure_rate', 'total_novelty', 'total_requests', 'total_tokens']

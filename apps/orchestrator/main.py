@@ -36,7 +36,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     logger.info("Starting Orchestrator Service")
-    
+
     # Initialize components
     app.state.event_bus = EventBus()
     app.state.event_producer = EventProducer(app.state.event_bus)
@@ -62,11 +62,11 @@ async def lifespan(app: FastAPI):
     app.state.orchestrator = OrchestratorEngine(
         event_producer=app.state.event_producer,
         workflow_engine=app.state.workflow_engine,
-        saga_manager=app.state.saga_manager
+        saga_manager=app.state.saga_manager,
     )
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Orchestrator Service")
 
@@ -77,9 +77,9 @@ def create_app() -> FastAPI:
         title="AIaaS Orchestrator",
         version="2.0.0",
         description="LangGraph-based orchestrator for multi-tenant AI platform",
-        lifespan=lifespan
+        lifespan=lifespan,
     )
-    
+
     # Add middleware
     app.add_middleware(
         CORSMiddleware,
@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     return app
 
 
@@ -99,8 +99,7 @@ app = create_app()
 async def api_exception_handler(request: Request, exc: APIException):
     """Handle API exceptions."""
     return JSONResponse(
-        status_code=exc.status_code,
-        content=error_response(exc.error_spec)
+        status_code=exc.status_code, content=error_response(exc.error_spec)
     )
 
 
@@ -110,12 +109,8 @@ async def validation_error_handler(request: Request, exc: ValidationError):
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response(
-            ErrorSpec(
-                code=ErrorCode.VALIDATION_FAIL,
-                message=str(exc),
-                retriable=False
-            )
-        )
+            ErrorSpec(code=ErrorCode.VALIDATION_FAIL, message=str(exc), retriable=False)
+        ),
     )
 
 
@@ -123,16 +118,16 @@ async def validation_error_handler(request: Request, exc: ValidationError):
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
     logger.error("Unexpected error", exc_info=exc, request_id=request.state.request_id)
-    
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=error_response(
             ErrorSpec(
                 code=ErrorCode.INTERNAL_ERROR,
                 message="Internal server error",
-                retriable=True
+                retriable=True,
             )
-        )
+        ),
     )
 
 
@@ -151,15 +146,14 @@ async def readiness_check():
         if not app.state.orchestrator.is_ready():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Orchestrator not ready"
+                detail="Orchestrator not ready",
             )
-        
+
         return {"status": "ready", "timestamp": time.time()}
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service not ready"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service not ready"
         )
 
 
@@ -167,173 +161,137 @@ async def readiness_check():
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {
-        "message": "AIaaS Orchestrator",
-        "version": "2.0.0",
-        "docs": "/docs"
-    }
+    return {"message": "AIaaS Orchestrator", "version": "2.0.0", "docs": "/docs"}
 
 
 @app.post("/v1/runs", response_model=AgentRun)
 async def create_run(
     agent_spec: AgentSpec,
     context: Dict[str, Any],
-    tenant_id: str = Depends(get_current_tenant)
+    tenant_id: str = Depends(get_current_tenant),
 ):
     """Create new agent run."""
     with tracer.start_as_current_span("create_run") as span:
         span.set_attribute("tenant_id", str(tenant_id))
         span.set_attribute("agent_name", agent_spec.name)
-        
+
         try:
             # Create agent run
             run = await app.state.orchestrator.create_run(
-                tenant_id=tenant_id,
-                agent_spec=agent_spec,
-                context=context
+                tenant_id=tenant_id, agent_spec=agent_spec, context=context
             )
-            
+
             # Emit event
             await app.state.event_producer.emit(
                 "agent.run.requested",
                 {
                     "run_id": str(run.run_id),
                     "tenant_id": str(tenant_id),
-                    "agent_name": agent_spec.name
-                }
+                    "agent_name": agent_spec.name,
+                },
             )
-            
+
             logger.info(
                 "Agent run created",
                 run_id=str(run.run_id),
                 tenant_id=str(tenant_id),
-                agent_name=agent_spec.name
+                agent_name=agent_spec.name,
             )
-            
+
             return run
-            
+
         except Exception as e:
             logger.error(
                 "Failed to create run",
                 tenant_id=str(tenant_id),
                 agent_name=agent_spec.name,
-                error=str(e)
+                error=str(e),
             )
             raise
 
 
 @app.post("/v1/runs/{run_id}/start")
-async def start_run(
-    run_id: str,
-    tenant_id: str = Depends(get_current_tenant)
-):
+async def start_run(run_id: str, tenant_id: str = Depends(get_current_tenant)):
     """Start agent run execution."""
     with tracer.start_as_current_span("start_run") as span:
         span.set_attribute("tenant_id", str(tenant_id))
         span.set_attribute("run_id", run_id)
-        
+
         try:
             # Start run
             await app.state.orchestrator.start_run(run_id, tenant_id)
-            
+
             # Emit event
             await app.state.event_producer.emit(
-                "agent.run.started",
-                {
-                    "run_id": run_id,
-                    "tenant_id": str(tenant_id)
-                }
+                "agent.run.started", {"run_id": run_id, "tenant_id": str(tenant_id)}
             )
-            
-            logger.info(
-                "Agent run started",
-                run_id=run_id,
-                tenant_id=str(tenant_id)
-            )
-            
+
+            logger.info("Agent run started", run_id=run_id, tenant_id=str(tenant_id))
+
             return success_response(None, "Run started successfully")
-            
+
         except Exception as e:
             logger.error(
                 "Failed to start run",
                 run_id=run_id,
                 tenant_id=str(tenant_id),
-                error=str(e)
+                error=str(e),
             )
             raise
 
 
 @app.get("/v1/runs/{run_id}", response_model=AgentRun)
-async def get_run(
-    run_id: str,
-    tenant_id: str = Depends(get_current_tenant)
-):
+async def get_run(run_id: str, tenant_id: str = Depends(get_current_tenant)):
     """Get agent run status."""
     with tracer.start_as_current_span("get_run") as span:
         span.set_attribute("tenant_id", str(tenant_id))
         span.set_attribute("run_id", run_id)
-        
+
         try:
             # Get run
             run = await app.state.orchestrator.get_run(run_id, tenant_id)
-            
+
             return run
-            
+
         except Exception as e:
             logger.error(
                 "Failed to get run",
                 run_id=run_id,
                 tenant_id=str(tenant_id),
-                error=str(e)
+                error=str(e),
             )
             raise
 
 
 @app.post("/v1/runs/{run_id}/cancel")
-async def cancel_run(
-    run_id: str,
-    tenant_id: str = Depends(get_current_tenant)
-):
+async def cancel_run(run_id: str, tenant_id: str = Depends(get_current_tenant)):
     """Cancel agent run."""
     with tracer.start_as_current_span("cancel_run") as span:
         span.set_attribute("tenant_id", str(tenant_id))
         span.set_attribute("run_id", run_id)
-        
+
         try:
             # Cancel run
             await app.state.orchestrator.cancel_run(run_id, tenant_id)
-            
+
             # Emit event
             await app.state.event_producer.emit(
-                "agent.run.cancelled",
-                {
-                    "run_id": run_id,
-                    "tenant_id": str(tenant_id)
-                }
+                "agent.run.cancelled", {"run_id": run_id, "tenant_id": str(tenant_id)}
             )
-            
-            logger.info(
-                "Agent run cancelled",
-                run_id=run_id,
-                tenant_id=str(tenant_id)
-            )
-            
+
+            logger.info("Agent run cancelled", run_id=run_id, tenant_id=str(tenant_id))
+
             return success_response(None, "Run cancelled successfully")
-            
+
         except Exception as e:
             logger.error(
                 "Failed to cancel run",
                 run_id=run_id,
                 tenant_id=str(tenant_id),
-                error=str(e)
+                error=str(e),
             )
             raise
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "apps.orchestrator.main:app",
-        host="0.0.0.0",
-        port=8081,
-        reload=True
-    )
+    uvicorn.run("apps.orchestrator.main:app", host="0.0.0.0", port=8081, reload=True)

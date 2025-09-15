@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/orchestrator/core/saga_orchestrator.py
+# hypothesis_version: 6.138.15
+
+[1000.0, 1000, 10000, 30000, 86400, 300000, 'Compensation failed', 'Saga compensated', 'Saga created', 'Saga step completed', 'Saga step failed', 'Saga step timed out', 'active_sagas', 'compensated', 'compensated_sagas', 'compensating', 'completed', 'completed_at', 'completed_sagas', 'completed_steps', 'created_at', 'error', 'failed', 'failed_sagas', 'failed_step', 'max_retries', 'name', 'parallel_execution', 'pending', 'result', 'results', 'reverse_order', 'running', 'saga_id', 'started_at', 'status', 'step_id', 'steps', 'success', 'success_rate', 'timeout_ms', 'total_sagas']

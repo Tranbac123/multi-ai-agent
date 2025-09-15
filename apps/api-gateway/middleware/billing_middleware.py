@@ -11,8 +11,8 @@ import redis.asyncio as redis
 from fastapi import Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 
-from apps.billing-service.core.usage_tracker import UsageTracker, UsageType
-from apps.billing-service.core.webhook_aggregator import WebhookAggregator
+from apps.billing_service.core.usage_tracker import UsageTracker, UsageType
+from apps.billing_service.core.webhook_aggregator import WebhookAggregator
 
 logger = structlog.get_logger(__name__)
 

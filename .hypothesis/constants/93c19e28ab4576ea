@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/services/tools/saga_adapter.py
+# hypothesis_version: 6.138.15
+
+[86400, 'Executing saga step', 'Saga step completed', 'T', 'adapter_name', 'base_metrics', 'compensated', 'compensating', 'completed', 'completed_at', 'created_at', 'error', 'failed', 'in_progress', 'pending', 'result', 'saga_context:*', 'saga_id', 'started_at', 'status', 'status_counts', 'step_id', 'steps', 'tenant_id', 'total_sagas', 'updated_at', 'user_id']

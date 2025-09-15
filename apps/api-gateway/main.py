@@ -38,7 +38,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     logger.info("Starting API Gateway")
-    
+
     # Initialize database connection
     engine = create_async_engine(
         app.state.database_url,
@@ -65,17 +65,17 @@ async def lifespan(app: FastAPI):
     )
     app.state.db_engine = engine
     app.state.db_session = async_sessionmaker(engine, expire_on_commit=False)
-    
+
     # Initialize clients
     app.state.auth_client = AuthClient()
     app.state.rate_limiter = RateLimiter()
     app.state.quota_enforcer = QuotaEnforcer()
-    
+
     # Instrument SQLAlchemy
     SQLAlchemyInstrumentor().instrument(engine=engine)
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down API Gateway")
     await engine.dispose()
@@ -87,9 +87,9 @@ def create_app() -> FastAPI:
         title="AIaaS API Gateway",
         version="2.0.0",
         description="Multi-tenant AI-as-a-Service API Gateway",
-        lifespan=lifespan
+        lifespan=lifespan,
     )
-    
+
     # Add middleware
     app.add_middleware(
         CORSMiddleware,
@@ -98,18 +98,17 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=["*"]  # Configure in production
+        TrustedHostMiddleware, allowed_hosts=["*"]  # Configure in production
     )
-    
+
     app.add_middleware(TenantContextMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
-    
+
     # Instrument FastAPI
     FastAPIInstrumentor.instrument_app(app)
-    
+
     return app
 
 
@@ -120,14 +119,15 @@ app = create_app()
 async def tenant_context_middleware(request: Request, call_next):
     """Set tenant context for database queries."""
     tenant_id = getattr(request.state, "tenant_id", None)
-    
+
     if tenant_id:
         # Set tenant context in database session
         async with app.state.db_session() as session:
-            await session.execute(text("SELECT set_tenant_context(:tenant_id)"), 
-                                {"tenant_id": tenant_id})
+            await session.execute(
+                text("SELECT set_tenant_context(:tenant_id)"), {"tenant_id": tenant_id}
+            )
             request.state.db_session = session
-    
+
     response = await call_next(request)
     return response
 
@@ -136,7 +136,7 @@ async def tenant_context_middleware(request: Request, call_next):
 async def rate_limit_middleware(request: Request, call_next):
     """Apply rate limiting based on tenant plan."""
     tenant_id = getattr(request.state, "tenant_id", None)
-    
+
     if tenant_id:
         # Check rate limits
         if not await app.state.rate_limiter.check_rate_limit(tenant_id, request):
@@ -147,11 +147,11 @@ async def rate_limit_middleware(request: Request, call_next):
                         code=ErrorCode.RATE_LIMIT,
                         message="Rate limit exceeded",
                         retriable=True,
-                        retry_after_ms=60000
+                        retry_after_ms=60000,
                     )
-                )
+                ),
             )
-    
+
     response = await call_next(request)
     return response
 
@@ -160,7 +160,7 @@ async def rate_limit_middleware(request: Request, call_next):
 async def quota_enforcement_middleware(request: Request, call_next):
     """Enforce tenant quotas."""
     tenant_id = getattr(request.state, "tenant_id", None)
-    
+
     if tenant_id:
         # Check quotas
         if not await app.state.quota_enforcer.check_quotas(tenant_id, request):
@@ -170,11 +170,11 @@ async def quota_enforcement_middleware(request: Request, call_next):
                     ErrorSpec(
                         code=ErrorCode.QUOTA_EXCEEDED,
                         message="Quota exceeded",
-                        retriable=False
+                        retriable=False,
                     )
-                )
+                ),
             )
-    
+
     response = await call_next(request)
     return response
 
@@ -183,8 +183,7 @@ async def quota_enforcement_middleware(request: Request, call_next):
 async def api_exception_handler(request: Request, exc: APIException):
     """Handle API exceptions."""
     return JSONResponse(
-        status_code=exc.status_code,
-        content=error_response(exc.error_spec)
+        status_code=exc.status_code, content=error_response(exc.error_spec)
     )
 
 
@@ -194,12 +193,8 @@ async def validation_error_handler(request: Request, exc: ValidationError):
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response(
-            ErrorSpec(
-                code=ErrorCode.VALIDATION_FAIL,
-                message=str(exc),
-                retriable=False
-            )
-        )
+            ErrorSpec(code=ErrorCode.VALIDATION_FAIL, message=str(exc), retriable=False)
+        ),
     )
 
 
@@ -210,11 +205,9 @@ async def auth_error_handler(request: Request, exc: AuthenticationError):
         status_code=status.HTTP_401_UNAUTHORIZED,
         content=error_response(
             ErrorSpec(
-                code=ErrorCode.AUTHENTICATION_FAILED,
-                message=str(exc),
-                retriable=False
+                code=ErrorCode.AUTHENTICATION_FAILED, message=str(exc), retriable=False
             )
-        )
+        ),
     )
 
 
@@ -222,16 +215,16 @@ async def auth_error_handler(request: Request, exc: AuthenticationError):
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
     logger.error("Unexpected error", exc_info=exc, request_id=request.state.request_id)
-    
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=error_response(
             ErrorSpec(
                 code=ErrorCode.INTERNAL_ERROR,
                 message="Internal server error",
-                retriable=True
+                retriable=True,
             )
-        )
+        ),
     )
 
 
@@ -249,13 +242,12 @@ async def readiness_check():
         # Check database connectivity
         async with app.state.db_session() as session:
             await session.execute(text("SELECT 1"))
-        
+
         return {"status": "ready", "timestamp": time.time()}
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service not ready"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service not ready"
         )
 
 
@@ -263,20 +255,11 @@ async def readiness_check():
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {
-        "message": "AIaaS API Gateway",
-        "version": "2.0.0",
-        "docs": "/docs"
-    }
-    
+    return {"message": "AIaaS API Gateway", "version": "2.0.0", "docs": "/docs"}
+
     # Add WebSocket endpoint
     app.add_websocket_route("/ws/chat", websocket_endpoint)
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "apps.api-gateway.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run("apps.api-gateway.main:app", host="0.0.0.0", port=8000, reload=True)

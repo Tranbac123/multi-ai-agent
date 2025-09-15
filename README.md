@@ -252,11 +252,11 @@ cd multi-ai-agent
 
 ### **📚 Documentation**
 
-- **[High-Level System Design](docs/HIGH_LEVEL_DESIGN.md)** - Comprehensive system architecture and design patterns
-- **[Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions for development, staging, and production
-- **[Testing Guide](docs/testing/GETTING_STARTED.md)** - Testing setup and execution
-- **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Architecture and component details
-- **[Design Patterns](docs/DESIGN_PATTERNS.md)** - Comprehensive overview of design patterns used in the platform
+- **[📖 Complete Documentation](docs/README.md)** - Comprehensive documentation index with organized structure
+- **[🏗️ Architecture](docs/architecture/)** - System design, patterns, and topology
+- **[🚀 Deployment](docs/deployment/)** - Deployment guides and CI/CD pipeline
+- **[💻 Development](docs/development/)** - Development guides and workflows
+- **[🧪 Testing](docs/testing/)** - Comprehensive testing documentation and guides
 
 ## Development
 

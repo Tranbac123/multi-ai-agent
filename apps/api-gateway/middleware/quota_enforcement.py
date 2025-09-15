@@ -10,7 +10,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from apps.billing-service.core.usage_tracker import UsageTracker, UsageType
+from apps.billing_service.core.usage_tracker import UsageTracker, UsageType
 
 logger = structlog.get_logger(__name__)
 

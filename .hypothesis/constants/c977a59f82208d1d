@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/eval/golden_tasks/faq_handling.py
+# hypothesis_version: 6.138.15
+
+[0.02, 0.1, 0.8, 0.9, 0.92, 0.95, 0.99, 1000, '.', 'Basic FAQ Question', 'Pricing Question', 'actual', 'completed', 'confidence', 'contains', 'equals', 'expected', 'failed', 'faq_001', 'faq_002', 'faq_database', 'features', 'field', 'greater_than', 'message', 'passed', 'pending', 'pricing', 'pricing_database', 'response', 'running', 'source', 'tenant_001', 'tenant_id', 'timeout', 'type', 'user_001', 'user_002', 'user_id', 'value']

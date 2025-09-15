@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/apps/router_service/core/calibrated_classifier.py
+# hypothesis_version: 6.138.15
+
+[0.0, 1e-08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 1.0, 1.2, 1.5, 2.0, 100, 500, 1000, 86400, 'accuracy_threshold', 'complexity', 'confidence', 'confidence_threshold', 'day_of_week', 'default', 'enterprise', 'last_updated', 'novelty', 'novelty_score', 'predicted_tier', 'premium', 'request_complexity', 'schema_strictness', 'standard', 'temperature', 'time_of_day', 'timestamp', 'token_count', 'user_tier']

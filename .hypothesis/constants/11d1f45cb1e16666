@@ -1,0 +1,4 @@
+# file: /Users/tranvanbac/Documents/AI/ai-agent/multi-ai-agent/services/tools/email_adapter.py
+# hypothesis_version: 6.138.15
+
+[0.1, 1000, 3600, 30000, 60000, 'Email sent', 'compensated', 'email_adapter', 'host', 'port', 'sent', 'sent_emails_count', 'smtp_config', 'unknown']
