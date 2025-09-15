@@ -1,0 +1,415 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Self-Serve Plans & Lifecycle Dashboard",
+    "tags": ["self-serve", "lifecycle", "webhooks"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Tenant Signups Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(tenant_signups_total[5m])",
+            "legendFormat": "Signups/sec",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Signups per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Plan Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "tenant_plan_distribution",
+            "legendFormat": "{{plan}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Plan Upgrades",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(plan_upgrades_total[5m])",
+            "legendFormat": "Upgrades/sec",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Upgrades per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Revenue by Plan",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "revenue_by_plan",
+            "legendFormat": "{{plan}} - ${{__field.labels.plan}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Revenue ($)",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Webhook Delivery Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "webhook_deliveries_total{status=\"delivered\"}",
+            "legendFormat": "Delivered",
+            "refId": "A"
+          },
+          {
+            "expr": "webhook_deliveries_total{status=\"failed\"}",
+            "legendFormat": "Failed",
+            "refId": "B"
+          },
+          {
+            "expr": "webhook_deliveries_total{status=\"retrying\"}",
+            "legendFormat": "Retrying",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Webhook Delivery Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(webhook_deliveries_total{status=\"delivered\"}[5m]) / rate(webhook_deliveries_total[5m]) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Success Rate (%)",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        }
+      },
+      {
+        "id": 7,
+        "title": "Webhook Events by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(webhook_events_total[5m])",
+            "legendFormat": "{{event}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        }
+      },
+      {
+        "id": 8,
+        "title": "Trial Conversion Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "trial_conversions_total / trial_signups_total * 100",
+            "legendFormat": "Conversion Rate %",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 0,
+          "y": 28
+        }
+      },
+      {
+        "id": 9,
+        "title": "Average Time to Upgrade",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(time_to_upgrade_seconds)",
+            "legendFormat": "{{__field.labels.plan}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 28
+        }
+      },
+      {
+        "id": 10,
+        "title": "Churn Rate by Plan",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(tenant_churn_total[24h])",
+            "legendFormat": "{{plan}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 28
+        }
+      },
+      {
+        "id": 11,
+        "title": "Onboarding Completion Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(onboarding_completed_total[5m]) / rate(onboarding_started_total[5m]) * 100",
+            "legendFormat": "Completion Rate %",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Completion Rate (%)",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        }
+      },
+      {
+        "id": 12,
+        "title": "Onboarding Step Completion",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(onboarding_step_completed_total[5m])",
+            "legendFormat": "{{step}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Steps completed per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        }
+      },
+      {
+        "id": 13,
+        "title": "API Gateway Self-Serve Requests",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(api_gateway_requests_total{service=\"tenant-service\"}[5m])",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 40
+        }
+      },
+      {
+        "id": 14,
+        "title": "Admin Portal Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(admin_portal_requests_total[5m])",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests per second",
+            "min": 0
+          }
+        ],
+        "xAxes": [
+          {
+            "label": "Time"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 40
+        }
+      },
+      {
+        "id": 15,
+        "title": "Payment Processing Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(payment_success_total[5m]) / rate(payment_attempts_total[5m]) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 12,
+          "x": 0,
+          "y": 48
+        }
+      },
+      {
+        "id": 16,
+        "title": "Billing Cycle Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "billing_cycle_distribution",
+            "legendFormat": "{{cycle}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 12,
+          "x": 12,
+          "y": 48
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}
