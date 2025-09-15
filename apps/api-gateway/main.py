@@ -23,6 +23,8 @@ from libs.clients.auth import AuthClient, get_current_tenant
 from libs.clients.rate_limiter import RateLimiter
 from libs.clients.quota_enforcer import QuotaEnforcer
 from libs.utils.middleware import TenantContextMiddleware, RequestLoggingMiddleware
+from libs.middleware.regional_middleware import RegionalMiddleware, RegionalAccessValidator, RegionalMetricsCollector
+from apps.api-gateway.core.region_router import RegionRouter
 from libs.utils.exceptions import APIException, ValidationError, AuthenticationError
 from libs.utils.responses import success_response, error_response
 from .websocket import websocket_endpoint
@@ -71,6 +73,11 @@ async def lifespan(app: FastAPI):
     app.state.rate_limiter = RateLimiter()
     app.state.quota_enforcer = QuotaEnforcer()
 
+    # Initialize regional components
+    app.state.region_router = RegionRouter(app.state.db_session())
+    app.state.regional_access_validator = RegionalAccessValidator(app.state.region_router)
+    app.state.regional_metrics_collector = RegionalMetricsCollector()
+
     # Instrument SQLAlchemy
     SQLAlchemyInstrumentor().instrument(engine=engine)
 
@@ -98,6 +105,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Add regional middleware
+    regional_middleware = RegionalMiddleware(app.state.region_router)
+    app.middleware("http")(regional_middleware)
 
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["*"]  # Configure in production
