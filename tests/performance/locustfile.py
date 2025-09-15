@@ -1,129 +1,288 @@
-"""Performance tests using Locust."""
+"""
+Locust performance test file for API endpoints.
 
-from locust import HttpUser, task, between
+Usage:
+    locust -f tests/performance/locustfile.py --host=http://localhost:8000
+    locust -f tests/performance/locustfile.py --host=http://localhost:8000 --users=100 --spawn-rate=10 --run-time=60s
+"""
+
+import time
 import random
-import json
+from locust import HttpUser, task, between
 
 
-class AIaaSUser(HttpUser):
-    """Simulate user behavior for AIaaS platform."""
+class WebsiteUser(HttpUser):
+    """Locust user for API endpoint performance testing."""
     
-    wait_time = between(1, 3)
+    wait_time = between(1, 3)  # Wait 1-3 seconds between tasks
     
     def on_start(self):
-        """Setup user session."""
-        self.tenant_id = "test-tenant-123"
-        self.session_id = f"session-{random.randint(1000, 9999)}"
-        self.headers = {
-            "Content-Type": "application/json",
-            "X-Tenant-ID": self.tenant_id
-        }
-    
-    @task(3)
-    def chat_message(self):
-        """Send chat message."""
-        payload = {
-            "message": "Hello, I need help with my order",
-            "session_id": self.session_id
-        }
-        
-        response = self.client.post(
-            "/api/v1/chat/message",
-            json=payload,
-            headers=self.headers
-        )
-        
-        if response.status_code != 200:
-            print(f"Chat message failed: {response.status_code}")
-    
-    @task(2)
-    def get_agents(self):
-        """Get available agents."""
-        response = self.client.get(
-            "/api/v1/agents",
-            headers=self.headers
-        )
-        
-        if response.status_code != 200:
-            print(f"Get agents failed: {response.status_code}")
-    
-    @task(1)
-    def get_conversation_history(self):
-        """Get conversation history."""
-        response = self.client.get(
-            f"/api/v1/chat/history/{self.session_id}",
-            headers=self.headers
-        )
-        
-        if response.status_code != 200:
-            print(f"Get history failed: {response.status_code}")
-    
-    @task(1)
-    def upload_document(self):
-        """Upload document."""
-        files = {
-            'file': ('test.txt', 'This is a test document', 'text/plain')
-        }
-        
-        response = self.client.post(
-            "/api/v1/ingestion/upload",
-            files=files,
-            headers={"X-Tenant-ID": self.tenant_id}
-        )
-        
-        if response.status_code != 200:
-            print(f"Upload failed: {response.status_code}")
-    
-    @task(1)
-    def get_usage_stats(self):
-        """Get usage statistics."""
-        response = self.client.get(
-            "/api/v1/usage/stats",
-            headers=self.headers
-        )
-        
-        if response.status_code != 200:
-            print(f"Get usage stats failed: {response.status_code}")
-
-
-class HighLoadUser(HttpUser):
-    """Simulate high load scenarios."""
-    
-    wait_time = between(0.1, 0.5)
-    
-    def on_start(self):
-        """Setup high load session."""
-        self.tenant_id = "load-test-tenant"
-        self.headers = {
-            "Content-Type": "application/json",
-            "X-Tenant-ID": self.tenant_id
-        }
+        """Called when a user starts."""
+        self.tenant_id = f"tenant_{random.randint(1000, 9999)}"
+        self.user_id = f"user_{random.randint(1000, 9999)}"
     
     @task(10)
-    def rapid_chat_messages(self):
-        """Send rapid chat messages."""
+    def query_endpoint(self):
+        """Test query endpoint performance."""
         payload = {
-            "message": f"Load test message {random.randint(1, 1000)}",
-            "session_id": f"load-session-{random.randint(1, 100)}"
+            "message": f"Test query from {self.user_id}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "context": {
+                "session_id": f"session_{random.randint(10000, 99999)}",
+                "timestamp": time.time()
+            }
         }
         
-        self.client.post(
-            "/api/v1/chat/message",
+        with self.client.post(
+            "/api/query",
             json=payload,
-            headers=self.headers
-        )
+            catch_response=True,
+            name="POST /api/query"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            elif response.status_code == 429:
+                response.failure("Rate limited")
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
     
     @task(5)
-    def concurrent_uploads(self):
-        """Concurrent document uploads."""
-        files = {
-            'file': (f'test-{random.randint(1, 1000)}.txt', 
-                    f'Load test document {random.randint(1, 1000)}', 
-                    'text/plain')
+    def workflow_endpoint(self):
+        """Test workflow endpoint performance."""
+        payload = {
+            "workflow_id": f"workflow_{random.randint(100, 999)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "input_data": {
+                "action": "process_request",
+                "data": f"Workflow data {random.randint(1, 1000)}"
+            }
         }
         
-        self.client.post(
-            "/api/v1/ingestion/upload",
-            files=files,
-            headers={"X-Tenant-ID": self.tenant_id}
-        )
+        with self.client.post(
+            "/api/workflow",
+            json=payload,
+            catch_response=True,
+            name="POST /api/workflow"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            elif response.status_code == 429:
+                response.failure("Rate limited")
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(3)
+    def ingest_endpoint(self):
+        """Test ingest endpoint performance."""
+        payload = {
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "content": f"Test content {random.randint(1, 1000)}",
+            "metadata": {
+                "source": "locust_test",
+                "type": "test_document",
+                "timestamp": time.time()
+            }
+        }
+        
+        with self.client.post(
+            "/api/ingest",
+            json=payload,
+            catch_response=True,
+            name="POST /api/ingest"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            elif response.status_code == 429:
+                response.failure("Rate limited")
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(2)
+    def status_endpoint(self):
+        """Test status endpoint performance."""
+        with self.client.get(
+            f"/api/status?tenant_id={self.tenant_id}&user_id={self.user_id}",
+            catch_response=True,
+            name="GET /api/status"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            elif response.status_code == 404:
+                response.failure("Not found")
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(1)
+    def health_check(self):
+        """Test health check endpoint."""
+        with self.client.get(
+            "/health",
+            catch_response=True,
+            name="GET /health"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Health check failed: {response.status_code}")
+
+
+class StressTestUser(HttpUser):
+    """Locust user for stress testing."""
+    
+    wait_time = between(0.1, 0.5)  # Faster requests for stress testing
+    weight = 1  # Lower weight for stress testing
+    
+    def on_start(self):
+        """Called when a user starts."""
+        self.tenant_id = f"stress_tenant_{random.randint(1000, 9999)}"
+        self.user_id = f"stress_user_{random.randint(1000, 9999)}"
+    
+    @task(20)
+    def rapid_queries(self):
+        """Rapid query requests for stress testing."""
+        payload = {
+            "message": f"Stress test query {random.randint(1, 10000)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id
+        }
+        
+        with self.client.post(
+            "/api/query",
+            json=payload,
+            catch_response=True,
+            name="POST /api/query (stress)"
+        ) as response:
+            if response.status_code in [200, 429]:  # Accept rate limiting
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(10)
+    def rapid_workflows(self):
+        """Rapid workflow requests for stress testing."""
+        payload = {
+            "workflow_id": f"stress_workflow_{random.randint(100, 999)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "input_data": {"action": "stress_test"}
+        }
+        
+        with self.client.post(
+            "/api/workflow",
+            json=payload,
+            catch_response=True,
+            name="POST /api/workflow (stress)"
+        ) as response:
+            if response.status_code in [200, 429]:  # Accept rate limiting
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+
+
+class SpikeTestUser(HttpUser):
+    """Locust user for spike testing."""
+    
+    wait_time = between(0.05, 0.2)  # Very fast requests for spike testing
+    weight = 1  # Lower weight for spike testing
+    
+    def on_start(self):
+        """Called when a user starts."""
+        self.tenant_id = f"spike_tenant_{random.randint(1000, 9999)}"
+        self.user_id = f"spike_user_{random.randint(1000, 9999)}"
+    
+    @task(30)
+    def spike_queries(self):
+        """Spike query requests."""
+        payload = {
+            "message": f"Spike test query {random.randint(1, 50000)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id
+        }
+        
+        with self.client.post(
+            "/api/query",
+            json=payload,
+            catch_response=True,
+            name="POST /api/query (spike)"
+        ) as response:
+            if response.status_code in [200, 429, 503]:  # Accept rate limiting and service unavailable
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(15)
+    def spike_ingest(self):
+        """Spike ingest requests."""
+        payload = {
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "content": f"Spike test content {random.randint(1, 50000)}"
+        }
+        
+        with self.client.post(
+            "/api/ingest",
+            json=payload,
+            catch_response=True,
+            name="POST /api/ingest (spike)"
+        ) as response:
+            if response.status_code in [200, 429, 503]:  # Accept rate limiting and service unavailable
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+
+
+class EnduranceTestUser(HttpUser):
+    """Locust user for endurance testing."""
+    
+    wait_time = between(5, 15)  # Slower requests for endurance testing
+    weight = 1  # Lower weight for endurance testing
+    
+    def on_start(self):
+        """Called when a user starts."""
+        self.tenant_id = f"endurance_tenant_{random.randint(1000, 9999)}"
+        self.user_id = f"endurance_user_{random.randint(1000, 9999)}"
+        self.start_time = time.time()
+    
+    @task(5)
+    def endurance_query(self):
+        """Endurance query requests."""
+        payload = {
+            "message": f"Endurance test query {int(time.time() - self.start_time)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id
+        }
+        
+        with self.client.post(
+            "/api/query",
+            json=payload,
+            catch_response=True,
+            name="POST /api/query (endurance)"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
+    
+    @task(2)
+    def endurance_workflow(self):
+        """Endurance workflow requests."""
+        payload = {
+            "workflow_id": f"endurance_workflow_{random.randint(100, 999)}",
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "input_data": {"action": "endurance_test"}
+        }
+        
+        with self.client.post(
+            "/api/workflow",
+            json=payload,
+            catch_response=True,
+            name="POST /api/workflow (endurance)"
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Unexpected status: {response.status_code}")
