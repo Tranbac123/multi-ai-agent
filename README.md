@@ -210,6 +210,17 @@ The platform has been significantly enhanced with production-grade features for 
 
 ## Quick Start
 
+### **🚀 One-Command Setup**
+
+```bash
+# Clone and start the platform
+git clone <repo-url>
+cd multi-ai-agent
+./start.sh
+```
+
+### **📖 Detailed Setup**
+
 1. **Clone and setup**:
 
    ```bash
@@ -238,6 +249,12 @@ The platform has been significantly enhanced with production-grade features for 
    - Grafana: http://localhost:3000
    - Prometheus: http://localhost:9090
    - Jaeger: http://localhost:16686
+
+### **📚 Deployment Guides**
+
+- **[Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions for development, staging, and production
+- **[Testing Guide](docs/testing/GETTING_STARTED.md)** - Testing setup and execution
+- **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Architecture and component details
 
 ## Development
 
