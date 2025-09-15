@@ -250,8 +250,9 @@ cd multi-ai-agent
    - Prometheus: http://localhost:9090
    - Jaeger: http://localhost:16686
 
-### **📚 Deployment Guides**
+### **📚 Documentation**
 
+- **[High-Level System Design](docs/HIGH_LEVEL_DESIGN.md)** - Comprehensive system architecture and design patterns
 - **[Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions for development, staging, and production
 - **[Testing Guide](docs/testing/GETTING_STARTED.md)** - Testing setup and execution
 - **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Architecture and component details
