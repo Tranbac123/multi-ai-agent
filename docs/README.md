@@ -8,6 +8,7 @@ Welcome to the comprehensive documentation for the Multi-Tenant AIaaS Platform -
 Complete features and capabilities documentation:
 
 - **[Complete Features Documentation](FEATURES.md)** - Comprehensive overview of all platform features, capabilities, and use cases
+- **[Multi-Channel Chat Integration](MULTI_CHANNEL_CHAT_INTEGRATION.md)** - Facebook, Zalo, TikTok, and other chat platform integrations
 
 ### **🏗️ Architecture**
 Core system architecture and design documentation:

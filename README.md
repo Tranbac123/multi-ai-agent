@@ -58,6 +58,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 - **Ingestion Service**: Document processing and knowledge management
 - **Analytics Service**: CQRS read-only analytics and reporting
 - **Billing Service**: Usage tracking and billing engine
+- **Chat Adapters**: Multi-channel chat integration (Facebook, Zalo, TikTok, WhatsApp, Telegram)
 
 ### **Control Plane**
 
@@ -243,6 +244,7 @@ cd multi-ai-agent
    - Orchestrator: http://localhost:8003
    - Analytics Service: http://localhost:8004
    - Billing Service: http://localhost:8005
+   - Chat Adapters: http://localhost:8006
    - Web Dashboard: http://localhost:5173
    - API Docs: http://localhost:8000/docs
    - WebSocket: ws://localhost:8000/ws/chat
@@ -335,6 +337,7 @@ make update-docker # Update Docker images
 - **Analytics**: `/api/v1/analytics/*` - Metrics and reporting
 - **Billing**: `/api/v1/billing/*` - Usage and billing
 - **Ingestion**: `/api/v1/ingestion/*` - Document processing
+- **Chat Adapters**: `/facebook/webhook`, `/zalo/webhook`, `/tiktok/webhook` - Multi-channel chat integration
 
 ## CI/CD Pipeline
 
