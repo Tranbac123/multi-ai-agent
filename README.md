@@ -255,6 +255,7 @@ cd multi-ai-agent
 - **[Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions for development, staging, and production
 - **[Testing Guide](docs/testing/GETTING_STARTED.md)** - Testing setup and execution
 - **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Architecture and component details
+- **[Design Patterns](docs/DESIGN_PATTERNS.md)** - Comprehensive overview of design patterns used in the platform
 
 ## Development
 
