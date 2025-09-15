@@ -7,9 +7,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 import redis.asyncio as redis
 
-from apps.billing-service.core.usage_tracker import UsageTracker, UsageType
-from apps.billing-service.core.billing_engine import BillingEngine, InvoiceStatus
-from apps.billing-service.core.webhook_aggregator import WebhookAggregator, WebhookEventType
+from apps.billing_service.core.usage_tracker import UsageTracker, UsageType
+from apps.billing_service.core.billing_engine import BillingEngine, InvoiceStatus
+from apps.billing_service.core.webhook_aggregator import WebhookAggregator, WebhookEventType
 
 
 @pytest.fixture
