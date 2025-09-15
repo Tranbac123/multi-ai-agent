@@ -59,6 +59,21 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 - **Analytics Service**: CQRS read-only analytics and reporting
 - **Billing Service**: Usage tracking and billing engine
 - **Chat Adapters**: Multi-channel chat integration (Facebook, Zalo, TikTok, WhatsApp, Telegram)
+- **Tenant Service**: Self-serve tenant onboarding, plan management, and lifecycle hooks
+- **Admin Portal**: Tenant administration, plan configuration, and system management
+
+## 🌟 Enterprise-Grade Features
+
+The platform now includes **8 advanced enterprise capabilities**:
+
+1. **🌍 Data Residency & Regionalization** - Complete data sovereignty with regional provider selection
+2. **⚖️ Fairness & Isolation** - Per-tenant concurrency control with weighted fair queuing  
+3. **💰 CostGuard** - Intelligent cost management with budget enforcement and drift detection
+4. **🔒 Privacy & DLP** - Advanced data protection with PII detection and field-level encryption
+5. **⚡ Tail-latency Control** - Request hedging and coordinated cancellation for optimal performance
+6. **🌐 Multi-region Active-Active** - Disaster recovery with NATS mirroring and automated failover
+7. **🔐 Supply-chain Security** - SBOM generation, image signing, and vulnerability scanning
+8. **🛠️ Self-serve Plans** - Complete tenant onboarding with webhooks and admin portal
 
 ### **Control Plane**
 
