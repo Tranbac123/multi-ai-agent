@@ -25,6 +25,9 @@ from libs.clients.quota_enforcer import QuotaEnforcer
 from libs.utils.middleware import TenantContextMiddleware, RequestLoggingMiddleware
 from libs.middleware.regional_middleware import RegionalMiddleware, RegionalAccessValidator, RegionalMetricsCollector
 from apps.api-gateway.core.region_router import RegionRouter
+from apps.api-gateway.core.concurrency_manager import ConcurrencyManager
+from apps.api-gateway.core.fair_scheduler import WeightedFairScheduler
+from apps.api-gateway.middleware.admission_control import AdmissionControlMiddleware
 from libs.utils.exceptions import APIException, ValidationError, AuthenticationError
 from libs.utils.responses import success_response, error_response
 from .websocket import websocket_endpoint
@@ -77,6 +80,16 @@ async def lifespan(app: FastAPI):
     app.state.region_router = RegionRouter(app.state.db_session())
     app.state.regional_access_validator = RegionalAccessValidator(app.state.region_router)
     app.state.regional_metrics_collector = RegionalMetricsCollector()
+    
+    # Initialize fairness and concurrency components
+    app.state.concurrency_manager = ConcurrencyManager(app.state.redis_client)
+    app.state.fair_scheduler = WeightedFairScheduler()
+    app.state.admission_control = AdmissionControlMiddleware(
+        app.state.concurrency_manager,
+        app.state.fair_scheduler,
+        app.state.quota_enforcer,
+        app.state.billing_client
+    )
 
     # Instrument SQLAlchemy
     SQLAlchemyInstrumentor().instrument(engine=engine)
@@ -109,6 +122,10 @@ def create_app() -> FastAPI:
     # Add regional middleware
     regional_middleware = RegionalMiddleware(app.state.region_router)
     app.middleware("http")(regional_middleware)
+    
+    # Add admission control middleware
+    admission_middleware = app.state.admission_control
+    app.middleware("http")(admission_middleware)
 
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["*"]  # Configure in production
