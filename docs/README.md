@@ -11,6 +11,7 @@ Complete features and capabilities documentation:
 - **[Complete Features Documentation](FEATURES.md)** - Comprehensive overview of all platform features, capabilities, and use cases including 8 enterprise-grade modules
 - **[Multi-Channel Chat Integration](MULTI_CHANNEL_CHAT_INTEGRATION.md)** - Facebook, Zalo, TikTok, and other chat platform integrations
 - **[NEXT-PHASE Implementation Plan](NEXT_PHASE_IMPLEMENTATION_PLAN.md)** - Detailed implementation plan for all 8 enterprise-grade commits
+- **[Platform Hardening Summary](PLATFORM_HARDENING_SUMMARY.md)** - Complete summary of 11 production hardening commits
 
 ### **🏗️ Architecture**
 
