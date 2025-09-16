@@ -1,0 +1,343 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "SLO Monitoring & Error Budgets",
+    "tags": ["slo", "error-budget", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Availability SLO",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "api_availability_current",
+            "legendFormat": "Current Availability"
+          },
+          {
+            "expr": "api_availability_target",
+            "legendFormat": "Target (99.9%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Availability %",
+            "min": 99.0,
+            "max": 100.0
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 99.9,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "API Error Budget",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "api_availability_error_budget",
+            "legendFormat": "Error Budget Remaining"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Error Budget %",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 20,
+            "colorMode": "critical",
+            "op": "lt"
+          },
+          {
+            "value": 50,
+            "colorMode": "warning",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "API Latency SLO (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "api_latency_p95_current",
+            "legendFormat": "Current p95 Latency"
+          },
+          {
+            "expr": "api_latency_p95_target",
+            "legendFormat": "Target (500ms)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Milliseconds",
+            "min": 0,
+            "max": 1000
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 500,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Router Decision Latency SLO",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "router_decision_latency_current",
+            "legendFormat": "Current Latency"
+          },
+          {
+            "expr": "router_decision_latency_target",
+            "legendFormat": "Target (50ms)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Milliseconds",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 50,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Router Misroute Rate SLO",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "router_misroute_rate_current",
+            "legendFormat": "Current Misroute Rate"
+          },
+          {
+            "expr": "router_misroute_rate_target",
+            "legendFormat": "Target (1%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Misroute Rate %",
+            "min": 0,
+            "max": 5
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 1,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Tool Success Rate SLO",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "tool_success_rate_current",
+            "legendFormat": "Current Success Rate"
+          },
+          {
+            "expr": "tool_success_rate_target",
+            "legendFormat": "Target (99.5%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Success Rate %",
+            "min": 95,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 99.5,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 7,
+        "title": "WebSocket Connection Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ws_connection_success_rate_current",
+            "legendFormat": "Current Success Rate"
+          },
+          {
+            "expr": "ws_connection_success_rate_target",
+            "legendFormat": "Target (99%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Success Rate %",
+            "min": 95,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 99,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 8,
+        "title": "WebSocket Message Delivery Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ws_message_delivery_rate_current",
+            "legendFormat": "Current Delivery Rate"
+          },
+          {
+            "expr": "ws_message_delivery_rate_target",
+            "legendFormat": "Target (99.5%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Delivery Rate %",
+            "min": 95,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 99.5,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        }
+      },
+      {
+        "id": 9,
+        "title": "SLO Alert Summary",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "slo_alert_status",
+            "format": "table"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        }
+      },
+      {
+        "id": 10,
+        "title": "Error Budget Burn Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "error_budget_burn_rate",
+            "legendFormat": "{{slo_name}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Burn Rate",
+            "min": 0
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.1,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 40
+        }
+      }
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
