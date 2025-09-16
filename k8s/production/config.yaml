@@ -1,0 +1,434 @@
+# Production Configuration for Multi-AI-Agent Platform
+
+# Global configuration
+global:
+  environment: production
+  domain: "your-domain.com"
+  namespace: "multi-ai-agent-prod"
+  registry: "your-registry.com"
+  tag: "latest"
+
+# Database configuration
+database:
+  postgresql:
+    enabled: false # Use managed database
+    external:
+      host: "your-postgres-host.com"
+      port: 5432
+      database: "multi_ai_agent_prod"
+      username: "postgres"
+      ssl_mode: "require"
+
+  redis:
+    enabled: false # Use managed Redis
+    external:
+      host: "your-redis-host.com"
+      port: 6379
+      password: "your-redis-password"
+      ssl: true
+
+  nats:
+    enabled: false # Use managed NATS
+    external:
+      host: "your-nats-host.com"
+      port: 4222
+      tls: true
+
+# Service configurations
+services:
+  api-gateway:
+    replicas: 3
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 10
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  orchestrator:
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 15
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  router-service:
+    replicas: 3
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 10
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  realtime-service:
+    replicas: 3
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 20
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  analytics-service:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 8
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  billing-service:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 6
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  ingestion:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 8
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  chat-adapters:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 6
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  tenant-service:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 6
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  admin-portal:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 4
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+  eval-service:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 1
+      max_replicas: 4
+      target_cpu: 70
+      target_memory: 80
+    health_check:
+      enabled: true
+      path: "/health"
+      port: 8000
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    retention: "30d"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+
+  grafana:
+    enabled: true
+    admin_password: "your-grafana-password"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  jaeger:
+    enabled: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  alertmanager:
+    enabled: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+# Security configuration
+security:
+  tls:
+    enabled: true
+    cert_manager:
+      enabled: true
+      issuer: "letsencrypt-prod"
+
+  network_policies:
+    enabled: true
+
+  pod_security_policy:
+    enabled: true
+
+  rbac:
+    enabled: true
+
+# Ingress configuration
+ingress:
+  enabled: true
+  class: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+
+  hosts:
+    - host: "your-domain.com"
+      paths:
+        - path: "/"
+          pathType: "Prefix"
+          service: "api-gateway"
+        - path: "/api/v1/chat"
+          pathType: "Prefix"
+          service: "api-gateway"
+        - path: "/api/v1/router"
+          pathType: "Prefix"
+          service: "router-service"
+        - path: "/api/v1/analytics"
+          pathType: "Prefix"
+          service: "analytics-service"
+        - path: "/api/v1/billing"
+          pathType: "Prefix"
+          service: "billing-service"
+        - path: "/api/v1/ingestion"
+          pathType: "Prefix"
+          service: "ingestion"
+        - path: "/facebook/webhook"
+          pathType: "Prefix"
+          service: "chat-adapters"
+        - path: "/zalo/webhook"
+          pathType: "Prefix"
+          service: "chat-adapters"
+        - path: "/tiktok/webhook"
+          pathType: "Prefix"
+          service: "chat-adapters"
+        - path: "/admin"
+          pathType: "Prefix"
+          service: "admin-portal"
+        - path: "/tenant"
+          pathType: "Prefix"
+          service: "tenant-service"
+        - path: "/eval"
+          pathType: "Prefix"
+          service: "eval-service"
+
+# User experience monitoring
+user_experience:
+  enabled: true
+  metrics_port: 8000
+
+  response_time_targets:
+    p50: "< 100ms"
+    p95: "< 500ms"
+    p99: "< 1000ms"
+
+  error_rate_targets:
+    api_errors: "< 0.1%"
+    websocket_errors: "< 0.05%"
+    database_errors: "< 0.01%"
+
+  throughput_targets:
+    requests_per_second: "> 1000"
+    concurrent_users: "> 10000"
+    websocket_connections: "> 50000"
+
+  satisfaction_targets:
+    chat_completion_rate: "> 95%"
+    user_session_duration: "> 5 minutes"
+    feature_adoption_rate: "> 80%"
+    user_satisfaction_score: "> 4.5/5.0"
+
+# Business metrics
+business:
+  tenant_signup_rate: "> 10/day"
+  plan_upgrade_rate: "> 5%"
+  revenue_per_user: "> $50/month"
+  customer_retention: "> 90%"
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *" # Daily at 2 AM
+  retention: "30d"
+
+  databases:
+    postgresql:
+      enabled: true
+      schedule: "0 3 * * *" # Daily at 3 AM
+
+  volumes:
+    enabled: true
+    schedule: "0 4 * * *" # Daily at 4 AM
+
+# Disaster recovery
+disaster_recovery:
+  enabled: true
+  backup_region: "us-west-2"
+  rto: "4h" # Recovery Time Objective
+  rpo: "1h" # Recovery Point Objective
+
+  automated_failover:
+    enabled: true
+    health_check_interval: "30s"
+    failure_threshold: 3
+
+  cross_region_replication:
+    enabled: true
+    sync_interval: "1m"

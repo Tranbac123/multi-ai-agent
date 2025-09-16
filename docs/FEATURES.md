@@ -22,6 +22,7 @@ The platform now includes 8 advanced enterprise capabilities:
 The platform has been comprehensively hardened with enterprise-grade features for production stability, accuracy, safety, and reliability:
 
 #### **COMMIT 0 — Repo Audit Helpers**
+
 - **Audit readiness script** with comprehensive codebase scanning for production readiness criteria
 - **Loop safety detection** with MAX_STEPS, progress tracking, and oscillation detection validation
 - **Contract enforcement verification** with strict Pydantic validation and boundary checking
@@ -31,6 +32,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Automated CI integration** with PASS/FAIL reporting and readiness assessment
 
 #### **COMMIT 1 — Loop Safety in Orchestrator**
+
 - **MAX_STEPS enforcement** with configurable step limits and automatic loop termination
 - **Progress tracking** with state monitoring and no-progress event detection
 - **Oscillation detection** via state hashing with automatic loop cutting
@@ -39,6 +41,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Production-ready safety** with automatic escalation and manual intervention hooks
 
 #### **COMMIT 2 — Strict Contracts at All Boundaries**
+
 - **Pydantic strict validation** with strict=True and forbid_extra=True enforcement
 - **Comprehensive contract specs** for AgentSpec, MessageSpec, ToolSpec, ErrorSpec, RouterSpec
 - **Boundary enforcement** at API Gateway, Orchestrator, Router, and Tool adapters
@@ -47,6 +50,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Contract middleware** with automatic validation and error reporting
 
 #### **COMMIT 3 — Router v2 Guarantees**
+
 - **Feature extractor** with token_count, json_schema_strictness, domain_flags, novelty, historical_failure_rate
 - **Calibrated classifier** with temperature scaling and bandit policy optimization
 - **Early-exit logic** for strict JSON schema validation with SLM tier locking
@@ -55,6 +59,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Cost optimization** with expected_vs_actual_cost and expected_vs_actual_latency tracking
 
 #### **COMMIT 4 — Tool Adapter Reliability**
+
 - **Base adapter patterns** with timeouts, retries (exponential backoff + jitter), circuit-breaker, bulkhead
 - **Idempotency management** with Redis-based caching and duplicate request handling
 - **Write-ahead logging** with comprehensive event tracking and audit trails
@@ -63,6 +68,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Production reliability** with comprehensive error handling and recovery mechanisms
 
 #### **COMMIT 5 — Realtime Backpressure**
+
 - **Per-connection queues** with configurable drop policies (oldest, newest, priority-based)
 - **WebSocket message buffering** with intelligent backpressure handling and graceful degradation
 - **Connection management** with sticky sessions and Redis-based session storage
@@ -71,6 +77,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Health monitoring** with detailed status reporting and performance analytics
 
 #### **COMMIT 6 — Multi-tenant Safety & Fairness**
+
 - **Row-Level Security (RLS)** with strict tenant isolation and data access control
 - **Token bucket rate limiting** with per-tenant quotas and burst capacity management
 - **Concurrency token management** with Redis-based resource isolation and fair scheduling
@@ -79,6 +86,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Degradation management** with automatic system load monitoring and performance optimization
 
 #### **COMMIT 7 — RAG & Data Protection**
+
 - **RAG metadata management** with tenant isolation, role-based access, and TTL management
 - **Permissioned retrieval** with access validation and sensitivity filtering
 - **PII detection engine** with comprehensive pattern matching and redaction capabilities
@@ -87,6 +95,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Cross-tenant protection** with strict data isolation and leakage prevention
 
 #### **COMMIT 8 — Observability & SLOs**
+
 - **OpenTelemetry instrumentation** with comprehensive spans, metrics, and traces
 - **SLO management** with error budget tracking, burn rate analysis, and alerting
 - **Prometheus metrics** with detailed performance monitoring and cost tracking
@@ -95,6 +104,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Production monitoring** with comprehensive alerting and performance optimization
 
 #### **COMMIT 9 — Eval & Replay**
+
 - **Golden task management** with comprehensive task definitions and lifecycle management
 - **LLM judge evaluation** with structured scoring, criteria-based assessment, and confidence metrics
 - **Episode replay system** with state tracking, debugging capabilities, and regression testing
@@ -103,6 +113,7 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 - **Production evaluation** with comprehensive metrics and continuous improvement
 
 #### **COMMIT 10 — Performance Gates**
+
 - **Performance baseline management** with comprehensive metric tracking and regression detection
 - **Cost ceiling management** with spending limits, budget enforcement, and optimization recommendations
 - **Locust performance testing** with realistic user scenarios and performance gate validation
@@ -986,26 +997,26 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 
 ## 📊 **Platform Statistics**
 
-| Feature Category          | Count              | Status              |
-| ------------------------- | ------------------ | ------------------- |
-| **Core Services**         | 11 microservices   | ✅ Production Ready |
-| **API Endpoints**         | 200+ endpoints     | ✅ Fully Documented |
-| **Test Coverage**         | 2000+ tests        | ✅ 95%+ Coverage    |
-| **Design Patterns**       | 45+ patterns       | ✅ Implemented      |
-| **Quality Gates**         | 20+ categories     | ✅ Automated        |
-| **Security Features**     | 35+ features       | ✅ Validated        |
-| **Integration Points**    | 40+ integrations   | ✅ Tested           |
-| **Performance Targets**   | 15+ SLA targets    | ✅ Monitored        |
-| **Enterprise Features**   | 8 advanced modules | ✅ Production Ready |
-| **Production Hardening**  | 11 hardening commits| ✅ Complete         |
-| **Database Migrations**   | 12 migration sets  | ✅ Applied          |
-| **Monitoring Dashboards** | 15+ dashboards     | ✅ Active           |
-| **Multi-Channel Support** | 5 chat platforms   | ✅ Integrated       |
-| **Regional Deployments**  | 3+ regions         | ✅ Active           |
-| **Disaster Recovery**     | Full DR capability | ✅ Tested           |
-| **Performance Gates**     | 50+ baselines      | ✅ Monitored        |
-| **Evaluation System**     | 100+ golden tasks  | ✅ Active           |
-| **Observability**         | 1000+ metrics      | ✅ Monitored        |
+| Feature Category          | Count                | Status              |
+| ------------------------- | -------------------- | ------------------- |
+| **Core Services**         | 11 microservices     | ✅ Production Ready |
+| **API Endpoints**         | 200+ endpoints       | ✅ Fully Documented |
+| **Test Coverage**         | 2000+ tests          | ✅ 95%+ Coverage    |
+| **Design Patterns**       | 45+ patterns         | ✅ Implemented      |
+| **Quality Gates**         | 20+ categories       | ✅ Automated        |
+| **Security Features**     | 35+ features         | ✅ Validated        |
+| **Integration Points**    | 40+ integrations     | ✅ Tested           |
+| **Performance Targets**   | 15+ SLA targets      | ✅ Monitored        |
+| **Enterprise Features**   | 8 advanced modules   | ✅ Production Ready |
+| **Production Hardening**  | 11 hardening commits | ✅ Complete         |
+| **Database Migrations**   | 12 migration sets    | ✅ Applied          |
+| **Monitoring Dashboards** | 15+ dashboards       | ✅ Active           |
+| **Multi-Channel Support** | 5 chat platforms     | ✅ Integrated       |
+| **Regional Deployments**  | 3+ regions           | ✅ Active           |
+| **Disaster Recovery**     | Full DR capability   | ✅ Tested           |
+| **Performance Gates**     | 50+ baselines        | ✅ Monitored        |
+| **Evaluation System**     | 100+ golden tasks    | ✅ Active           |
+| **Observability**         | 1000+ metrics        | ✅ Monitored        |
 
 ## 🎯 **Getting Started**
 
