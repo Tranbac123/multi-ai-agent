@@ -99,75 +99,106 @@ class JSONValidator:
     
     def _validate_schema(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """Validate data against schema (simplified implementation)."""
-        if schema.get("type") == "object":
-            if not isinstance(data, dict):
-                return False, "Expected object"
-            
-            # Check required properties
-            required = schema.get("required", [])
-            for prop in required:
-                if prop not in data:
-                    return False, f"Missing required property: {prop}"
-            
-            # Check properties
-            properties = schema.get("properties", {})
-            for prop, value in data.items():
-                if prop in properties:
-                    prop_schema = properties[prop]
-                    is_valid, error = self._validate_schema(value, prop_schema)
-                    if not is_valid:
-                        return False, f"Property '{prop}' validation failed: {error}"
-                elif not schema.get("additionalProperties", True):
-                    return False, f"Additional property '{prop}' not allowed"
-            
-            return True, None
+        schema_type = schema.get("type")
         
-        elif schema.get("type") == "array":
-            if not isinstance(data, list):
-                return False, "Expected array"
-            
-            items_schema = schema.get("items", {})
-            for i, item in enumerate(data):
-                is_valid, error = self._validate_schema(item, items_schema)
-                if not is_valid:
-                    return False, f"Array item {i} validation failed: {error}"
-            
-            return True, None
-        
-        elif schema.get("type") == "string":
-            if not isinstance(data, str):
-                return False, "Expected string"
-            
-            # Check minimum/maximum length
-            min_length = schema.get("minLength")
-            max_length = schema.get("maxLength")
-            if min_length is not None and len(data) < min_length:
-                return False, f"String too short (minimum {min_length})"
-            if max_length is not None and len(data) > max_length:
-                return False, f"String too long (maximum {max_length})"
-            
-            return True, None
-        
-        elif schema.get("type") == "number":
-            if not isinstance(data, (int, float)):
-                return False, "Expected number"
-            
-            minimum = schema.get("minimum")
-            maximum = schema.get("maximum")
-            if minimum is not None and data < minimum:
-                return False, f"Number below minimum {minimum}"
-            if maximum is not None and data > maximum:
-                return False, f"Number above maximum {maximum}"
-            
-            return True, None
-        
-        elif schema.get("type") == "boolean":
-            if not isinstance(data, bool):
-                return False, "Expected boolean"
-            return True, None
-        
+        if schema_type == "object":
+            return self._validate_object(data, schema)
+        elif schema_type == "array":
+            return self._validate_array(data, schema)
+        elif schema_type == "string":
+            return self._validate_string(data, schema)
+        elif schema_type == "number":
+            return self._validate_number(data, schema)
+        elif schema_type == "boolean":
+            return self._validate_boolean(data, schema)
         else:
             return True, None  # Unknown type, assume valid
+    
+    def _validate_object(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """Validate object type data."""
+        if not isinstance(data, dict):
+            return False, "Expected object"
+        
+        # Check required properties
+        required_error = self._check_required_properties(data, schema)
+        if required_error:
+            return False, required_error
+        
+        # Check properties
+        properties_error = self._check_object_properties(data, schema)
+        if properties_error:
+            return False, properties_error
+        
+        return True, None
+    
+    def _check_required_properties(self, data: Dict[str, Any], schema: Dict[str, Any]) -> Optional[str]:
+        """Check that all required properties are present."""
+        required = schema.get("required", [])
+        for prop in required:
+            if prop not in data:
+                return f"Missing required property: {prop}"
+        return None
+    
+    def _check_object_properties(self, data: Dict[str, Any], schema: Dict[str, Any]) -> Optional[str]:
+        """Check object properties against schema."""
+        properties = schema.get("properties", {})
+        for prop, value in data.items():
+            if prop in properties:
+                prop_schema = properties[prop]
+                is_valid, error = self._validate_schema(value, prop_schema)
+                if not is_valid:
+                    return f"Property '{prop}' validation failed: {error}"
+            elif not schema.get("additionalProperties", True):
+                return f"Additional property '{prop}' not allowed"
+        return None
+    
+    def _validate_array(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """Validate array type data."""
+        if not isinstance(data, list):
+            return False, "Expected array"
+        
+        items_schema = schema.get("items", {})
+        for i, item in enumerate(data):
+            is_valid, error = self._validate_schema(item, items_schema)
+            if not is_valid:
+                return False, f"Array item {i} validation failed: {error}"
+        
+        return True, None
+    
+    def _validate_string(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """Validate string type data."""
+        if not isinstance(data, str):
+            return False, "Expected string"
+        
+        # Check minimum/maximum length
+        min_length = schema.get("minLength")
+        max_length = schema.get("maxLength")
+        if min_length is not None and len(data) < min_length:
+            return False, f"String too short (minimum {min_length})"
+        if max_length is not None and len(data) > max_length:
+            return False, f"String too long (maximum {max_length})"
+        
+        return True, None
+    
+    def _validate_number(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """Validate number type data."""
+        if not isinstance(data, (int, float)):
+            return False, "Expected number"
+        
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if minimum is not None and data < minimum:
+            return False, f"Number below minimum {minimum}"
+        if maximum is not None and data > maximum:
+            return False, f"Number above maximum {maximum}"
+        
+        return True, None
+    
+    def _validate_boolean(self, data: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """Validate boolean type data."""
+        if not isinstance(data, bool):
+            return False, "Expected boolean"
+        return True, None
 
 
 class ConfidenceEstimator:

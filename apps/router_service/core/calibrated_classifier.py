@@ -299,76 +299,106 @@ class CalibratedClassifier:
             feature_hash = self._create_feature_hash(features)
             hash_value = int(feature_hash, 16) % 1000  # 0-999
 
-            # Deterministic rules based on features and hash
-            tier_a_score = 0
-            tier_b_score = 0
-            tier_c_score = 0
-
-            # Tier A scoring (fast, cheap)
-            if features.token_count < 100:
-                tier_a_score += 3
-            elif features.token_count < 500:
-                tier_a_score += 2
-            else:
-                tier_a_score += 1
-
-            if features.request_complexity < 0.3:
-                tier_a_score += 3
-            elif features.request_complexity < 0.6:
-                tier_a_score += 2
-            else:
-                tier_a_score += 1
-
-            if features.schema_strictness > 0.7:
-                tier_a_score += 2
-
-            if features.historical_failure_rate < 0.2:
-                tier_a_score += 2
-
-            # Tier C scoring (slow, expensive, accurate)
-            if features.token_count > 1000:
-                tier_c_score += 3
-            elif features.token_count > 500:
-                tier_c_score += 2
-            else:
-                tier_c_score += 1
-
-            if features.request_complexity > 0.7:
-                tier_c_score += 3
-            elif features.request_complexity > 0.4:
-                tier_c_score += 2
-            else:
-                tier_c_score += 1
-
-            if features.novelty_score > 0.7:
-                tier_c_score += 2
-
-            if features.historical_failure_rate > 0.5:
-                tier_c_score += 2
-
-            if features.user_tier == "enterprise":
-                tier_c_score += 2
-
-            # Tier B is default
-            tier_b_score = 2
-
-            # Use hash for tie-breaking to ensure consistency
-            if tier_a_score > tier_c_score and tier_a_score > tier_b_score:
-                return Tier.A, 0.85, False
-            elif tier_c_score > tier_a_score and tier_c_score > tier_b_score:
-                return Tier.C, 0.85, False
-            elif tier_a_score == tier_c_score:
-                # Use hash for tie-breaking
-                if hash_value % 2 == 0:
-                    return Tier.A, 0.8, False
-                else:
-                    return Tier.C, 0.8, False
-            else:
-                return Tier.B, 0.8, False
+            # Calculate tier scores
+            tier_scores = self._calculate_tier_scores(features)
+            
+            # Determine best tier with tie-breaking
+            return self._select_best_tier(tier_scores, hash_value)
 
         except Exception as e:
             logger.error("Deterministic fallback failed", error=str(e))
             return Tier.B, 0.5, True
+    
+    def _calculate_tier_scores(self, features: RouterFeatures) -> Dict[str, int]:
+        """Calculate scores for each tier based on features."""
+        return {
+            "tier_a": self._calculate_tier_a_score(features),
+            "tier_b": 2,  # Default score
+            "tier_c": self._calculate_tier_c_score(features)
+        }
+    
+    def _calculate_tier_a_score(self, features: RouterFeatures) -> int:
+        """Calculate Tier A score (fast, cheap)."""
+        score = 0
+        
+        # Token count scoring
+        if features.token_count < 100:
+            score += 3
+        elif features.token_count < 500:
+            score += 2
+        else:
+            score += 1
+
+        # Request complexity scoring
+        if features.request_complexity < 0.3:
+            score += 3
+        elif features.request_complexity < 0.6:
+            score += 2
+        else:
+            score += 1
+
+        # Schema strictness bonus
+        if features.schema_strictness > 0.7:
+            score += 2
+
+        # Historical failure rate bonus
+        if features.historical_failure_rate < 0.2:
+            score += 2
+
+        return score
+    
+    def _calculate_tier_c_score(self, features: RouterFeatures) -> int:
+        """Calculate Tier C score (slow, expensive, accurate)."""
+        score = 0
+        
+        # Token count scoring
+        if features.token_count > 1000:
+            score += 3
+        elif features.token_count > 500:
+            score += 2
+        else:
+            score += 1
+
+        # Request complexity scoring
+        if features.request_complexity > 0.7:
+            score += 3
+        elif features.request_complexity > 0.4:
+            score += 2
+        else:
+            score += 1
+
+        # Novelty score bonus
+        if features.novelty_score > 0.7:
+            score += 2
+
+        # Historical failure rate bonus
+        if features.historical_failure_rate > 0.5:
+            score += 2
+
+        # Enterprise tier bonus
+        if features.user_tier == "enterprise":
+            score += 2
+
+        return score
+    
+    def _select_best_tier(self, tier_scores: Dict[str, int], hash_value: int) -> Tuple[Tier, float, bool]:
+        """Select the best tier based on scores and handle tie-breaking."""
+        tier_a_score = tier_scores["tier_a"]
+        tier_b_score = tier_scores["tier_b"]
+        tier_c_score = tier_scores["tier_c"]
+        
+        if tier_a_score > tier_c_score and tier_a_score > tier_b_score:
+            return Tier.A, 0.85, False
+        elif tier_c_score > tier_a_score and tier_c_score > tier_b_score:
+            return Tier.C, 0.85, False
+        elif tier_a_score == tier_c_score:
+            # Use hash for tie-breaking
+            if hash_value % 2 == 0:
+                return Tier.A, 0.8, False
+            else:
+                return Tier.C, 0.8, False
+        else:
+            return Tier.B, 0.8, False
 
     def _create_feature_hash(self, features: RouterFeatures) -> str:
         """Create a deterministic hash from features."""

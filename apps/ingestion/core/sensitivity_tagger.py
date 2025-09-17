@@ -470,54 +470,81 @@ class SensitivityTagger:
     async def get_sensitivity_summary(self, tenant_id: str) -> Dict[str, Any]:
         """Get sensitivity classification summary for tenant."""
         try:
-            tenant_tags = [
-                tag for tag in self.document_tags.values()
-                if tag.metadata.get("tenant_id") == tenant_id
-            ]
+            tenant_tags = self._get_tenant_tags(tenant_id)
             
-            summary = {
-                "tenant_id": tenant_id,
-                "total_documents": len(tenant_tags),
-                "sensitivity_distribution": {},
-                "data_categories": {},
-                "pii_detection_stats": {
-                    "documents_with_pii": 0,
-                    "pii_types_found": set(),
-                    "average_confidence": 0.0
-                }
-            }
+            summary = self._create_base_summary(tenant_id, tenant_tags)
             
             if not tenant_tags:
                 return summary
             
-            # Count by sensitivity level
-            for level in DocumentSensitivity:
-                count = sum(1 for tag in tenant_tags if tag.sensitivity_level == level)
-                summary["sensitivity_distribution"][level.value] = count
-            
-            # Count by data category
-            for category in DataCategory:
-                count = sum(1 for tag in tenant_tags if category in tag.data_categories)
-                summary["data_categories"][category.value] = count
-            
-            # PII detection stats
-            pii_tags = [tag for tag in tenant_tags if tag.pii_detected]
-            summary["pii_detection_stats"]["documents_with_pii"] = len(pii_tags)
-            
-            if pii_tags:
-                all_pii_types = set()
-                for tag in pii_tags:
-                    all_pii_types.update(tag.pii_types)
-                summary["pii_detection_stats"]["pii_types_found"] = [t.value for t in all_pii_types]
-                
-                avg_confidence = sum(tag.confidence_score for tag in pii_tags) / len(pii_tags)
-                summary["pii_detection_stats"]["average_confidence"] = avg_confidence
+            # Calculate distribution statistics
+            summary["sensitivity_distribution"] = self._calculate_sensitivity_distribution(tenant_tags)
+            summary["data_categories"] = self._calculate_data_categories(tenant_tags)
+            summary["pii_detection_stats"] = self._calculate_pii_stats(tenant_tags)
             
             return summary
             
         except Exception as e:
             logger.error("Failed to get sensitivity summary", tenant_id=tenant_id, error=str(e))
             return {"tenant_id": tenant_id, "error": str(e)}
+    
+    def _get_tenant_tags(self, tenant_id: str) -> List:
+        """Get all tags for a specific tenant."""
+        return [
+            tag for tag in self.document_tags.values()
+            if tag.metadata.get("tenant_id") == tenant_id
+        ]
+    
+    def _create_base_summary(self, tenant_id: str, tenant_tags: List) -> Dict[str, Any]:
+        """Create base summary structure."""
+        return {
+            "tenant_id": tenant_id,
+            "total_documents": len(tenant_tags),
+            "sensitivity_distribution": {},
+            "data_categories": {},
+            "pii_detection_stats": {
+                "documents_with_pii": 0,
+                "pii_types_found": set(),
+                "average_confidence": 0.0
+            }
+        }
+    
+    def _calculate_sensitivity_distribution(self, tenant_tags: List) -> Dict[str, int]:
+        """Calculate distribution by sensitivity level."""
+        distribution = {}
+        for level in DocumentSensitivity:
+            count = sum(1 for tag in tenant_tags if tag.sensitivity_level == level)
+            distribution[level.value] = count
+        return distribution
+    
+    def _calculate_data_categories(self, tenant_tags: List) -> Dict[str, int]:
+        """Calculate distribution by data category."""
+        categories = {}
+        for category in DataCategory:
+            count = sum(1 for tag in tenant_tags if category in tag.data_categories)
+            categories[category.value] = count
+        return categories
+    
+    def _calculate_pii_stats(self, tenant_tags: List) -> Dict[str, Any]:
+        """Calculate PII detection statistics."""
+        pii_tags = [tag for tag in tenant_tags if tag.pii_detected]
+        
+        stats = {
+            "documents_with_pii": len(pii_tags),
+            "pii_types_found": [],
+            "average_confidence": 0.0
+        }
+        
+        if pii_tags:
+            all_pii_types = set()
+            for tag in pii_tags:
+                all_pii_types.update(tag.pii_types)
+            stats["pii_types_found"] = [t.value for t in all_pii_types]
+            
+            avg_confidence = sum(tag.confidence_score for tag in pii_tags) / len(pii_tags)
+            stats["average_confidence"] = avg_confidence
+        
+        return stats
     
     async def bulk_tag_documents(self, documents: List[Dict[str, Any]], 
                                tenant_id: str, user_id: str = "system") -> List[SensitivityTag]:

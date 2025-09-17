@@ -1,7 +1,6 @@
 apps/ingestion/core/pii_redaction.py
     M 232:4 PIIDetector.detect_pii - C
 apps/ingestion/core/sensitivity_tagger.py
-    M 470:4 SensitivityTagger.get_sensitivity_summary - C
     M 228:4 SensitivityTagger._analyze_content - C
     M 341:4 SensitivityTagger._determine_sensitivity_level - C
 apps/api-gateway/middleware/billing_middleware.py
@@ -20,10 +19,7 @@ apps/realtime/core/backpressure_handler.py
     M 192:4 BackpressureHandler._process_queue - C
 apps/router-service/core/safe_mode_router.py
     M 194:4 SafeModeRouter._estimate_request_complexity - C
-apps/router-service/core/early_exit_manager.py
-    M 100:4 JSONValidator._validate_schema - D
 apps/router_service/core/calibrated_classifier.py
-    M 293:4 CalibratedClassifier._deterministic_fallback - D
     M 118:4 CalibratedClassifier._calculate_tier_scores - C
 apps/router_service/core/early_exit_escalation.py
     M 98:4 EarlyExitEscalation._check_early_exit - C
@@ -79,5 +75,5 @@ libs/infrastructure/dr_runbooks.py
 services/memory/knowledge_service.py
     M 133:4 KnowledgeService._has_access - C
 
-46 blocks (classes, functions, methods) analyzed.
-Average complexity: C (13.652173913043478)
+43 blocks (classes, functions, methods) analyzed.
+Average complexity: C (13.093023255813954)
