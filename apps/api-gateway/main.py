@@ -2,18 +2,13 @@
 
 import asyncio
 import time
-from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import text
-import structlog
-from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
@@ -23,53 +18,40 @@ from libs.clients.auth import AuthClient, get_current_tenant
 from libs.clients.rate_limiter import RateLimiter
 from libs.clients.quota_enforcer import QuotaEnforcer
 from libs.utils.middleware import TenantContextMiddleware, RequestLoggingMiddleware
-from libs.middleware.regional_middleware import RegionalMiddleware, RegionalAccessValidator, RegionalMetricsCollector
+from libs.middleware.regional_middleware import RegionalAccessValidator, RegionalMetricsCollector
 # from apps.api-gateway.core.region_router import RegionRouter
 from apps.api_gateway.core.concurrency_manager import ConcurrencyManager
 from apps.api_gateway.core.fair_scheduler import WeightedFairScheduler
 from apps.api_gateway.middleware.admission_control import AdmissionControlMiddleware
 from libs.utils.exceptions import APIException, ValidationError, AuthenticationError
 from libs.utils.responses import success_response, error_response
+from libs.utils.logging_config import configure_structured_logging, get_logger
+from libs.utils.otel_config import configure_otel_tracing, get_tracer
+from libs.utils.database_config import initialize_database
+from libs.utils.redis_config import initialize_redis
+from libs.utils.fastapi_app_factory import create_lifespan_manager
 # from .websocket import websocket_endpoint
 
 # Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer(),
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
+configure_structured_logging()
+logger = get_logger(__name__)
 
-logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer(__name__)
+# Configure OpenTelemetry
+configure_otel_tracing("api-gateway")
+tracer = get_tracer(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    # Startup
-    logger.info("Starting API Gateway")
+async def startup_hook(app: FastAPI):
+    """API Gateway startup hook."""
+    # Initialize database
+    db_config = initialize_database(app.state.database_url)
+    await db_config.initialize()
+    app.state.db_config = db_config
 
-    # Initialize database connection
-    engine = create_async_engine(
-        app.state.database_url,
-        echo=False,
-        pool_pre_ping=True,
-        pool_recycle=300,
-    )
-    app.state.db_engine = engine
-    app.state.db_session = async_sessionmaker(engine, expire_on_commit=False)
+    # Initialize Redis
+    redis_config = initialize_redis()
+    await redis_config.initialize()
+    app.state.redis_config = redis_config
 
     # Initialize clients
     app.state.auth_client = AuthClient()
@@ -77,12 +59,12 @@ async def lifespan(app: FastAPI):
     app.state.quota_enforcer = QuotaEnforcer()
 
     # Initialize regional components
-    app.state.region_router = RegionRouter(app.state.db_session())
+    app.state.region_router = RegionRouter(app.state.db_config.get_session)
     app.state.regional_access_validator = RegionalAccessValidator(app.state.region_router)
     app.state.regional_metrics_collector = RegionalMetricsCollector()
     
     # Initialize fairness and concurrency components
-    app.state.concurrency_manager = ConcurrencyManager(app.state.redis_client)
+    app.state.concurrency_manager = ConcurrencyManager(app.state.redis_config.client)
     app.state.fair_scheduler = WeightedFairScheduler()
     app.state.admission_control = AdmissionControlMiddleware(
         app.state.concurrency_manager,
@@ -92,41 +74,38 @@ async def lifespan(app: FastAPI):
     )
 
     # Instrument SQLAlchemy
-    SQLAlchemyInstrumentor().instrument(engine=engine)
+    SQLAlchemyInstrumentor().instrument(engine=db_config.engine)
 
-    yield
 
-    # Shutdown
-    logger.info("Shutting down API Gateway")
-    await engine.dispose()
+async def shutdown_hook(app: FastAPI):
+    """API Gateway shutdown hook."""
+    # Close database connection
+    if hasattr(app.state, 'db_config'):
+        await app.state.db_config.close()
+    
+    # Close Redis connection
+    if hasattr(app.state, 'redis_config'):
+        await app.state.redis_config.close()
 
 
 def create_app() -> FastAPI:
     """Create FastAPI application."""
+    # Create lifespan manager
+    lifespan_manager = create_lifespan_manager(
+        service_name="API Gateway",
+        startup_hook=startup_hook,
+        shutdown_hook=shutdown_hook
+    )
+    
+    # Create FastAPI app with shared factory
     app = FastAPI(
         title="AIaaS API Gateway",
         version="2.0.0",
         description="Multi-tenant AI-as-a-Service API Gateway",
-        lifespan=lifespan,
+        lifespan=lifespan_manager,
     )
 
-    # Add middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Configure in production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # Add regional middleware
-    regional_middleware = RegionalMiddleware(app.state.region_router)
-    app.middleware("http")(regional_middleware)
-    
-    # Add admission control middleware
-    admission_middleware = app.state.admission_control
-    app.middleware("http")(admission_middleware)
-
+    # Add additional middleware
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["*"]  # Configure in production
     )
@@ -143,14 +122,15 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+# Add middleware after app creation
 @app.middleware("http")
 async def tenant_context_middleware(request: Request, call_next):
     """Set tenant context for database queries."""
     tenant_id = getattr(request.state, "tenant_id", None)
 
-    if tenant_id:
+    if tenant_id and hasattr(app.state, 'db_config'):
         # Set tenant context in database session
-        async with app.state.db_session() as session:
+        async with app.state.db_config.get_session() as session:
             await session.execute(
                 text("SELECT set_tenant_context(:tenant_id)"), {"tenant_id": tenant_id}
             )
@@ -165,7 +145,7 @@ async def rate_limit_middleware(request: Request, call_next):
     """Apply rate limiting based on tenant plan."""
     tenant_id = getattr(request.state, "tenant_id", None)
 
-    if tenant_id:
+    if tenant_id and hasattr(app.state, 'rate_limiter'):
         # Check rate limits
         if not await app.state.rate_limiter.check_rate_limit(tenant_id, request):
             return JSONResponse(
@@ -189,7 +169,7 @@ async def quota_enforcement_middleware(request: Request, call_next):
     """Enforce tenant quotas."""
     tenant_id = getattr(request.state, "tenant_id", None)
 
-    if tenant_id:
+    if tenant_id and hasattr(app.state, 'quota_enforcer'):
         # Check quotas
         if not await app.state.quota_enforcer.check_quotas(tenant_id, request):
             return JSONResponse(
@@ -268,8 +248,12 @@ async def readiness_check():
     """Readiness check endpoint."""
     try:
         # Check database connectivity
-        async with app.state.db_session() as session:
-            await session.execute(text("SELECT 1"))
+        if hasattr(app.state, 'db_config'):
+            is_healthy = await app.state.db_config.health_check()
+            if not is_healthy:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not ready"
+                )
 
         return {"status": "ready", "timestamp": time.time()}
     except Exception as e:
