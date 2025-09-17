@@ -4,20 +4,14 @@ apps/ingestion/core/sensitivity_tagger.py
     M 470:4 SensitivityTagger.get_sensitivity_summary - C
     M 228:4 SensitivityTagger._analyze_content - C
     M 341:4 SensitivityTagger._determine_sensitivity_level - C
-apps/api-gateway/main.py
-    ERROR: invalid syntax (<unknown>, line 27)
 apps/api-gateway/middleware/billing_middleware.py
     M 416:4 BillingMiddleware._calculate_usage_quantity - C
-apps/api-gateway/middleware/admission_control.py
-    ERROR: invalid syntax (<unknown>, line 10)
 apps/api-gateway/core/region_router.py
     M 230:4 RegionRouter.select_provider - C
 apps/chat-adapters/adapters/facebook_adapter.py
     M 200:4 FacebookMessengerAdapter._convert_to_facebook_format - C
 apps/eval-service/core/llm_judge.py
     M 240:4 LLMJudge._parse_judge_response - C
-apps/tenant-service/main.py
-    ERROR: invalid syntax (<unknown>, line 27)
 apps/admin-portal/main.py
     F 514:0 update_tenant - C
 apps/realtime/main.py
@@ -39,9 +33,9 @@ apps/billing-service/core/webhook_aggregator.py
 apps/realtime-service/core/websocket_manager.py
     M 359:4 WebSocketManager._ping_monitor - C
 apps/orchestrator/core/eval_integration.py
-    M 270:4 EvalIntegration._run_golden_tasks - C
-    M 478:4 EvalIntegration._check_quality_gates - C
-    M 109:4 EvalIntegration.run_evaluation - C
+    M 267:4 EvalIntegration._run_golden_tasks - C
+    M 475:4 EvalIntegration._check_quality_gates - C
+    M 106:4 EvalIntegration.run_evaluation - C
 apps/orchestrator/core/degradation_manager.py
     M 155:4 DegradationManager._determine_load_level - C
 libs/clients/http/timeout_manager.py
@@ -49,10 +43,8 @@ libs/clients/http/timeout_manager.py
     M 440:4 TimeoutManager.get_timeout_recommendations - C
 libs/clients/http/request_hedging.py
     M 177:4 RequestHedgingManager._execute_parallel_hedging - C
-libs/middleware/regional_middleware.py
-    ERROR: invalid syntax (<unknown>, line 9)
 libs/security/cve_gates.py
-    ERROR: invalid syntax (<unknown>, line 71)
+    M 285:4 CVEGatesManager.evaluate_gate - C
 libs/security/fairness_middleware.py
     M 317:4 PreAdmissionControl.check_admission - C
 libs/security/image_signing.py
@@ -84,10 +76,8 @@ libs/infrastructure/failover_manager.py
     M 243:4 FailoverManager._should_trigger_failover - C
 libs/infrastructure/dr_runbooks.py
     M 646:4 DRRunbooksManager.get_all_executions - C
-libs/infrastructure/nats_mirroring.py
-    ERROR: expected 'except' or 'finally' block (<unknown>, line 448)
 services/memory/knowledge_service.py
     M 133:4 KnowledgeService._has_access - C
 
-45 blocks (classes, functions, methods) analyzed.
-Average complexity: C (13.71111111111111)
+46 blocks (classes, functions, methods) analyzed.
+Average complexity: C (13.652173913043478)

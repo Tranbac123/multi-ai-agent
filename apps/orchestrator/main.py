@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 import structlog
 from opentelemetry import trace
 
-from libs.contracts.agent import AgentRun, AgentStep, AgentSpec
+from libs.contracts.agent import AgentRun, AgentSpec
 from libs.contracts.tool import ToolCall, ToolResult
 from libs.contracts.message import MessageSpec, MessageRole
 from libs.contracts.error import ErrorSpec, ErrorCode

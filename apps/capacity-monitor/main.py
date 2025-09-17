@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
-from configs.capacity_config import CapacityConfigManager, Environment, DegradeMode
+from configs.capacity_config import CapacityConfigManager, DegradeMode
 
 logger = structlog.get_logger(__name__)
 

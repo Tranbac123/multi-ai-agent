@@ -25,7 +25,7 @@ def validate_contract(
     data: Union[Dict, str, bytes],
     contract_class: Type[BaseModel],
     strict: bool = True,
-    forbid_extra: bool = True
+    forbid_extra: bool = True  # noqa: F841
 ) -> BaseModel:
     """
     Validate data against a contract class.

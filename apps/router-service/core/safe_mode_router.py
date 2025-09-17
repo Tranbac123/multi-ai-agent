@@ -6,7 +6,7 @@ from enum import Enum
 import structlog
 from datetime import datetime, timezone
 
-from libs.contracts.router import RouterDecision, RouterRequest, LLMTier, RoutingReason
+from libs.contracts.router import RouterDecision, RouterRequest, LLMTier
 from libs.contracts.billing import BudgetConfig, BudgetStatus
 
 logger = structlog.get_logger(__name__)

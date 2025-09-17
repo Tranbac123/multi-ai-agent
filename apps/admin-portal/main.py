@@ -7,11 +7,11 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 import structlog
-from fastapi import FastAPI, HTTPException, status, Depends, Request, Form
+from fastapi import FastAPI, HTTPException, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, validator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import text
@@ -25,8 +25,8 @@ from opentelemetry.semconv.resource import ResourceAttributes
 from libs.clients.auth import AuthClient
 from libs.clients.billing import BillingClient
 from libs.clients.quota import QuotaClient
-from libs.middleware.tenant_middleware import TenantMiddleware
-from libs.middleware.rate_limiter import RateLimiterMiddleware
+# from libs.middleware.tenant_middleware import TenantMiddleware
+# from libs.middleware.rate_limiter import RateLimiterMiddleware
 
 
 # Configure OpenTelemetry

@@ -240,7 +240,7 @@ async def execute_golden_task(
     task_id: str,
     run_id: str,
     tenant_id: str,
-    executor_config: Dict[str, Any],
+    # executor_config: Dict[str, Any],
     task_manager: GoldenTaskManager = Depends(get_task_manager)
 ):
     """Execute a golden task."""

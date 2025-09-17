@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from libs.adapters.resilient_adapter import (
     ResilientAdapter,
-    resilient_adapter_manager,
     create_database_adapter,
     create_api_adapter,
     create_llm_adapter,

@@ -1,7 +1,7 @@
 """Input validation and sanitization."""
 
 import re
-import html
+# import html
 from typing import Any, Dict, List, Optional, Union
 import structlog
 from pydantic import BaseModel, ValidationError

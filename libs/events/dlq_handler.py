@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import structlog
 
 from .event_types import Event, EventType
-from .event_bus import EventBus, EventBusConfig
+from .event_bus import EventBus
 
 logger = structlog.get_logger(__name__)
 

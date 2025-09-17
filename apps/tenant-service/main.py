@@ -22,11 +22,11 @@ from opentelemetry.semconv.resource import ResourceAttributes
 from libs.clients.auth import AuthClient
 from libs.clients.billing import BillingClient
 from libs.clients.quota import QuotaClient
-from libs.middleware.tenant_middleware import TenantMiddleware
-from libs.middleware.rate_limiter import RateLimiterMiddleware
-from apps.tenant-service.core.tenant_onboarding import TenantOnboardingManager
-from apps.tenant-service.core.plan_upgrade_manager import PlanUpgradeManager
-from apps.tenant-service.core.webhook_manager import WebhookManager, WebhookEvent
+# from libs.middleware.tenant_middleware import TenantMiddleware
+# from libs.middleware.rate_limiter import RateLimiterMiddleware
+# from apps.tenant-service.core.tenant_onboarding import TenantOnboardingManager
+# from apps.tenant-service.core.plan_upgrade_manager import PlanUpgradeManager
+from apps.tenant_service.core.webhook_manager import WebhookManager, WebhookEvent
 
 
 # Configure OpenTelemetry

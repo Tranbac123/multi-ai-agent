@@ -486,7 +486,7 @@ class PlanUpgradeManager:
             return None
     
     async def _update_tenant_plan(self, upgrade_request: UpgradeRequest, 
-                                trial: bool = False, trial_days: int = 0):
+                                trial: bool = False, trial_days: int = 0):  # noqa: F841
         """Update tenant plan in database."""
         try:
             query = text("""

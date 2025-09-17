@@ -24,13 +24,13 @@ from libs.clients.rate_limiter import RateLimiter
 from libs.clients.quota_enforcer import QuotaEnforcer
 from libs.utils.middleware import TenantContextMiddleware, RequestLoggingMiddleware
 from libs.middleware.regional_middleware import RegionalMiddleware, RegionalAccessValidator, RegionalMetricsCollector
-from apps.api-gateway.core.region_router import RegionRouter
-from apps.api-gateway.core.concurrency_manager import ConcurrencyManager
-from apps.api-gateway.core.fair_scheduler import WeightedFairScheduler
-from apps.api-gateway.middleware.admission_control import AdmissionControlMiddleware
+# from apps.api-gateway.core.region_router import RegionRouter
+from apps.api_gateway.core.concurrency_manager import ConcurrencyManager
+from apps.api_gateway.core.fair_scheduler import WeightedFairScheduler
+from apps.api_gateway.middleware.admission_control import AdmissionControlMiddleware
 from libs.utils.exceptions import APIException, ValidationError, AuthenticationError
 from libs.utils.responses import success_response, error_response
-from .websocket import websocket_endpoint
+# from .websocket import websocket_endpoint
 
 # Configure structured logging
 structlog.configure(
@@ -284,9 +284,6 @@ async def readiness_check():
 async def root():
     """Root endpoint."""
     return {"message": "AIaaS API Gateway", "version": "2.0.0", "docs": "/docs"}
-
-    # Add WebSocket endpoint
-    app.add_websocket_route("/ws/chat", websocket_endpoint)
 
 
 if __name__ == "__main__":

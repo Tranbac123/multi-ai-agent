@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import structlog
 from datetime import datetime, timedelta
-from sqlalchemy import text, and_, or_, func
+from sqlalchemy import text, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections import defaultdict, deque
 

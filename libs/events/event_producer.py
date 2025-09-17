@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import structlog
 
-from .event_bus import EventBus, EventBusConfig
+from .event_bus import EventBus
 from .event_types import Event, EventType, EventMetadata
 
 logger = structlog.get_logger(__name__)

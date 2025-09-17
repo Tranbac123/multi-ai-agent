@@ -419,7 +419,7 @@ class PerformanceGateValidator:
                    unit=unit,
                    severity=severity)
     
-    def _on_request(self, request_type, name, response_time, response_length, exception, context, **kwargs):
+    def _on_request(self, request_type, name, response_time, response_length, exception, context, **kwargs):  # noqa: F841
         """Handle request events for metric collection."""
         
         # Collect latency metrics

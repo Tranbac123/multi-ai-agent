@@ -2,259 +2,259 @@ name: Quality Gates - Duplication & Dead Code Prevention
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   quality-analysis:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Set up Node.js 18
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-        
-    - name: Install Node.js dependencies
-      run: |
-        cd web
-        npm install
-        
-    - name: Install jscpd globally
-      run: npm install -g jscpd
-      
-    - name: Run code duplication detection
-      run: |
-        echo "🔍 Running code duplication detection..."
-        jscpd --config .jscpd.json --threshold 30 --reporter json --output reports/duplication
-        DUPLICATION_PERCENTAGE=$(cat reports/duplication/jscpd-report.json | jq -r '.statistics.total.percentage')
-        echo "Duplication percentage: $DUPLICATION_PERCENTAGE%"
-        if (( $(echo "$DUPLICATION_PERCENTAGE > 5" | bc -l) )); then
-          echo "❌ Code duplication exceeds threshold (5%)"
-          exit 1
-        else
-          echo "✅ Code duplication within acceptable limits"
-        fi
-      continue-on-error: false
-      
-    - name: Run dead code detection (Python)
-      run: |
-        echo "💀 Running Python dead code detection..."
-        vulture apps/ libs/ control-plane/ data-plane/ services/ --min-confidence 80 --sort-by-size > reports/dead-code/python-dead-code.txt || true
-        DEAD_CODE_COUNT=$(wc -l < reports/dead-code/python-dead-code.txt)
-        echo "Python dead code items: $DEAD_CODE_COUNT"
-        if [ $DEAD_CODE_COUNT -gt 20 ]; then
-          echo "❌ Too many dead code items detected ($DEAD_CODE_COUNT > 20)"
-          exit 1
-        else
-          echo "✅ Python dead code within acceptable limits"
-        fi
-      continue-on-error: false
-      
-    - name: Run dead code detection (TypeScript)
-      run: |
-        echo "💀 Running TypeScript dead code detection..."
-        cd web
-        npm run ts-unused-exports-report || true
-        cd ..
-        if [ -f web/reports/ts-unused-exports.json ]; then
-          UNUSED_EXPORTS_COUNT=$(cat web/reports/ts-unused-exports.json | jq -r 'length')
-          echo "TypeScript unused exports: $UNUSED_EXPORTS_COUNT"
-          if [ $UNUSED_EXPORTS_COUNT -gt 10 ]; then
-            echo "❌ Too many unused exports detected ($UNUSED_EXPORTS_COUNT > 10)"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Install Node.js dependencies
+        run: |
+          cd web
+          npm install
+
+      - name: Install jscpd globally
+        run: npm install -g jscpd
+
+      - name: Run code duplication detection
+        run: |
+          echo "🔍 Running code duplication detection..."
+          jscpd --config .jscpd.json --threshold 30 --reporter json --output reports/duplication
+          DUPLICATION_PERCENTAGE=$(cat reports/duplication/jscpd-report.json | jq -r '.statistics.total.percentage')
+          echo "Duplication percentage: $DUPLICATION_PERCENTAGE%"
+          if (( $(echo "$DUPLICATION_PERCENTAGE > 5" | bc -l) )); then
+            echo "❌ Code duplication exceeds threshold (5%)"
             exit 1
           else
-            echo "✅ TypeScript unused exports within acceptable limits"
+            echo "✅ Code duplication within acceptable limits"
           fi
-        else
-          echo "⚠️ TypeScript dead code report not found"
-        fi
-      continue-on-error: false
-      
-    - name: Run code complexity analysis
-      run: |
-        echo "📈 Running code complexity analysis..."
-        radon cc apps/ libs/ control-plane/ data-plane/ services/ -nc -j > reports/complexity/complexity.json
-        HIGH_COMPLEXITY=$(cat reports/complexity/complexity.json | jq -r '. | length')
-        echo "High complexity functions: $HIGH_COMPLEXITY"
-        if [ $HIGH_COMPLEXITY -gt 15 ]; then
-          echo "❌ Too many high complexity functions detected ($HIGH_COMPLEXITY > 15)"
-          exit 1
-        else
-          echo "✅ Code complexity within acceptable limits"
-        fi
-      continue-on-error: false
-      
-    - name: Run linting checks
-      run: |
-        echo "🔍 Running linting checks..."
-        # Python linting
-        ruff check apps/ libs/ control-plane/ data-plane/ services/ --output-format=github
-        # TypeScript linting
-        cd web && npm run lint
-        cd ..
-      continue-on-error: false
-      
-    - name: Run type checking
-      run: |
-        echo "🔍 Running type checking..."
-        # Python type checking
-        mypy apps/ libs/ control-plane/ data-plane/ services/ --config-file mypy.ini
-        # TypeScript type checking
-        cd web && npx tsc --noEmit
-        cd ..
-      continue-on-error: false
-      
-    - name: Generate comprehensive quality report
-      run: |
-        echo "📊 Generating comprehensive quality report..."
-        python3 scripts/quality_analysis_report.py --verbose --html
-      continue-on-error: true
-      
-    - name: Upload quality reports
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: quality-reports
-        path: reports/
-        retention-days: 30
-        
-    - name: Comment PR with quality report
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-          const path = require('path');
-          
-          try {
-            // Read quality analysis summary
-            const summaryPath = 'reports/quality_analysis_summary.json';
-            if (fs.existsSync(summaryPath)) {
-              const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
-              
-              const comment = `## 🔍 Quality Analysis Report
-              
-              **Overall Status:** ${summary.overall_status.toUpperCase()}
-              
-              ### 📊 Metrics
-              - **Code Duplication:** ${summary.duplication.percentage.toFixed(1)}% (${summary.duplication.status})
-              - **Dead Code:** ${summary.dead_code.total_items} items (${summary.dead_code.status})
-              - **High Complexity:** ${summary.complexity.high_complexity_functions} functions (${summary.complexity.status})
-              
-              ### 💡 Recommendations
-              ${summary.recommendations.map(rec => `- ${rec}`).join('\n')}
-              
-              📁 [Download detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-              `;
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
+        continue-on-error: false
+
+      - name: Run dead code detection (Python)
+        run: |
+          echo "💀 Running Python dead code detection..."
+          vulture apps/ libs/ control-plane/ data-plane/ services/ --min-confidence 80 --sort-by-size > reports/dead-code/python-dead-code.txt || true
+          DEAD_CODE_COUNT=$(wc -l < reports/dead-code/python-dead-code.txt)
+          echo "Python dead code items: $DEAD_CODE_COUNT"
+          if [ $DEAD_CODE_COUNT -gt 20 ]; then
+            echo "❌ Too many dead code items detected ($DEAD_CODE_COUNT > 20)"
+            exit 1
+          else
+            echo "✅ Python dead code within acceptable limits"
+          fi
+        continue-on-error: false
+
+      - name: Run dead code detection (TypeScript)
+        run: |
+          echo "💀 Running TypeScript dead code detection..."
+          cd web
+          npm run ts-unused-exports-report || true
+          cd ..
+          if [ -f web/reports/ts-unused-exports.json ]; then
+            UNUSED_EXPORTS_COUNT=$(cat web/reports/ts-unused-exports.json | jq -r 'length')
+            echo "TypeScript unused exports: $UNUSED_EXPORTS_COUNT"
+            if [ $UNUSED_EXPORTS_COUNT -gt 10 ]; then
+              echo "❌ Too many unused exports detected ($UNUSED_EXPORTS_COUNT > 10)"
+              exit 1
+            else
+              echo "✅ TypeScript unused exports within acceptable limits"
+            fi
+          else
+            echo "⚠️ TypeScript dead code report not found"
+          fi
+        continue-on-error: false
+
+      - name: Run code complexity analysis
+        run: |
+          echo "📈 Running code complexity analysis..."
+          radon cc apps/ libs/ control-plane/ data-plane/ services/ -nc -j > reports/complexity/complexity.json
+          HIGH_COMPLEXITY=$(cat reports/complexity/complexity.json | jq -r '. | length')
+          echo "High complexity functions: $HIGH_COMPLEXITY"
+          if [ $HIGH_COMPLEXITY -gt 15 ]; then
+            echo "❌ Too many high complexity functions detected ($HIGH_COMPLEXITY > 15)"
+            exit 1
+          else
+            echo "✅ Code complexity within acceptable limits"
+          fi
+        continue-on-error: false
+
+      - name: Run linting checks
+        run: |
+          echo "🔍 Running linting checks..."
+          # Python linting
+          ruff check apps/ libs/ control-plane/ data-plane/ services/ --output-format=github
+          # TypeScript linting
+          cd web && npm run lint
+          cd ..
+        continue-on-error: false
+
+      - name: Run type checking
+        run: |
+          echo "🔍 Running type checking..."
+          # Python type checking
+          mypy apps/ libs/ control-plane/ data-plane/ services/ --config-file mypy.ini
+          # TypeScript type checking
+          cd web && npx tsc --noEmit
+          cd ..
+        continue-on-error: false
+
+      - name: Generate comprehensive quality report
+        run: |
+          echo "📊 Generating comprehensive quality report..."
+          python3 scripts/quality_analysis_report.py --verbose --html
+        continue-on-error: true
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: quality-reports
+          path: reports/
+          retention-days: 30
+
+      - name: Comment PR with quality report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            try {
+              // Read quality analysis summary
+              const summaryPath = 'reports/quality_analysis_summary.json';
+              if (fs.existsSync(summaryPath)) {
+                const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+                
+                const comment = `## 🔍 Quality Analysis Report
+                
+                **Overall Status:** ${summary.overall_status.toUpperCase()}
+                
+                ### 📊 Metrics
+                - **Code Duplication:** ${summary.duplication.percentage.toFixed(1)}% (${summary.duplication.status})
+                - **Dead Code:** ${summary.dead_code.total_items} items (${summary.dead_code.status})
+                - **High Complexity:** ${summary.complexity.high_complexity_functions} functions (${summary.complexity.status})
+                
+                ### 💡 Recommendations
+                ${summary.recommendations.map(rec => `- ${rec}`).join('\n')}
+                
+                📁 [Download detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                `;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.log('Failed to generate quality report comment:', error);
             }
-          } catch (error) {
-            console.log('Failed to generate quality report comment:', error);
-          }
 
   architectural-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-        
-    - name: Check for architectural violations
-      run: |
-        echo "🏗️ Running architectural checks..."
-        
-        # Check for circular imports
-        echo "Checking for circular imports..."
-        python -c "
-        import sys
-        import importlib.util
-        
-        def check_circular_imports():
-            circular_imports = []
-            # Add specific checks for known problematic patterns
-            return circular_imports
-        
-        violations = check_circular_imports()
-        if violations:
-            print('❌ Circular import violations found:')
-            for violation in violations:
-                print(f'  - {violation}')
-            sys.exit(1)
-        else:
-            print('✅ No circular import violations found')
-        "
-        
-        # Check for duplicate function signatures
-        echo "Checking for duplicate function signatures..."
-        python -c "
-        import ast
-        import os
-        from collections import defaultdict
-        
-        def extract_function_signatures(directory):
-            signatures = defaultdict(list)
-            for root, dirs, files in os.walk(directory):
-                for file in files:
-                    if file.endswith('.py'):
-                        filepath = os.path.join(root, file)
-                        try:
-                            with open(filepath, 'r') as f:
-                                tree = ast.parse(f.read())
-                                for node in ast.walk(tree):
-                                    if isinstance(node, ast.FunctionDef):
-                                        sig = f'{node.name}({len(node.args.args)} args)'
-                                        signatures[sig].append(f'{filepath}:{node.lineno}')
-                        except:
-                            pass
-            return signatures
-        
-        signatures = extract_function_signatures('apps/')
-        duplicates = {k: v for k, v in signatures.items() if len(v) > 3}
-        
-        if duplicates:
-            print('⚠️ Potential duplicate function patterns found:')
-            for sig, locations in list(duplicates.items())[:5]:  # Show first 5
-                print(f'  - {sig}: {len(locations)} occurrences')
-        else:
-            print('✅ No significant duplicate function patterns found')
-        "
-        
-        # Check for unused imports
-        echo "Checking for unused imports..."
-        ruff check apps/ libs/ --select F401 --output-format=github || true
-        
-        echo "✅ Architectural checks completed"
-      continue-on-error: false
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Check for architectural violations
+        run: |
+          echo "🏗️ Running architectural checks..."
+
+          # Check for circular imports
+          echo "Checking for circular imports..."
+          python -c "
+          import sys
+          import importlib.util
+
+          def check_circular_imports():
+              circular_imports = []
+              # Add specific checks for known problematic patterns
+              return circular_imports
+
+          violations = check_circular_imports()
+          if violations:
+              print('❌ Circular import violations found:')
+              for violation in violations:
+                  print(f'  - {violation}')
+              sys.exit(1)
+          else:
+              print('✅ No circular import violations found')
+          "
+
+          # Check for duplicate function signatures
+          echo "Checking for duplicate function signatures..."
+          python -c "
+          import ast
+          import os
+          from collections import defaultdict
+
+          def extract_function_signatures(directory):
+              signatures = defaultdict(list)
+              for root, dirs, files in os.walk(directory):
+                  for file in files:
+                      if file.endswith('.py'):
+                          filepath = os.path.join(root, file)
+                          try:
+                              with open(filepath, 'r') as f:
+                                  tree = ast.parse(f.read())
+                                  for node in ast.walk(tree):
+                                      if isinstance(node, ast.FunctionDef):
+                                          sig = f'{node.name}({len(node.args.args)} args)'
+                                          signatures[sig].append(f'{filepath}:{node.lineno}')
+                          except:
+                              pass
+              return signatures
+
+          signatures = extract_function_signatures('apps/')
+          duplicates = {k: v for k, v in signatures.items() if len(v) > 3}
+
+          if duplicates:
+              print('⚠️ Potential duplicate function patterns found:')
+              for sig, locations in list(duplicates.items())[:5]:  # Show first 5
+                  print(f'  - {sig}: {len(locations)} occurrences')
+          else:
+              print('✅ No significant duplicate function patterns found')
+          "
+
+          # Check for unused imports
+          echo "Checking for unused imports..."
+          ruff check apps/ libs/ --select F401 --output-format=github || true
+
+          echo "✅ Architectural checks completed"
+        continue-on-error: false

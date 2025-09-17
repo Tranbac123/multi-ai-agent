@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, text
 
 from libs.contracts.billing import BudgetConfig, BudgetAlert, BudgetUsage
-from libs.utils.exceptions import BudgetExceededError, BudgetConfigurationError
+from libs.utils.exceptions import BudgetConfigurationError
 
 logger = structlog.get_logger(__name__)
 

@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 import structlog
 
-from libs.contracts.tenant import Tenant, User, APIKey
+# from libs.contracts.tenant import Tenant, User, APIKey
 from libs.contracts.error import ErrorSpec, ErrorCode
 from libs.utils.exceptions import AuthenticationError, AuthorizationError
 

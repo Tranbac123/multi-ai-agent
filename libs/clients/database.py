@@ -7,7 +7,7 @@ from uuid import UUID
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import text
-from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.orm import sessionmaker
 
 logger = structlog.get_logger(__name__)
 

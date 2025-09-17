@@ -8,7 +8,7 @@ from uuid import uuid4
 import structlog
 
 from libs.contracts.error import ErrorResponse, ServiceError, ValidationError
-from libs.contracts.agent import AgentRequest, AgentResponse, MessageSpec
+from libs.contracts.agent import MessageSpec
 from libs.contracts.tool import ToolCall, ToolResult, ToolSpec
 from libs.contracts.router import RouterDecisionRequest, RouterDecisionResponse
 

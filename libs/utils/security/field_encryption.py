@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
+# from cryptography.hazmat.backends import default_backend
 
 logger = structlog.get_logger(__name__)
 

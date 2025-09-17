@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 import time
 
 from apps.api_gateway.core.concurrency_manager import ConcurrencyManager
-from apps.api-gateway.core.fair_scheduler import WeightedFairScheduler, RequestPriority
+from apps.api_gateway.core.fair_scheduler import WeightedFairScheduler, RequestPriority
 from libs.clients.quota_enforcer import QuotaEnforcer
 from libs.clients.billing import BillingClient
 from libs.utils.auth import get_tenant_from_jwt

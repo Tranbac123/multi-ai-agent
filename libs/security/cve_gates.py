@@ -68,7 +68,7 @@ class ComponentVulnerability:
 
 
 @dataclass
-class CVE GateRule:
+class CVEGateRule:
     """CVE gate rule definition."""
     rule_id: str
     name: str
@@ -106,7 +106,7 @@ class CVEGatesManager:
     def __init__(self):
         self.vulnerabilities: Dict[str, Vulnerability] = {}
         self.component_vulnerabilities: Dict[str, ComponentVulnerability] = {}
-        self.gate_rules: Dict[str, CVE GateRule] = {}
+        self.gate_rules: Dict[str, CVEGateRule] = {}
         self.vulnerability_databases = [
             "https://cve.mitre.org/data/downloads/allitems.xml",
             "https://nvd.nist.gov/feeds/xml/cve/2.0/nvdcve-2.0-modified.xml",
@@ -234,7 +234,7 @@ class CVEGatesManager:
                         error=str(e))
             return []
     
-    async def create_gate_rule(self, rule: CVE GateRule) -> bool:
+    async def create_gate_rule(self, rule: CVEGateRule) -> bool:
         """Create a new CVE gate rule."""
         try:
             logger.info("Creating CVE gate rule",
@@ -258,7 +258,7 @@ class CVEGatesManager:
                         error=str(e))
             return False
     
-    def _validate_gate_rule(self, rule: CVE GateRule) -> bool:
+    def _validate_gate_rule(self, rule: CVEGateRule) -> bool:
         """Validate CVE gate rule."""
         try:
             # Check required fields
@@ -351,7 +351,7 @@ class CVEGatesManager:
                         error=str(e))
             raise
     
-    def _filter_vulnerabilities(self, vulnerabilities: List[ComponentVulnerability], rule: CVE GateRule) -> List[ComponentVulnerability]:
+    def _filter_vulnerabilities(self, vulnerabilities: List[ComponentVulnerability], rule: CVEGateRule) -> List[ComponentVulnerability]:
         """Filter vulnerabilities based on gate rule criteria."""
         try:
             filtered = []
@@ -402,7 +402,7 @@ class CVEGatesManager:
             return {}
     
     def _determine_gate_status(self, severity_counts: Dict[VulnerabilitySeverity, int], 
-                             rule: CVE GateRule, blocked_vulnerabilities: List[str]) -> GateStatus:
+                             rule: CVEGateRule, blocked_vulnerabilities: List[str]) -> GateStatus:
         """Determine gate status based on vulnerability counts and rule criteria."""
         try:
             # Check for blocked vulnerabilities
@@ -429,7 +429,7 @@ class CVEGatesManager:
             return GateStatus.FAIL
     
     def _generate_gate_message(self, status: GateStatus, severity_counts: Dict[VulnerabilitySeverity, int], 
-                             rule: CVE GateRule) -> str:
+                             rule: CVEGateRule) -> str:
         """Generate gate evaluation message."""
         try:
             if status == GateStatus.PASS:

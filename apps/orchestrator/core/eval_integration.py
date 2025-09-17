@@ -13,8 +13,6 @@ import redis.asyncio as redis
 from eval.golden_tasks.faq_handling import (
     FAQHandlingGoldenTasks,
     GoldenTask,
-    TaskResult,
-    TaskStatus,
 )
 from eval.golden_tasks.order_management import OrderManagementGoldenTasks
 from eval.golden_tasks.lead_capture import LeadCaptureGoldenTasks
@@ -22,7 +20,6 @@ from eval.episode_replay import (
     EpisodeReplay,
     Episode,
     EpisodeStep,
-    EpisodeStatus,
     ReplayMode,
 )
 

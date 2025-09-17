@@ -13,7 +13,7 @@ import structlog
 from fastapi import HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
-from passlib.hash import bcrypt
+# from passlib.hash import bcrypt
 
 from libs.clients.database import get_db_session
 from libs.contracts.database import UserProfile, UserRole

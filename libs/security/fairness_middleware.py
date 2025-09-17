@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import structlog
 from datetime import datetime, timedelta
-import heapq
+# import heapq
 from collections import defaultdict, deque
 
 logger = structlog.get_logger(__name__)

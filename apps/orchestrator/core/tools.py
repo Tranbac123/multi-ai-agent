@@ -5,12 +5,7 @@ from decimal import Decimal
 import structlog
 from libs.contracts.database import (
     CustomerProfile,
-    OrderInfo,
-    OrderItem,
     ProductInfo,
-    LeadInfo,
-    MessageInfo,
-    FAQEntry,
     UserProfile,
 )
 from libs.contracts.tool import ToolCall, ToolResult, ToolSpec
@@ -129,7 +124,7 @@ class CRMTool(BaseTool):
         return await self.execute_with_resilience(_create)
 
     async def search_customers(
-        self, search_data: Dict[str, Any]
+        self, search_data: Dict[str, Any]  # noqa: F841
     ) -> List[Dict[str, Any]]:
         """Search customers with resilience patterns."""
 
@@ -301,7 +296,7 @@ class OrderTool(BaseTool):
         return await self.execute_with_resilience(_update)
 
     async def add_order_item(
-        self, order_id: int, product_id: int, qty: int, unit_price: float
+        self, order_id: int, product_id: int, qty: int, unit_price: float  # noqa: F841
     ) -> bool:
         """Add order item with resilience patterns."""
 

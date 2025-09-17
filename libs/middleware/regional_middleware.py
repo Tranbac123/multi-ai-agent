@@ -6,7 +6,7 @@ from fastapi import Request, Response, HTTPException, status
 from fastapi.responses import JSONResponse
 import time
 
-from apps.api-gateway.core.region_router import RegionRouter
+# from apps.api-gateway.core.region_router import RegionRouter
 from libs.utils.auth import get_tenant_from_jwt
 
 logger = structlog.get_logger(__name__)

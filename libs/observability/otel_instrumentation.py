@@ -16,7 +16,7 @@ from contextvars import ContextVar
 
 from opentelemetry import trace, metrics
 from opentelemetry.trace import Status, StatusCode
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+# from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor

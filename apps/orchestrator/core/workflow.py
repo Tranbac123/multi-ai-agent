@@ -6,7 +6,7 @@ from uuid import UUID
 import structlog
 from opentelemetry import trace
 
-from libs.contracts.agent import AgentRun, AgentStep
+from libs.contracts.agent import AgentRun
 from libs.contracts.tool import ToolCall, ToolResult
 from libs.contracts.message import MessageSpec, MessageRole
 from libs.contracts.error import ErrorSpec, ErrorCode

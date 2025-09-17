@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from collections import deque
 import asyncio
 import time
-import heapq
+# import heapq
 import structlog
 from enum import Enum
 

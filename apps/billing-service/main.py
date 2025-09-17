@@ -16,10 +16,8 @@ from opentelemetry import trace
 
 from libs.contracts.billing import (
     UsageCounter,
-    BillingPlan,
     Invoice,
     PaymentMethod,
-    UsageReport,
     BillingEvent,
     MeteredUsage,
 )

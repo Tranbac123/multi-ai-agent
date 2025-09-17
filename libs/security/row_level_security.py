@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 import structlog
 from datetime import datetime, timedelta
-from sqlalchemy import text, func, and_, or_
+from sqlalchemy import text, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -329,7 +329,7 @@ class RLSManager:
         self, 
         tenant_id: str, 
         resource_tenant_id: str,
-        required_access: TenantAccessLevel = TenantAccessLevel.READ
+        required_access: TenantAccessLevel = TenantAccessLevel.READ  # noqa: F841
     ) -> bool:
         """Validate that tenant has access to a resource."""
         

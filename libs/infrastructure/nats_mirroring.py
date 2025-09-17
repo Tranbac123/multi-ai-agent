@@ -443,9 +443,7 @@ class NATSMirroringManager:
             
             # Update status
             if stream_name in self.mirroring_stats:
-                self.mirroring_stats[stream_name].status = Mirro
-
-ringStatus.ACTIVE
+                self.mirroring_stats[stream_name].status = MirroringStatus.ACTIVE
             
             logger.info("Mirroring resumed", stream_name=stream_name)
             return True
