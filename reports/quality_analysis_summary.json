@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-09-17T13:25:14.072428",
+  "analysis_type": "comprehensive_quality_analysis",
+  "duplication": {
+    "percentage": 0.0,
+    "status": "pass",
+    "threshold": 5.0
+  },
+  "dead_code": {
+    "python_items": 51,
+    "typescript_items": 4,
+    "total_items": 55,
+    "status": "pass"
+  },
+  "complexity": {
+    "high_complexity_functions": 0,
+    "medium_complexity_functions": 0,
+    "total_functions": 0,
+    "status": "pass"
+  },
+  "overall_status": "fail",
+  "recommendations": [
+    "Dead code detected (55 items). Remove unused functions, variables, and imports."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-09-17T13:25:08.050717",
+  "tool": "jscpd",
+  "exit_code": 0,
+  "stdout": "\u001b[3m\u001b[90mDetection time:\u001b[39m\u001b[23m: 0.586ms\n",
+  "stderr": "",
+  "summary": {
+    "duplication_percentage": 0.0,
+    "duplicated_lines": 0,
+    "total_lines": 0,
+    "duplicated_tokens": 0,
+    "total_tokens": 0,
+    "duplicated_blocks": 0
+  }
+}

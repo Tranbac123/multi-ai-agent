@@ -1,0 +1,63 @@
+# Ruff configuration for Multi-AI-Agent Platform
+# Enforces DRY principles and code quality
+
+target-version = "py311"
+line-length = 100
+
+# Enable specific rule sets
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (includes F401, F841)
+    "F401",   # unused import
+    "F841",   # unused variable
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "PIE",    # flake8-pie
+    "T20",    # flake8-print
+    "SIM",    # flake8-simplify
+    "ERA",    # eradicate (remove commented code)
+    "PLR",    # pylint refactor
+    "TRY",    # tryceratops (better exceptions)
+    "PERF",   # perflint
+    "RUF",    # ruff-specific rules
+]
+
+# Ignore specific rules that are too strict for our use case
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B904",   # allow raising without from inside except
+    "PLR0913", # too many arguments (sometimes necessary for APIs)
+    "PLR0912", # too many branches (complex business logic)
+    "PLR0915", # too many statements (complex functions)
+    "TRY003", # avoid specifying long messages outside exception class
+]
+
+# Exclude directories
+exclude = [
+    ".git",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    "__pycache__",
+    "node_modules",
+    "venv",
+    "env",
+    "build",
+    "dist",
+    "coverage",
+    "reports",
+    "docs",
+    "infra",
+    "k8s",
+    "observability/dashboards",
+    "eval/episodes",
+    "test_episodes",
+    "load_tests",
+    "perf",
+    "load"
+]

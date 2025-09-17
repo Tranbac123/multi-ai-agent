@@ -1,6 +1,6 @@
 # Multi-Tenant AIaaS Platform Makefile
 
-.PHONY: help install test lint format type-check audit clean build deploy
+.PHONY: help install test lint format type-check audit clean build deploy dup dead comp qa
 
 # Default target
 help:
@@ -13,6 +13,12 @@ help:
 	@echo "  format       Format code with black and ruff"
 	@echo "  type-check   Run type checking with mypy"
 	@echo "  audit        Run platform readiness audit"
+	@echo ""
+	@echo "Code Quality Analysis:"
+	@echo "  dup          Detect code duplication (jscpd)"
+	@echo "  dead         Detect dead code (vulture + ts-prune)"
+	@echo "  comp         Analyze code complexity (radon)"
+	@echo "  qa           Run all quality analysis tools"
 	@echo ""
 	@echo "Build & Deploy:"
 	@echo "  build        Build Docker images"
@@ -180,6 +186,45 @@ harden-websocket:
 harden-rls:
 	@echo "Checking RLS policies..."
 	python scripts/audit_readiness.py --verbose | grep -E "(RLS|PASS|FAIL)"
+
+# Code Quality Analysis
+dup:
+	@echo "🔍 Detecting code duplication..."
+	@mkdir -p reports/duplication
+	jscpd --config .jscpd.json
+	@echo "📊 Duplication report saved to reports/duplication/"
+
+dead:
+	@echo "💀 Detecting dead code..."
+	@mkdir -p reports/dead-code
+	@echo "Python dead code analysis:"
+	vulture apps/ libs/ control-plane/ data-plane/ services/ --min-confidence 80 --sort-by-size > reports/dead-code/python-dead-code.txt || true
+	@echo "TypeScript dead code analysis:"
+	cd web && npm run dead-code || true
+	@echo "📊 Dead code reports saved to reports/dead-code/"
+
+comp:
+	@echo "📈 Analyzing code complexity..."
+	@mkdir -p reports/complexity
+	radon cc apps/ libs/ control-plane/ data-plane/ services/ -nc -j > reports/complexity/complexity.json
+	radon cc apps/ libs/ control-plane/ data-plane/ services/ -nc -a > reports/complexity/complexity-average.txt
+	@echo "📊 Complexity reports saved to reports/complexity/"
+
+qa: dup dead comp
+	@echo "🎯 Quality Analysis Summary:"
+	@echo "================================"
+	@echo "📊 Duplication Report: reports/duplication/"
+	@echo "💀 Dead Code Report: reports/dead-code/"
+	@echo "📈 Complexity Report: reports/complexity/"
+	@echo "🔍 Linting Report: Above output"
+	@echo "================================"
+	@echo "✅ Quality analysis complete!"
+
+qa-comprehensive:
+	@echo "🔍 Running comprehensive quality analysis..."
+	@mkdir -p reports
+	python3 scripts/quality_analysis_report.py --verbose --html
+	@echo "📊 Comprehensive report saved to reports/quality_analysis_report.html"
 
 # Test specific hardening criteria
 test-loop-safety:

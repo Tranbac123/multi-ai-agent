@@ -1,0 +1,93 @@
+apps/ingestion/core/pii_redaction.py
+    M 232:4 PIIDetector.detect_pii - C
+apps/ingestion/core/sensitivity_tagger.py
+    M 470:4 SensitivityTagger.get_sensitivity_summary - C
+    M 228:4 SensitivityTagger._analyze_content - C
+    M 341:4 SensitivityTagger._determine_sensitivity_level - C
+apps/api-gateway/main.py
+    ERROR: invalid syntax (<unknown>, line 27)
+apps/api-gateway/middleware/billing_middleware.py
+    M 416:4 BillingMiddleware._calculate_usage_quantity - C
+apps/api-gateway/middleware/admission_control.py
+    ERROR: invalid syntax (<unknown>, line 10)
+apps/api-gateway/core/region_router.py
+    M 230:4 RegionRouter.select_provider - C
+apps/chat-adapters/adapters/facebook_adapter.py
+    M 200:4 FacebookMessengerAdapter._convert_to_facebook_format - C
+apps/eval-service/core/llm_judge.py
+    M 240:4 LLMJudge._parse_judge_response - C
+apps/tenant-service/main.py
+    ERROR: invalid syntax (<unknown>, line 27)
+apps/admin-portal/main.py
+    F 514:0 update_tenant - C
+apps/realtime/main.py
+    F 118:0 websocket_endpoint - C
+apps/realtime/core/backpressure_handler.py
+    M 192:4 BackpressureHandler._process_queue - C
+apps/router-service/core/safe_mode_router.py
+    M 194:4 SafeModeRouter._estimate_request_complexity - C
+apps/router-service/core/early_exit_manager.py
+    M 100:4 JSONValidator._validate_schema - D
+apps/router_service/core/calibrated_classifier.py
+    M 293:4 CalibratedClassifier._deterministic_fallback - D
+    M 118:4 CalibratedClassifier._calculate_tier_scores - C
+apps/router_service/core/early_exit_escalation.py
+    M 98:4 EarlyExitEscalation._check_early_exit - C
+    M 228:4 EarlyExitEscalation._check_domain_early_exit_rules - C
+apps/billing-service/core/webhook_aggregator.py
+    M 499:4 WebhookAggregator._update_counters_from_event - C
+apps/realtime-service/core/websocket_manager.py
+    M 359:4 WebSocketManager._ping_monitor - C
+apps/orchestrator/core/eval_integration.py
+    M 270:4 EvalIntegration._run_golden_tasks - C
+    M 478:4 EvalIntegration._check_quality_gates - C
+    M 109:4 EvalIntegration.run_evaluation - C
+apps/orchestrator/core/degradation_manager.py
+    M 155:4 DegradationManager._determine_load_level - C
+libs/clients/http/timeout_manager.py
+    M 349:4 TimeoutManager.get_timeout_stats - C
+    M 440:4 TimeoutManager.get_timeout_recommendations - C
+libs/clients/http/request_hedging.py
+    M 177:4 RequestHedgingManager._execute_parallel_hedging - C
+libs/middleware/regional_middleware.py
+    ERROR: invalid syntax (<unknown>, line 9)
+libs/security/cve_gates.py
+    ERROR: invalid syntax (<unknown>, line 71)
+libs/security/fairness_middleware.py
+    M 317:4 PreAdmissionControl.check_admission - C
+libs/security/image_signing.py
+    M 360:4 ImageSigningManager.verify_image_signature - C
+libs/contracts/message_spec.py
+    M 211:4 MessageSpec.validate_message_consistency - C
+libs/contracts/tool_spec.py
+    C 37:0 ToolParameter - C
+    M 72:4 ToolParameter.validate_default_value - C
+    M 383:4 ToolSpec.validate_tool_consistency - C
+libs/contracts/router_spec.py
+    M 339:4 RouterDecisionResponse.validate_response_consistency - C
+    M 223:4 RouterDecisionRequest.validate_request_consistency - C
+libs/workflows/workflow_loader.py
+    M 378:4 WorkflowLoader._merge_specs - C
+libs/utils/security/pii_detector.py
+    M 251:4 PIIDetector._calculate_confidence - C
+libs/observability/slo_manager.py
+    M 461:4 SLOManager.get_slo_metrics_summary - C
+    M 175:4 ErrorBudget.get_status - C
+libs/reliability/saga_manager.py
+    M 266:4 SagaManager.get_saga_status - C
+libs/events/event_store.py
+    M 108:4 EventStore.get_events - C
+    M 237:4 EventStore.get_event_statistics - C
+libs/performance/locust_profiles.py
+    M 441:4 PerformanceGateValidator._on_test_stop - C
+libs/infrastructure/failover_manager.py
+    M 243:4 FailoverManager._should_trigger_failover - C
+libs/infrastructure/dr_runbooks.py
+    M 646:4 DRRunbooksManager.get_all_executions - C
+libs/infrastructure/nats_mirroring.py
+    ERROR: expected 'except' or 'finally' block (<unknown>, line 448)
+services/memory/knowledge_service.py
+    M 133:4 KnowledgeService._has_access - C
+
+45 blocks (classes, functions, methods) analyzed.
+Average complexity: C (13.71111111111111)
