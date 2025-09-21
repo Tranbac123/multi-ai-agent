@@ -168,7 +168,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to production
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -181,7 +181,7 @@ jobs:
             docker system prune -f
 
       - name: Run database migrations
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
