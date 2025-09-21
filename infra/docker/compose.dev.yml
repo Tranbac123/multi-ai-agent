@@ -218,10 +218,10 @@ services:
       retries: 5
 
   # Analytics Service
-  analytics-service:
+  analytics_service:
     build:
       context: ../..
-      dockerfile: infra/docker/Dockerfile.analytics-service
+      dockerfile: infra/docker/Dockerfile.analytics_service
     ports:
       - "8083:8083"
     environment:
