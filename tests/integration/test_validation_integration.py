@@ -86,7 +86,7 @@ class TestAPIValidation:
         """Test that valid request returns 200."""
         valid_payload = {"message": "Hello world", "tenant_id": "tenant-456"}
 
-        with patch("apps.router_service.main.router_service") as mock_router:
+        with patch("apps.router-service.main.router-service") as mock_router:
             mock_router.decide.return_value = RouterDecisionResponse(
                 agent_id="test-agent",
                 tier="A",
@@ -129,7 +129,7 @@ class TestServiceBoundaryValidation:
 
     def test_router_decision_validation(self):
         """Test router validates decision requests."""
-        from apps.router_service.core.router import RouterService
+        from apps.router-service.core.router import RouterService
 
         router = RouterService()
 

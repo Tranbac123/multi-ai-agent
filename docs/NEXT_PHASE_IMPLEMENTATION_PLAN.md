@@ -277,7 +277,7 @@ CREATE TABLE tenant_budgets (
 ##### **3.2 Cost Ceiling Enforcement**
 
 ```python
-# apps/router_service/core/cost_guard.py
+# apps/router-service/core/cost_guard.py
 class CostGuard:
     def __init__(self, billing_client: BillingClient):
         self.billing = billing_client
@@ -314,7 +314,7 @@ class DriftDetector:
 ##### **3.4 Safe Mode Implementation**
 
 ```python
-# apps/router_service/core/safe_mode.py
+# apps/router-service/core/safe_mode.py
 class SafeModeManager:
     def __init__(self):
         self.safe_mode_configs = {
@@ -337,9 +337,9 @@ class SafeModeManager:
 #### **Files to Create/Modify**
 
 - `data-plane/migrations/007_budget_schema.py`
-- `apps/router_service/core/cost_guard.py`
+- `apps/router-service/core/cost_guard.py`
 - `apps/billing_service/core/drift_detector.py`
-- `apps/router_service/core/safe_mode.py`
+- `apps/router-service/core/safe_mode.py`
 - `observability/dashboards/cost_governance.json`
 
 ---

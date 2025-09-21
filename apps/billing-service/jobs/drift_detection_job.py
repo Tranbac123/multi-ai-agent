@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import text
 
 from apps.billing-service.core.budget_manager import BudgetManager, BudgetPeriod
-from apps.router_service.core.cost_drift_detector import CostDriftDetector
-from apps.router_service.core.safe_mode_router import SafeModeRouter, SafeModeLevel
+from apps.router-service.core.cost_drift_detector import CostDriftDetector
+from apps.router-service.core.safe_mode_router import SafeModeRouter, SafeModeLevel
 from libs.clients.notification import NotificationClient
 from libs.contracts.billing import BudgetAlert, BudgetConfig
 

@@ -52,7 +52,7 @@ class TestImpactAnalyzer:
                 description="Orchestrator changes require integration, E2E, and chaos tests"
             ),
             TestImpactRule(
-                pattern="apps/router_service/**",
+                pattern="apps/router-service/**",
                 test_paths=["tests/integration/router/", "tests/eval/", "tests/performance/"],
                 priority=10,
                 description="Router changes require integration, evaluation, and performance tests"
@@ -293,7 +293,7 @@ class TestImpactAnalyzer:
             return True
         
         # Run full suite if core services changed
-        core_services = ["apps/api-gateway/**", "apps/orchestrator/**", "apps/router_service/**"]
+        core_services = ["apps/api-gateway/**", "apps/orchestrator/**", "apps/router-service/**"]
         core_changes = 0
         
         for change in changes:

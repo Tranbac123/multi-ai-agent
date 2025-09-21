@@ -6,13 +6,13 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 import redis.asyncio as redis
 
-from apps.router_service.core.router_v2 import RouterV2, RouterDecision
-from apps.router_service.core.feature_extractor import RouterFeatures, Tier
-from apps.router_service.core.calibrated_classifier import CalibratedClassifier
-from apps.router_service.core.bandit_policy import BanditPolicy
-from apps.router_service.core.early_exit_escalation import EarlyExitEscalation, EscalationDecision
-from apps.router_service.core.canary_manager import CanaryManager
-from apps.router_service.core.metrics import MetricsCollector
+from apps.router-service.core.router_v2 import RouterV2, RouterDecision
+from apps.router-service.core.feature_extractor import RouterFeatures, Tier
+from apps.router-service.core.calibrated_classifier import CalibratedClassifier
+from apps.router-service.core.bandit_policy import BanditPolicy
+from apps.router-service.core.early_exit_escalation import EarlyExitEscalation, EscalationDecision
+from apps.router-service.core.canary_manager import CanaryManager
+from apps.router-service.core.metrics import MetricsCollector
 
 
 class TestRouterV2:

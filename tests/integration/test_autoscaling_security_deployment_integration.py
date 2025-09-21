@@ -305,7 +305,7 @@ class TestAutoscalingSecurityDeploymentIntegration:
         expected_netpols = [
             "api-gateway-netpol",
             "orchestrator-netpol",
-            "router_service-netpol",
+            "router-service-netpol",
             "realtime-netpol",
             "analytics-service-netpol",
             "billing-service-netpol",
@@ -335,7 +335,7 @@ class TestAutoscalingSecurityDeploymentIntegration:
         expected_scaled_objects = [
             "orchestrator-scaler",
             "ingestion-scaler",
-            "router_service-scaler",
+            "router-service-scaler",
             "realtime-scaler",
             "analytics-service-scaler",
             "billing-service-scaler",
@@ -358,7 +358,7 @@ class TestAutoscalingSecurityDeploymentIntegration:
 
         # Expected HPAs
         expected_hpas = [
-            "router_service-hpa",
+            "router-service-hpa",
             "realtime-hpa",
             "analytics-service-hpa",
             "billing-service-hpa",

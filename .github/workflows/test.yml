@@ -322,7 +322,7 @@ jobs:
         run: |
           python -c "
           import asyncio
-          from apps.router_service.core.router_v2 import RouterV2
+          from apps.router-service.core.router_v2 import RouterV2
 
           async def check_router_latency():
               router = RouterV2()

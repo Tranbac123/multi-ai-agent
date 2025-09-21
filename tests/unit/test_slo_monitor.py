@@ -33,7 +33,7 @@ class TestSLOMonitor:
         # Check specific targets exist
         services = [target.service for target in monitor.slo_targets]
         assert "api-gateway" in services
-        assert "router_service" in services
+        assert "router-service" in services
         assert "orchestrator" in services
         assert "realtime" in services
         assert "analytics-service" in services
@@ -281,7 +281,7 @@ class TestSLOMonitor:
         # Check service breakdown
         services = summary["services"]
         assert "api-gateway" in services
-        assert "router_service" in services
+        assert "router-service" in services
         assert "orchestrator" in services
         assert "realtime" in services
         assert "analytics-service" in services

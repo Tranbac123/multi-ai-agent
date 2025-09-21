@@ -111,10 +111,10 @@ services:
       retries: 3
 
   # Router Service
-  router_service:
+  router-service:
     build:
       context: .
-      dockerfile: apps/router_service/Dockerfile
+      dockerfile: apps/router-service/Dockerfile
     ports:
       - "8002:8002"
     environment:
@@ -130,7 +130,7 @@ services:
       nats:
         condition: service_healthy
     volumes:
-      - ./apps/router_service:/app
+      - ./apps/router-service:/app
       - ./libs:/app/libs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]

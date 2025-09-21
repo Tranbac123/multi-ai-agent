@@ -101,7 +101,7 @@ services:
         cpu: 4000m
         memory: 8Gi
 
-  router_service:
+  router-service:
     replicas: 3
     resources:
       requests:
@@ -146,7 +146,7 @@ python scripts/verify_production_setup.py
 # Build all services
 docker build -t your-registry/multi-ai-agent-api-gateway:latest apps/api-gateway/
 docker build -t your-registry/multi-ai-agent-orchestrator:latest apps/orchestrator/
-docker build -t your-registry/multi-ai-agent-router:latest apps/router_service/
+docker build -t your-registry/multi-ai-agent-router:latest apps/router-service/
 docker build -t your-registry/multi-ai-agent-realtime:latest apps/realtime/
 docker build -t your-registry/multi-ai-agent-analytics:latest apps/analytics-service/
 docker build -t your-registry/multi-ai-agent-billing:latest apps/billing-service/
@@ -190,7 +190,7 @@ kubectl apply -f k8s/production/secrets.yaml
 # Deploy core services
 kubectl apply -f k8s/production/api-gateway/
 kubectl apply -f k8s/production/orchestrator/
-kubectl apply -f k8s/production/router_service/
+kubectl apply -f k8s/production/router-service/
 kubectl apply -f k8s/production/realtime/
 kubectl apply -f k8s/production/analytics-service/
 kubectl apply -f k8s/production/billing-service/
@@ -313,7 +313,7 @@ python scripts/production_health_check.py
 # Validate all services
 kubectl exec -it deployment/api-gateway -n multi-ai-agent-prod -- python scripts/health_check.py
 kubectl exec -it deployment/orchestrator -n multi-ai-agent-prod -- python scripts/health_check.py
-kubectl exec -it deployment/router_service -n multi-ai-agent-prod -- python scripts/health_check.py
+kubectl exec -it deployment/router-service -n multi-ai-agent-prod -- python scripts/health_check.py
 ```
 
 ### **7.2 Load Testing**

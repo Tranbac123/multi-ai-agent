@@ -9,11 +9,11 @@ import asyncio
 import numpy as np
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from apps.router_service.core.feature_extractor import FeatureExtractor, FeatureVector
-from apps.router_service.core.calibrated_classifier import CalibratedClassifier, RouterTier, ClassificationResult
-from apps.router_service.core.early_exit_manager import EarlyExitManager, EarlyExitResult
-from apps.router_service.core.canary_manager import CanaryManager, CanaryStatus
-from apps.router_service.core.enhanced_router import EnhancedRouter
+from apps.router-service.core.feature_extractor import FeatureExtractor, FeatureVector
+from apps.router-service.core.calibrated_classifier import CalibratedClassifier, RouterTier, ClassificationResult
+from apps.router-service.core.early_exit_manager import EarlyExitManager, EarlyExitResult
+from apps.router-service.core.canary_manager import CanaryManager, CanaryStatus
+from apps.router-service.core.enhanced_router import EnhancedRouter
 
 
 @pytest.fixture

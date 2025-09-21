@@ -37,11 +37,11 @@ class TestMultiChannelJourney:
     @pytest.fixture
     async def router(self):
         """Create router instance for testing."""
-        from apps.router_service.core.router import RouterEngine
-        from apps.router_service.core.features import FeatureExtractor
-        from apps.router_service.core.classifier import MLClassifier
-        from apps.router_service.core.cost import CostCalculator
-        from apps.router_service.core.judge import LLMJudge
+        from apps.router-service.core.router import RouterEngine
+        from apps.router-service.core.features import FeatureExtractor
+        from apps.router-service.core.classifier import MLClassifier
+        from apps.router-service.core.cost import CostCalculator
+        from apps.router-service.core.judge import LLMJudge
         
         feature_extractor = FeatureExtractor()
         classifier = MLClassifier()

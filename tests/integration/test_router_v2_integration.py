@@ -5,8 +5,8 @@ import asyncio
 import time
 from typing import Dict, Any
 
-from apps.router_service.core.router_v2 import RouterV2
-from apps.router_service.core.feature_extractor import Tier
+from apps.router-service.core.router_v2 import RouterV2
+from apps.router-service.core.feature_extractor import Tier
 
 
 @pytest.fixture

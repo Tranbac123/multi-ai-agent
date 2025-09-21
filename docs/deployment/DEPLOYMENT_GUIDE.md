@@ -319,7 +319,7 @@ kubectl apply -f k8s/orchestrator-service.yaml
 
 # Deploy Router Service
 kubectl apply -f k8s/router-deployment.yaml
-kubectl apply -f k8s/router_service.yaml
+kubectl apply -f k8s/router-service.yaml
 
 # Deploy Realtime Service
 kubectl apply -f k8s/realtime-deployment.yaml

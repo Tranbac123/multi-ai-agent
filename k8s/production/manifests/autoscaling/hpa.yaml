@@ -4,13 +4,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: router_service-hpa
+  name: router-service-hpa
   namespace: production
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: router_service
+    name: router-service
   minReplicas: 2
   maxReplicas: 10
   metrics:

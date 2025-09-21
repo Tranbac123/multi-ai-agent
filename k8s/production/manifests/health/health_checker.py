@@ -73,7 +73,7 @@ class HealthChecker:
             
             # Router Service health checks
             HealthCheck(
-                name="router_service-readiness",
+                name="router-service-readiness",
                 check_type="readiness",
                 timeout_seconds=5,
                 interval_seconds=10,
@@ -81,7 +81,7 @@ class HealthChecker:
                 success_threshold=1
             ),
             HealthCheck(
-                name="router_service-liveness",
+                name="router-service-liveness",
                 check_type="liveness",
                 timeout_seconds=5,
                 interval_seconds=30,
@@ -239,7 +239,7 @@ class HealthChecker:
             # Check if service is ready to accept traffic
             readiness_checks = {
                 'api-gateway': await self._check_api_gateway_readiness(),
-                'router_service': await self._check_router_service_readiness(),
+                'router-service': await self._check_router-service_readiness(),
                 'orchestrator': await self._check_orchestrator_readiness(),
                 'realtime': await self._check_realtime_readiness(),
                 'analytics-service': await self._check_analytics-service_readiness(),
@@ -261,7 +261,7 @@ class HealthChecker:
             # Check if service is alive and responding
             liveness_checks = {
                 'api-gateway': await self._check_api_gateway_liveness(),
-                'router_service': await self._check_router_service_liveness(),
+                'router-service': await self._check_router-service_liveness(),
                 'orchestrator': await self._check_orchestrator_liveness(),
                 'realtime': await self._check_realtime_liveness(),
                 'analytics-service': await self._check_analytics-service_liveness(),
@@ -286,7 +286,7 @@ class HealthChecker:
             # Mock readiness check
             return HealthStatus.HEALTHY, "API Gateway is ready", {
                 'endpoints': ['/health', '/api/v1/chat', '/api/v1/websocket'],
-                'dependencies': ['router_service', 'orchestrator']
+                'dependencies': ['router-service', 'orchestrator']
             }
             
         except Exception as e:
@@ -308,7 +308,7 @@ class HealthChecker:
         except Exception as e:
             return HealthStatus.UNHEALTHY, f"API Gateway liveness check failed: {str(e)}", {}
     
-    async def _check_router_service_readiness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
+    async def _check_router-service_readiness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
         """Check Router Service readiness."""
         try:
             # Check if Router Service is ready
@@ -323,7 +323,7 @@ class HealthChecker:
         except Exception as e:
             return HealthStatus.UNHEALTHY, f"Router Service readiness check failed: {str(e)}", {}
     
-    async def _check_router_service_liveness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
+    async def _check_router-service_liveness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
         """Check Router Service liveness."""
         try:
             # Check if Router Service is alive

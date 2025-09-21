@@ -497,7 +497,7 @@ async def main():
     # Load configuration
     config = {
         "services": [
-            "api-gateway", "orchestrator", "router_service", "realtime",
+            "api-gateway", "orchestrator", "router-service", "realtime",
             "analytics-service", "billing-service", "ingestion", "chat-adapters",
             "tenant-service", "admin-portal", "eval-service"
         ],

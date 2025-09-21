@@ -350,7 +350,7 @@ class CoordinatedCancellationManager:
             # For now, return common services that might be involved
             common_services = [
                 "api_gateway",
-                "router_service",
+                "router-service",
                 "llm_service",
                 "vector_service",
                 "billing_service"

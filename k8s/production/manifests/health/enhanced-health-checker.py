@@ -318,15 +318,15 @@ async def main():
         
         # Router Service
         HealthCheck(
-            name="router_service",
-            url="http://router_service:8002/health",
+            name="router-service",
+            url="http://router-service:8002/health",
             expected_status=200,
             expected_response={"status": "ok"},
             critical=True
         ),
         HealthCheck(
-            name="router_service-ready",
-            url="http://router_service:8002/health/ready",
+            name="router-service-ready",
+            url="http://router-service:8002/health/ready",
             expected_status=200,
             critical=True
         ),

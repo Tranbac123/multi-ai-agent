@@ -47,7 +47,7 @@ This document provides a comprehensive overview of all services in the Multi-AI-
 
 ### **3. Router Service v2**
 
-- **Location**: `apps/router_service/`
+- **Location**: `apps/router-service/`
 - **Port**: `8002`
 - **Purpose**: Intelligent request routing with feature extraction and bandit policy
 - **Key Features**:

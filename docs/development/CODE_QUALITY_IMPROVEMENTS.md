@@ -92,7 +92,7 @@ The code quality improvement initiative focused on:
 
 ### Functions Refactored
 
-1. **`apps/router_service/core/early_exit_manager.py`**
+1. **`apps/router-service/core/early_exit_manager.py`**
 
    - `_validate_schema` → Split into multiple focused methods:
      - `_validate_object`
@@ -103,7 +103,7 @@ The code quality improvement initiative focused on:
      - `_validate_number`
      - `_validate_boolean`
 
-2. **`apps/router_service/core/calibrated_classifier.py`**
+2. **`apps/router-service/core/calibrated_classifier.py`**
 
    - `_deterministic_fallback` → Split into:
      - `_calculate_tier_scores`

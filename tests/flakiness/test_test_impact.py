@@ -32,7 +32,7 @@ class TestTestImpact:
             "analysis_id": "impact_analysis_001",
             "code_changes": [
                 {
-                    "file_path": "apps/router_service/core/decision_engine.py",
+                    "file_path": "apps/router-service/core/decision_engine.py",
                     "change_type": "modified",
                     "change_lines": [10, 15, 20],
                     "impact_level": "high"
@@ -349,7 +349,7 @@ class TestTestImpact:
             "report_details": {
                 "code_changes": [
                     {
-                        "file_path": "apps/router_service/core/decision_engine.py",
+                        "file_path": "apps/router-service/core/decision_engine.py",
                         "change_type": "modified",
                         "impact_level": "high"
                     }

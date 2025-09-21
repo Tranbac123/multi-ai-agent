@@ -230,7 +230,7 @@ class TestKEDAManager:
         # Check specific scalers exist
         assert "orchestrator-nats" in manager.scalers
         assert "ingestion-nats" in manager.scalers
-        assert "router_service-cpu" in manager.scalers
+        assert "router-service-cpu" in manager.scalers
         assert "realtime-cpu" in manager.scalers
         assert "analytics-service-memory" in manager.scalers
         assert "billing-service-redis" in manager.scalers
@@ -326,8 +326,8 @@ class TestHealthChecker:
         check_names = [check.name for check in checker.health_checks]
         assert "api-gateway-readiness" in check_names
         assert "api-gateway-liveness" in check_names
-        assert "router_service-readiness" in check_names
-        assert "router_service-liveness" in check_names
+        assert "router-service-readiness" in check_names
+        assert "router-service-liveness" in check_names
         assert "orchestrator-readiness" in check_names
         assert "orchestrator-liveness" in check_names
         assert "realtime-readiness" in check_names
@@ -410,7 +410,7 @@ class TestHealthChecker:
         # Check service breakdown
         services = summary["services"]
         assert "api-gateway" in services
-        assert "router_service" in services
+        assert "router-service" in services
         assert "orchestrator" in services
         assert "realtime" in services
         assert "analytics-service" in services

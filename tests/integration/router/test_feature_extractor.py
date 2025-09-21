@@ -5,7 +5,7 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 import time
 
-from apps.router_service.core.feature_extractor import FeatureExtractor, RouterFeatures, Tier
+from apps.router-service.core.feature_extractor import FeatureExtractor, RouterFeatures, Tier
 
 
 class TestFeatureExtractor:

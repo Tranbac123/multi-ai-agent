@@ -99,8 +99,8 @@ class TimeoutManager:
             )
             
             # Router Service timeouts
-            self.timeout_configs["router_service"] = TimeoutConfig(
-                operation_type="router_service",
+            self.timeout_configs["router-service"] = TimeoutConfig(
+                operation_type="router-service",
                 connect_timeout_ms=500,
                 read_timeout_ms=3000,
                 write_timeout_ms=1000,

@@ -51,7 +51,7 @@ class HealthCheckValidator:
         services = [
             "api-gateway",
             "orchestrator", 
-            "router_service",
+            "router-service",
             "realtime",
             "analytics-service",
             "billing-service",

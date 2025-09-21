@@ -265,7 +265,7 @@ async def test_payment_timestamp(self, mock_time, mock_redis):
     assert result.processed_at == 1234567890.0
 
 
-@patch('apps.router_service.core.features.FeatureExtractor.extract_features')
+@patch('apps.router-service.core.features.FeatureExtractor.extract_features')
 def test_router_feature_extraction(self, mock_extract):
     """Test router feature extraction."""
     mock_extract.return_value = {"feature1": 0.5, "feature2": 0.3}

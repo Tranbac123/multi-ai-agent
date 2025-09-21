@@ -96,7 +96,7 @@ api_gateway:
   maxReplicas: 15
 
 # Router Service HPA
-router_service:
+router-service:
   metrics:
     - type: Resource
       resource:
@@ -428,7 +428,7 @@ readiness_probes:
     success_threshold: 1
     failure_threshold: 3
 
-  router_service:
+  router-service:
     http_get:
       path: /health/ready
       port: 8000
@@ -503,7 +503,7 @@ network_policies:
       - to:
           - namespaceSelector:
               matchLabels:
-                name: router_service
+                name: router-service
         ports:
           - protocol: TCP
             port: 8000

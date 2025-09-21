@@ -5,17 +5,17 @@ import asyncio
 import time
 import json
 from unittest.mock import AsyncMock, MagicMock
-from apps.router_service.core.feature_extractor import (
+from apps.router-service.core.feature_extractor import (
     FeatureExtractor,
     RouterFeatures,
     Tier,
 )
-from apps.router_service.core.calibrated_classifier import CalibratedClassifier
-from apps.router_service.core.early_exit_escalation import (
+from apps.router-service.core.calibrated_classifier import CalibratedClassifier
+from apps.router-service.core.early_exit_escalation import (
     EarlyExitEscalation,
     EscalationReason,
 )
-from apps.router_service.core.router_v2 import RouterV2
+from apps.router-service.core.router_v2 import RouterV2
 
 
 class TestFeatureExtractorHardening:

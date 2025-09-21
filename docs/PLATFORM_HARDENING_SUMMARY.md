@@ -104,11 +104,11 @@ The Multi-AI-Agent Platform has been comprehensively hardened through **11 produ
 
 **Files Created**:
 
-- `apps/router_service/core/feature_extractor.py` - Feature extraction engine
-- `apps/router_service/core/calibrated_classifier.py` - Calibrated classification
-- `apps/router_service/core/early_exit_manager.py` - Early-exit logic
-- `apps/router_service/core/canary_manager.py` - Canary deployment management
-- `apps/router_service/core/enhanced_router.py` - Enhanced router with guarantees
+- `apps/router-service/core/feature_extractor.py` - Feature extraction engine
+- `apps/router-service/core/calibrated_classifier.py` - Calibrated classification
+- `apps/router-service/core/early_exit_manager.py` - Early-exit logic
+- `apps/router-service/core/canary_manager.py` - Canary deployment management
+- `apps/router-service/core/enhanced_router.py` - Enhanced router with guarantees
 - `tests/integration/test_router_guarantees.py` - Router guarantees testing
 
 **Acceptance Criteria Met**:

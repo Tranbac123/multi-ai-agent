@@ -29,21 +29,21 @@ data:
         curl -f http://localhost:8000/health/ready || exit 1
 
   # Router Service health probes
-  router_service-liveness.yaml: |
+  router-service-liveness.yaml: |
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: router_service-liveness
+      name: router-service-liveness
       namespace: production
     data:
       liveness.sh: |
         #!/bin/bash
         curl -f http://localhost:8002/health || exit 1
-  router_service-readiness.yaml: |
+  router-service-readiness.yaml: |
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: router_service-readiness
+      name: router-service-readiness
       namespace: production
     data:
       readiness.sh: |
@@ -206,23 +206,23 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: router_service
+  name: router-service
   namespace: production
   labels:
-    app: router_service
+    app: router-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: router_service
+      app: router-service
   template:
     metadata:
       labels:
-        app: router_service
+        app: router-service
     spec:
       containers:
-      - name: router_service
-        image: ai-platform/router_service:latest
+      - name: router-service
+        image: ai-platform/router-service:latest
         ports:
         - containerPort: 8002
         env:

@@ -288,7 +288,7 @@ class TestSLOMonitoring:
 
         # Define SLO target
         slo_target = {
-            "service": "router_service",
+            "service": "router-service",
             "metric": "p95_latency",
             "target": 1000.0,  # 1000ms p95 latency
             "window": "1h",
@@ -311,13 +311,13 @@ class TestSLOMonitoring:
             1400,
         ]  # p95 = 1300
         for latency in latencies:
-            await slo_monitor.record_latency("router_service", latency, time.time())
+            await slo_monitor.record_latency("router-service", latency, time.time())
 
         # Check SLO status
-        slo_status = await slo_monitor.check_slo_status("router_service", "p95_latency")
+        slo_status = await slo_monitor.check_slo_status("router-service", "p95_latency")
 
         assert slo_status is not None
-        assert slo_status["service"] == "router_service"
+        assert slo_status["service"] == "router-service"
         assert slo_status["metric"] == "p95_latency"
         assert slo_status["current_value"] == 1300.0  # p95 latency
         assert slo_status["target"] == 1000.0
@@ -500,7 +500,7 @@ class TestObservabilityIntegration:
 
             # Record SLO data
             await slo_monitor.record_availability("api_gateway", True, time.time())
-            await slo_monitor.record_latency("router_service", 800.0, time.time())
+            await slo_monitor.record_latency("router-service", 800.0, time.time())
 
             # Simulate work
             await asyncio.sleep(0.1)

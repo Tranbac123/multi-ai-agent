@@ -293,7 +293,7 @@ class ContractValidator:
         return ContractValidator.validate_inter_service_payload(
             payload=request_data,
             contract_class=RouterDecisionRequest,
-            service_name="router_service",
+            service_name="router-service",
             operation="router_decision"
         )
     

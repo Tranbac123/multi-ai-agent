@@ -22,7 +22,7 @@ class TestKEDAConfiguration:
         
         expected_services = [
             'orchestrator-enhanced-scaler',
-            'router_service-enhanced-scaler',
+            'router-service-enhanced-scaler',
             'realtime-enhanced-scaler',
             'analytics-service-enhanced-scaler',
             'billing-service-enhanced-scaler'
@@ -64,12 +64,12 @@ class TestKEDAConfiguration:
         prometheus_triggers = [t for t in triggers if t['type'] == 'prometheus']
         assert len(prometheus_triggers) >= 2  # CPU and Memory
 
-    def test_router_service_keda_configuration(self, keda_config):
+    def test_router-service_keda_configuration(self, keda_config):
         """Test router service KEDA configuration."""
         router_scaler = next(
             obj for obj in keda_config 
             if obj.get('kind') == 'ScaledObject' and 
-            obj['metadata']['name'] == 'router_service-enhanced-scaler'
+            obj['metadata']['name'] == 'router-service-enhanced-scaler'
         )
         
         spec = router_scaler['spec']
@@ -301,7 +301,7 @@ class TestHPAConfiguration:
         
         expected_hpas = [
             'api-gateway-enhanced-hpa',
-            'router_service-enhanced-hpa',
+            'router-service-enhanced-hpa',
             'orchestrator-enhanced-hpa',
             'realtime-enhanced-hpa',
             'analytics-service-enhanced-hpa',
@@ -345,12 +345,12 @@ class TestHPAConfiguration:
         assert 'requests_per_second' in pod_metric_names
         assert 'response_time_p95' in pod_metric_names
 
-    def test_router_service_hpa_configuration(self, hpa_config):
+    def test_router-service_hpa_configuration(self, hpa_config):
         """Test Router Service HPA configuration."""
         router_hpa = next(
             obj for obj in hpa_config 
             if obj.get('kind') == 'HorizontalPodAutoscaler' and 
-            obj['metadata']['name'] == 'router_service-enhanced-hpa'
+            obj['metadata']['name'] == 'router-service-enhanced-hpa'
         )
         
         spec = router_hpa['spec']

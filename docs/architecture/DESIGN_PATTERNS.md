@@ -178,7 +178,7 @@ class EmailAdapter(BaseToolAdapter):
 **Implementation**:
 
 ```python
-# apps/router_service/core/router_v2.py
+# apps/router-service/core/router_v2.py
 class RouterV2:
     """Router v2 with calibrated bandit policy, early exit, and canary support."""
 
