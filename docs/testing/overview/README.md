@@ -226,7 +226,7 @@ The test architecture has been completely upgraded to production-grade standards
 - `test_tools.py` - Tool adapters and reliability patterns
 - `test_workflow_loader.py` - Workflow loading and validation
 - `test_router_v2.py` - Router v2 functionality
-- `test_analytics_service.py` - Analytics engine
+- `test_analytics-service.py` - Analytics engine
 - `test_slo_monitor.py` - SLO monitoring
 - `test_realtime_service.py` - Realtime WebSocket handling
 - `test_autoscaling_health.py` - KEDA autoscaling

@@ -242,7 +242,7 @@ class HealthChecker:
                 'router_service': await self._check_router_service_readiness(),
                 'orchestrator': await self._check_orchestrator_readiness(),
                 'realtime': await self._check_realtime_readiness(),
-                'analytics-service': await self._check_analytics_service_readiness(),
+                'analytics-service': await self._check_analytics-service_readiness(),
                 'billing-service': await self._check_billing_service_readiness()
             }
             
@@ -264,7 +264,7 @@ class HealthChecker:
                 'router_service': await self._check_router_service_liveness(),
                 'orchestrator': await self._check_orchestrator_liveness(),
                 'realtime': await self._check_realtime_liveness(),
-                'analytics-service': await self._check_analytics_service_liveness(),
+                'analytics-service': await self._check_analytics-service_liveness(),
                 'billing-service': await self._check_billing_service_liveness()
             }
             
@@ -402,7 +402,7 @@ class HealthChecker:
         except Exception as e:
             return HealthStatus.UNHEALTHY, f"Realtime Service liveness check failed: {str(e)}", {}
     
-    async def _check_analytics_service_readiness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
+    async def _check_analytics-service_readiness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
         """Check Analytics Service readiness."""
         try:
             # Check if Analytics Service is ready
@@ -417,7 +417,7 @@ class HealthChecker:
         except Exception as e:
             return HealthStatus.UNHEALTHY, f"Analytics Service readiness check failed: {str(e)}", {}
     
-    async def _check_analytics_service_liveness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
+    async def _check_analytics-service_liveness(self) -> tuple[HealthStatus, str, Dict[str, Any]]:
         """Check Analytics Service liveness."""
         try:
             # Check if Analytics Service is alive

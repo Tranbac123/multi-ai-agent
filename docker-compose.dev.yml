@@ -167,10 +167,10 @@ services:
       retries: 3
 
   # Analytics Service
-  analytics_service:
+  analytics-service:
     build:
       context: .
-      dockerfile: apps/analytics_service/Dockerfile
+      dockerfile: apps/analytics-service/Dockerfile
     ports:
       - "8004:8004"
     environment:
@@ -185,7 +185,7 @@ services:
       nats:
         condition: service_healthy
     volumes:
-      - ./apps/analytics_service:/app
+      - ./apps/analytics-service:/app
       - ./libs:/app/libs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]

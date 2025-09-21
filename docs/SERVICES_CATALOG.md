@@ -73,7 +73,7 @@ This document provides a comprehensive overview of all services in the Multi-AI-
   - **Advanced Backpressure Management**: Per-connection Redis outbound queues with sticky sessions
   - **Intelligent Message Dropping**: Sophisticated policies for intermediate vs final messages
   - **Sequence Tracking**: Message acknowledgments and ordered delivery guarantees
-  - **Slow Client Detection**: Adaptive handling for clients with poor connectivity  
+  - **Slow Client Detection**: Adaptive handling for clients with poor connectivity
   - **Resume on Reconnect**: Persistent message queues survive connection drops
   - **Multi-tenant Isolation**: Complete tenant-level message and connection isolation
   - **Production Monitoring**: Comprehensive metrics, health checks, and connection statistics
@@ -86,7 +86,7 @@ This document provides a comprehensive overview of all services in the Multi-AI-
 
 ### **5. Analytics Service**
 
-- **Location**: `apps/analytics_service/`
+- **Location**: `apps/analytics-service/`
 - **Port**: `8004`
 - **Purpose**: Read-only CQRS analytics, KPIs, and reporting
 - **Key Features**:

@@ -5,7 +5,7 @@ import json
 import os
 from unittest.mock import Mock, patch
 
-from apps.analytics_service.core.dashboard_generator import GrafanaDashboardGenerator, DashboardPanel
+from apps.analytics-service.core.dashboard_generator import GrafanaDashboardGenerator, DashboardPanel
 
 
 class TestGrafanaDashboardGenerator:

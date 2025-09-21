@@ -601,7 +601,7 @@ class EventStore:
 **Implementation**:
 
 ```python
-# apps/analytics_service/core/analytics_engine.py
+# apps/analytics-service/core/analytics_engine.py
 class AnalyticsEngine:
     """Analytics engine implementing CQRS pattern."""
 

@@ -7,7 +7,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timedelta
 from dataclasses import asdict
 
-from apps.analytics_service.core.analytics_engine import (
+from apps.analytics-service.core.analytics_engine import (
     AnalyticsEngine,
     DataSource,
     TimeWindow,

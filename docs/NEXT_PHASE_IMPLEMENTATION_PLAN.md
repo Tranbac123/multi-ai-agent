@@ -105,7 +105,7 @@ class RegionalMiddleware:
 ##### **1.4 Regional Analytics Setup**
 
 ```python
-# apps/analytics_service/core/regional_analytics.py
+# apps/analytics-service/core/regional_analytics.py
 class RegionalAnalyticsEngine:
     def __init__(self):
         self.regional_read_replicas = {}
@@ -130,7 +130,7 @@ class RegionalAnalyticsEngine:
 - `data-plane/migrations/006_regional_schema.py`
 - `apps/api-gateway/core/region_router.py`
 - `libs/middleware/regional_middleware.py`
-- `apps/analytics_service/core/regional_analytics.py`
+- `apps/analytics-service/core/regional_analytics.py`
 - `tests/integration/regional/test_data_residency.py`
 
 ---

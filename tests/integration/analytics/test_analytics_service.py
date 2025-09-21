@@ -6,8 +6,8 @@ from unittest.mock import Mock, AsyncMock, patch
 from fastapi.testclient import TestClient
 from datetime import datetime
 
-from apps.analytics_service.main import app
-from apps.analytics_service.core.analytics_engine import KPIMetrics, TenantAnalytics, DataSource
+from apps.analytics-service.main import app
+from apps.analytics-service.core.analytics_engine import KPIMetrics, TenantAnalytics, DataSource
 
 
 class TestAnalyticsService:
@@ -63,7 +63,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_readiness_check_success(self, client, mock_redis):
         """Test readiness check when Redis is available."""
-        with patch('apps.analytics_service.main.redis_client', mock_redis):
+        with patch('apps.analytics-service.main.redis_client', mock_redis):
             response = client.get("/ready")
             assert response.status_code == 200
             assert response.json()["status"] == "ready"
@@ -74,7 +74,7 @@ class TestAnalyticsService:
         """Test readiness check when Redis is unavailable."""
         mock_redis.ping.side_effect = Exception("Redis connection failed")
         
-        with patch('apps.analytics_service.main.redis_client', mock_redis):
+        with patch('apps.analytics-service.main.redis_client', mock_redis):
             response = client.get("/ready")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -112,7 +112,7 @@ class TestAnalyticsService:
         )
         mock_analytics_engine.get_kpi_metrics.return_value = mock_metrics
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/kpi/{tenant_id}?time_window={time_window}")
             
             assert response.status_code == 200
@@ -132,7 +132,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_kpi_metrics_service_not_ready(self, client):
         """Test getting KPI metrics when service is not ready."""
-        with patch('apps.analytics_service.main.analytics_engine', None):
+        with patch('apps.analytics-service.main.analytics_engine', None):
             response = client.get("/analytics/kpi/tenant_123")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -143,7 +143,7 @@ class TestAnalyticsService:
         tenant_id = "tenant_123"
         mock_analytics_engine.get_kpi_metrics.side_effect = Exception("Database error")
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/kpi/{tenant_id}")
             assert response.status_code == 500
             assert "Failed to get KPI metrics" in response.json()["detail"]
@@ -207,7 +207,7 @@ class TestAnalyticsService:
         )
         mock_analytics_engine.get_comprehensive_analytics.return_value = mock_analytics
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/comprehensive/{tenant_id}?time_window={time_window}")
             
             assert response.status_code == 200
@@ -252,7 +252,7 @@ class TestAnalyticsService:
         tenant_id = "tenant_123"
         mock_analytics_engine.get_comprehensive_analytics.side_effect = Exception("Warehouse error")
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/comprehensive/{tenant_id}")
             assert response.status_code == 500
             assert "Failed to get comprehensive analytics" in response.json()["detail"]
@@ -269,7 +269,7 @@ class TestAnalyticsService:
         ]
         mock_redis.keys.return_value = mock_keys
         
-        with patch('apps.analytics_service.main.redis_client', mock_redis):
+        with patch('apps.analytics-service.main.redis_client', mock_redis):
             response = client.get("/analytics/tenants")
             
             assert response.status_code == 200
@@ -286,7 +286,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_list_tenants_service_not_ready(self, client):
         """Test listing tenants when service is not ready."""
-        with patch('apps.analytics_service.main.redis_client', None):
+        with patch('apps.analytics-service.main.redis_client', None):
             response = client.get("/analytics/tenants")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -296,7 +296,7 @@ class TestAnalyticsService:
         """Test listing tenants with error."""
         mock_redis.keys.side_effect = Exception("Redis error")
         
-        with patch('apps.analytics_service.main.redis_client', mock_redis):
+        with patch('apps.analytics-service.main.redis_client', mock_redis):
             response = client.get("/analytics/tenants")
             assert response.status_code == 500
             assert "Failed to list tenants" in response.json()["detail"]
@@ -304,7 +304,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_list_dashboards_success(self, client, mock_dashboard_generator):
         """Test listing dashboards successfully."""
-        with patch('apps.analytics_service.main.dashboard_generator', mock_dashboard_generator):
+        with patch('apps.analytics-service.main.dashboard_generator', mock_dashboard_generator):
             response = client.get("/analytics/dashboards")
             
             assert response.status_code == 200
@@ -324,7 +324,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_list_dashboards_service_not_ready(self, client):
         """Test listing dashboards when service is not ready."""
-        with patch('apps.analytics_service.main.dashboard_generator', None):
+        with patch('apps.analytics-service.main.dashboard_generator', None):
             response = client.get("/analytics/dashboards")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -332,7 +332,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_dashboard_success(self, client, mock_dashboard_generator):
         """Test getting specific dashboard successfully."""
-        with patch('apps.analytics_service.main.dashboard_generator', mock_dashboard_generator):
+        with patch('apps.analytics-service.main.dashboard_generator', mock_dashboard_generator):
             response = client.get("/analytics/dashboards/router")
             
             assert response.status_code == 200
@@ -346,7 +346,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_dashboard_not_found(self, client, mock_dashboard_generator):
         """Test getting non-existent dashboard."""
-        with patch('apps.analytics_service.main.dashboard_generator', mock_dashboard_generator):
+        with patch('apps.analytics-service.main.dashboard_generator', mock_dashboard_generator):
             response = client.get("/analytics/dashboards/nonexistent")
             assert response.status_code == 404
             assert "Dashboard not found" in response.json()["detail"]
@@ -354,7 +354,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_dashboard_service_not_ready(self, client):
         """Test getting dashboard when service is not ready."""
-        with patch('apps.analytics_service.main.dashboard_generator', None):
+        with patch('apps.analytics-service.main.dashboard_generator', None):
             response = client.get("/analytics/dashboards/router")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -362,7 +362,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_prometheus_metrics_success(self, client, mock_analytics_engine):
         """Test getting Prometheus metrics successfully."""
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get("/analytics/metrics/prometheus")
             
             assert response.status_code == 200
@@ -376,7 +376,7 @@ class TestAnalyticsService:
     @pytest.mark.asyncio
     async def test_get_prometheus_metrics_service_not_ready(self, client):
         """Test getting Prometheus metrics when service is not ready."""
-        with patch('apps.analytics_service.main.analytics_engine', None):
+        with patch('apps.analytics-service.main.analytics_engine', None):
             response = client.get("/analytics/metrics/prometheus")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -395,8 +395,8 @@ class TestAnalyticsService:
         mock_redis.keys.return_value = mock_keys
         mock_redis.delete = AsyncMock()
         
-        with patch('apps.analytics_service.main.redis_client', mock_redis), \
-             patch('apps.analytics_service.main.analytics_engine', Mock()):
+        with patch('apps.analytics-service.main.redis_client', mock_redis), \
+             patch('apps.analytics-service.main.analytics_engine', Mock()):
             response = client.post(f"/analytics/refresh/{tenant_id}")
             
             assert response.status_code == 200
@@ -410,9 +410,9 @@ class TestAnalyticsService:
             mock_redis.delete.assert_called_once_with(*mock_keys)
 
     @pytest.mark.asyncio
-    async def test_refresh_analytics_service_not_ready(self, client):
+    async def test_refresh_analytics-service_not_ready(self, client):
         """Test refreshing analytics when service is not ready."""
-        with patch('apps.analytics_service.main.analytics_engine', None):
+        with patch('apps.analytics-service.main.analytics_engine', None):
             response = client.post("/analytics/refresh/tenant_123")
             assert response.status_code == 500
             assert "not ready" in response.json()["detail"]
@@ -423,8 +423,8 @@ class TestAnalyticsService:
         tenant_id = "tenant_123"
         mock_redis.keys.side_effect = Exception("Redis error")
         
-        with patch('apps.analytics_service.main.redis_client', mock_redis), \
-             patch('apps.analytics_service.main.analytics_engine', Mock()):
+        with patch('apps.analytics-service.main.redis_client', mock_redis), \
+             patch('apps.analytics-service.main.analytics_engine', Mock()):
             response = client.post(f"/analytics/refresh/{tenant_id}")
             assert response.status_code == 500
             assert "Failed to refresh analytics" in response.json()["detail"]
@@ -461,7 +461,7 @@ class TestAnalyticsService:
         )
         mock_analytics_engine.get_kpi_metrics.return_value = mock_metrics
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/kpi/{tenant_id}?time_window={time_window}")
             
             assert response.status_code == 200
@@ -502,7 +502,7 @@ class TestAnalyticsService:
         )
         mock_analytics_engine.get_kpi_metrics.return_value = mock_metrics
         
-        with patch('apps.analytics_service.main.analytics_engine', mock_analytics_engine):
+        with patch('apps.analytics-service.main.analytics_engine', mock_analytics_engine):
             response = client.get(f"/analytics/kpi/{tenant_id}")
             
             assert response.status_code == 200

@@ -5,14 +5,14 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
-from apps.analytics_service.core.analytics_engine import (
+from apps.analytics-service.core.analytics_engine import (
     AnalyticsEngine,
     DataSource,
     KPIMetrics,
     TenantAnalytics,
 )
-from apps.analytics_service.core.dashboard_generator import GrafanaDashboardGenerator
-from apps.analytics_service.main import app
+from apps.analytics-service.core.dashboard_generator import GrafanaDashboardGenerator
+from apps.analytics-service.main import app
 
 
 class TestAnalyticsEngine:

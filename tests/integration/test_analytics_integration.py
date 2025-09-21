@@ -6,8 +6,8 @@ import json
 import os
 from typing import Dict, Any
 
-from apps.analytics_service.core.analytics_engine import AnalyticsEngine
-from apps.analytics_service.core.dashboard_generator import GrafanaDashboardGenerator
+from apps.analytics-service.core.analytics_engine import AnalyticsEngine
+from apps.analytics-service.core.dashboard_generator import GrafanaDashboardGenerator
 
 
 @pytest.fixture
@@ -180,7 +180,7 @@ class TestAnalyticsIntegration:
                     assert any(op in expr for op in ["{", "}", "(", ")", "=", '"'])
 
     @pytest.mark.asyncio
-    async def test_analytics_service_end_to_end(
+    async def test_analytics-service_end_to_end(
         self, analytics_engine_with_redis, dashboard_generator
     ):
         """Test end-to-end analytics service functionality."""

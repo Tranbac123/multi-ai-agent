@@ -116,7 +116,7 @@ services:
       path: "/health"
       port: 8000
 
-  analytics_service:
+  analytics-service:
     replicas: 2
     resources:
       requests:
@@ -343,7 +343,7 @@ ingress:
           service: "router_service"
         - path: "/api/v1/analytics"
           pathType: "Prefix"
-          service: "analytics_service"
+          service: "analytics-service"
         - path: "/api/v1/billing"
           pathType: "Prefix"
           service: "billing-service"

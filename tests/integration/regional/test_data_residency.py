@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api_gateway.core.region_router import RegionRouter, ProviderType
-from apps.analytics_service.core.regional_analytics import RegionalAnalyticsEngine
+from apps.analytics-service.core.regional_analytics import RegionalAnalyticsEngine
 from libs.middleware.regional_middleware import RegionalMiddleware, RegionalAccessValidator
 
 
