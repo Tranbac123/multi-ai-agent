@@ -1,0 +1,160 @@
+# CODEOWNERS file for Multi-AI-Agent Platform
+# =============================================================================
+# This file defines code ownership for different parts of the repository.
+# When a pull request is created, the defined owners will be automatically
+# requested for review based on the files changed.
+#
+# Syntax: path @owner1 @owner2
+# - Use glob patterns to match files/directories
+# - Order matters: later matches override earlier ones
+# - Use teams (@org/team-name) or individuals (@username)
+#
+# Repository: https://github.com/Tranbac123/multi-ai-agent
+# =============================================================================
+
+# =============================================================================
+# Global Default Owner
+# =============================================================================
+# Repository owner has oversight of all changes
+* @Tranbac123
+
+# =============================================================================
+# Backend Services & Libraries
+# =============================================================================
+# Backend team owns all core services and shared libraries
+apps/ @Tranbac123 @org/backend-team
+libs/ @Tranbac123 @org/backend-team
+
+# Specific backend service ownership
+apps/api-gateway/ @Tranbac123 @org/backend-team
+apps/orchestrator/ @Tranbac123 @org/backend-team
+apps/realtime-service/ @Tranbac123 @org/backend-team
+apps/router-service/ @Tranbac123 @org/backend-team
+
+# Chat adapters (social media integrations)
+apps/chat-adapters/ @Tranbac123 @org/backend-team
+apps/chat-adapters/adapters/facebook_adapter.py @Tranbac123 @org/backend-team
+apps/chat-adapters/adapters/tiktok_adapter.py @Tranbac123 @org/backend-team
+apps/chat-adapters/adapters/zalo_adapter.py @Tranbac123 @org/backend-team
+
+# Shared libraries and utilities
+libs/contracts/ @Tranbac123 @org/backend-team
+libs/resilience/ @Tranbac123 @org/backend-team
+libs/router/ @Tranbac123 @org/backend-team
+libs/utils/ @Tranbac123 @org/backend-team
+
+# =============================================================================
+# Frontend
+# =============================================================================
+# Frontend team owns all web/UI related code
+web/ @Tranbac123 @org/frontend-team
+
+# Frontend specific files
+web/src/ @Tranbac123 @org/frontend-team
+web/public/ @Tranbac123 @org/frontend-team
+web/package.json @Tranbac123 @org/frontend-team
+web/tsconfig.json @Tranbac123 @org/frontend-team
+web/vite.config.ts @Tranbac123 @org/frontend-team
+web/.eslintrc.cjs @Tranbac123 @org/frontend-team
+
+# =============================================================================
+# Documentation
+# =============================================================================
+# Documentation team owns all documentation files
+docs/ @Tranbac123 @org/docs-team
+
+# Specific documentation files
+*.md @Tranbac123 @org/docs-team
+README.md @Tranbac123 @org/docs-team
+CHANGELOG.md @Tranbac123 @org/docs-team
+CONTRIBUTING.md @Tranbac123 @org/docs-team
+
+# Documentation directories
+docs/development/ @Tranbac123 @org/docs-team
+docs/deployment/ @Tranbac123 @org/docs-team
+docs/api/ @Tranbac123 @org/docs-team
+
+# =============================================================================
+# Quality Assurance & Testing
+# =============================================================================
+# QA team owns all testing and quality scripts
+tests/ @Tranbac123 @org/qa-team
+scripts/ @Tranbac123 @org/qa-team
+
+# Test directories
+tests/unit/ @Tranbac123 @org/qa-team
+tests/integration/ @Tranbac123 @org/qa-team
+tests/e2e/ @Tranbac123 @org/qa-team
+tests/performance/ @Tranbac123 @org/qa-team
+
+# Quality and deployment scripts
+scripts/quality_analysis_report.py @Tranbac123 @org/qa-team
+scripts/deploy_to_production.sh @Tranbac123 @org/qa-team
+scripts/run_tests.sh @Tranbac123 @org/qa-team
+
+# =============================================================================
+# Configuration & Infrastructure
+# =============================================================================
+# Critical configuration files require repository owner approval
+.github/ @Tranbac123
+.gitignore @Tranbac123
+.github/workflows/ @Tranbac123 @org/qa-team
+.github/CODEOWNERS @Tranbac123
+
+# Docker and Kubernetes configurations
+Dockerfile @Tranbac123 @org/backend-team
+docker-compose*.yml @Tranbac123 @org/backend-team
+k8s/ @Tranbac123 @org/backend-team
+infra/ @Tranbac123 @org/backend-team
+
+# Database migrations and schemas
+data-plane/ @Tranbac123 @org/backend-team
+data-plane/migrations/ @Tranbac123 @org/backend-team
+
+# =============================================================================
+# Security & Compliance
+# =============================================================================
+# Security-sensitive files require extra scrutiny
+**/security/ @Tranbac123
+**/*security* @Tranbac123
+**/*auth* @Tranbac123 @org/backend-team
+**/*credential* @Tranbac123
+**/*secret* @Tranbac123
+
+# =============================================================================
+# Dependencies & Package Management
+# =============================================================================
+# Package files require careful review
+requirements.txt @Tranbac123 @org/backend-team
+pyproject.toml @Tranbac123 @org/backend-team
+poetry.lock @Tranbac123 @org/backend-team
+package.json @Tranbac123 @org/frontend-team
+package-lock.json @Tranbac123 @org/frontend-team
+yarn.lock @Tranbac123 @org/frontend-team
+
+# =============================================================================
+# AI/ML Specific Files
+# =============================================================================
+# AI/ML models and evaluation require specialized review
+eval/ @Tranbac123 @org/backend-team
+eval/golden_tasks/ @Tranbac123 @org/qa-team
+**/*model* @Tranbac123 @org/backend-team
+**/*evaluation* @Tranbac123 @org/qa-team
+
+# =============================================================================
+# Monitoring & Observability
+# =============================================================================
+# Observability configuration
+observability/ @Tranbac123 @org/backend-team
+**/*metrics* @Tranbac123 @org/backend-team
+**/*monitoring* @Tranbac123 @org/backend-team
+**/*prometheus* @Tranbac123 @org/backend-team
+**/*grafana* @Tranbac123 @org/backend-team
+
+# =============================================================================
+# Load Testing & Performance
+# =============================================================================
+# Performance testing
+load_tests/ @Tranbac123 @org/qa-team
+**/*locust* @Tranbac123 @org/qa-team
+**/*performance* @Tranbac123 @org/qa-team
