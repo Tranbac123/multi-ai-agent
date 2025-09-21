@@ -6,10 +6,11 @@ A production-grade, multi-tenant AI-as-a-Service platform providing intelligent 
 
 Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
+- **[Services Catalog](docs/SERVICES_CATALOG.md)** - Complete directory of all platform services
 - **[System Overview](docs/SYSTEM_OVERVIEW.md)** - Production-grade multi-agent platform overview
+- **[Features Documentation](docs/FEATURES.md)** - Complete platform features and capabilities
 - **[Visual Architecture](docs/VISUAL_ARCHITECTURE.md)** - Architecture diagrams and illustrations
 - **[Runtime Topology](docs/RUNTIME_TOPOLOGY.md)** - Ingress, autoscaling, DLQ, retries, Saga patterns
-- **[Test Topology](docs/TEST_TOPOLOGY.md)** - Test dependency mapping (MOCK vs LIVE per suite)
 - **[Workflows Index](docs/WORKFLOWS_INDEX.md)** - YAML workflow definitions and registry
 - **[API Contracts](docs/CONTRACTS.md)** - Request/response schemas and validation rules
 - **[CI/CD Pipeline](docs/CI_CD_PIPELINE.md)** - Pipeline configuration and quality gates

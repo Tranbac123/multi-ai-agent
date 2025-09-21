@@ -22,7 +22,7 @@
             "refId": "B"
           },
           {
-            "expr": "up{job=\"router-service\"}",
+            "expr": "up{job=\"router_service\"}",
             "legendFormat": "Router Service",
             "refId": "C"
           },

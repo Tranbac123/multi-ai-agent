@@ -45,11 +45,11 @@ spec:
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: router-service-enhanced-scaler
+  name: router_service-enhanced-scaler
   namespace: production
 spec:
   scaleTargetRef:
-    name: router-service
+    name: router_service
   minReplicaCount: 2
   maxReplicaCount: 30
   pollingInterval: 15

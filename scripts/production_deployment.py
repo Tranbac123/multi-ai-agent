@@ -117,7 +117,7 @@ class ProductionDeployment:
         logger.info("Building and pushing containers")
         
         services = [
-            "api-gateway", "orchestrator", "router-service", "realtime-service",
+            "api-gateway", "orchestrator", "router_service", "realtime-service",
             "analytics-service", "billing-service", "ingestion", "chat-adapters",
             "tenant-service", "admin-portal", "eval-service"
         ]
@@ -167,7 +167,7 @@ class ProductionDeployment:
             "secrets.yaml",
             "api-gateway/",
             "orchestrator/",
-            "router-service/",
+            "router_service/",
             "realtime-service/",
             "analytics-service/",
             "billing-service/",
@@ -337,7 +337,7 @@ class ProductionDeployment:
         
         # Check all service health endpoints
         services = [
-            "api-gateway", "orchestrator", "router-service", "realtime-service",
+            "api-gateway", "orchestrator", "router_service", "realtime-service",
             "analytics-service", "billing-service", "ingestion", "chat-adapters",
             "tenant-service", "admin-portal", "eval-service"
         ]

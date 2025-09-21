@@ -159,7 +159,7 @@ async def health_check():
         return {
             "status": "healthy",
             "timestamp": time.time(),
-            "service": "router-service-v2"
+            "service": "router_service-v2"
         }
     except Exception as e:
         logger.error("Health check failed", error=str(e))

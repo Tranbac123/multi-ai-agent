@@ -22,7 +22,7 @@ class TestKEDAConfiguration:
         
         expected_services = [
             'orchestrator-enhanced-scaler',
-            'router-service-enhanced-scaler',
+            'router_service-enhanced-scaler',
             'realtime-enhanced-scaler',
             'analytics-service-enhanced-scaler',
             'billing-service-enhanced-scaler'
@@ -69,7 +69,7 @@ class TestKEDAConfiguration:
         router_scaler = next(
             obj for obj in keda_config 
             if obj.get('kind') == 'ScaledObject' and 
-            obj['metadata']['name'] == 'router-service-enhanced-scaler'
+            obj['metadata']['name'] == 'router_service-enhanced-scaler'
         )
         
         spec = router_scaler['spec']
@@ -301,7 +301,7 @@ class TestHPAConfiguration:
         
         expected_hpas = [
             'api-gateway-enhanced-hpa',
-            'router-service-enhanced-hpa',
+            'router_service-enhanced-hpa',
             'orchestrator-enhanced-hpa',
             'realtime-enhanced-hpa',
             'analytics-service-enhanced-hpa',
@@ -350,7 +350,7 @@ class TestHPAConfiguration:
         router_hpa = next(
             obj for obj in hpa_config 
             if obj.get('kind') == 'HorizontalPodAutoscaler' and 
-            obj['metadata']['name'] == 'router-service-enhanced-hpa'
+            obj['metadata']['name'] == 'router_service-enhanced-hpa'
         )
         
         spec = router_hpa['spec']

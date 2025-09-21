@@ -60,9 +60,9 @@ class SLOMonitor:
             SLOTarget("api-gateway", "availability", 0.999, "30d", 0.1),
             SLOTarget("api-gateway", "p50_latency", 100.0, "30d", 0.1),
             SLOTarget("api-gateway", "p95_latency", 500.0, "30d", 0.1),
-            SLOTarget("router-service", "availability", 0.999, "30d", 0.1),
-            SLOTarget("router-service", "decision_latency_p50", 50.0, "30d", 0.1),
-            SLOTarget("router-service", "misroute_rate", 0.05, "30d", 0.1),
+            SLOTarget("router_service", "availability", 0.999, "30d", 0.1),
+            SLOTarget("router_service", "decision_latency_p50", 50.0, "30d", 0.1),
+            SLOTarget("router_service", "misroute_rate", 0.05, "30d", 0.1),
             SLOTarget("orchestrator", "availability", 0.999, "30d", 0.1),
             SLOTarget("orchestrator", "workflow_completion_rate", 0.95, "30d", 0.1),
             SLOTarget("realtime", "availability", 0.999, "30d", 0.1),
@@ -130,7 +130,7 @@ class SLOMonitor:
         try:
             mock_values = {
                 "api-gateway": {"availability": 0.9995, "p50_latency": 85.0, "p95_latency": 450.0},
-                "router-service": {"availability": 0.9998, "decision_latency_p50": 45.0, "misroute_rate": 0.03},
+                "router_service": {"availability": 0.9998, "decision_latency_p50": 45.0, "misroute_rate": 0.03},
                 "orchestrator": {"availability": 0.9992, "workflow_completion_rate": 0.96},
                 "realtime": {"availability": 0.9999, "websocket_backpressure_drops": 0.005},
                 "analytics-service": {"availability": 0.9997, "query_latency_p95": 800.0},

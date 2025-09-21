@@ -257,7 +257,7 @@ class KEDAManager:
             
             # Router Service - CPU usage
             ScalerConfig(
-                name="router-service-cpu",
+                name="router_service-cpu",
                 scaler_type=ScalerType.CPU,
                 min_replicas=2,
                 max_replicas=10,

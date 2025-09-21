@@ -92,7 +92,7 @@ The code quality improvement initiative focused on:
 
 ### Functions Refactored
 
-1. **`apps/router-service/core/early_exit_manager.py`**
+1. **`apps/router_service/core/early_exit_manager.py`**
 
    - `_validate_schema` → Split into multiple focused methods:
      - `_validate_object`

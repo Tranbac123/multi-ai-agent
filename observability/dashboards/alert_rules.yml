@@ -30,40 +30,40 @@ groups:
 
       # Router Service SLO Alerts
       - alert: RouterServiceAvailabilitySLO
-        expr: (1 - (rate(router_requests_total{service="router-service",status=~"5.."}[30d]) / rate(router_requests_total{service="router-service"}[30d]))) < 0.999
+        expr: (1 - (rate(router_requests_total{service="router_service",status=~"5.."}[30d]) / rate(router_requests_total{service="router_service"}[30d]))) < 0.999
         for: 5m
         labels:
           severity: critical
-          service: router-service
+          service: router_service
           slo: availability
         annotations:
           summary: "Router Service availability SLO breach"
           description: "Router Service availability is {{ $value | humanizePercentage }} below 99.9% target"
-          runbook_url: "https://docs.example.com/runbooks/router-service-availability"
+          runbook_url: "https://docs.example.com/runbooks/router_service-availability"
 
       - alert: RouterServiceDecisionLatencySLO
-        expr: histogram_quantile(0.50, rate(router_decision_duration_seconds_bucket{service="router-service"}[30d])) > 0.05
+        expr: histogram_quantile(0.50, rate(router_decision_duration_seconds_bucket{service="router_service"}[30d])) > 0.05
         for: 5m
         labels:
           severity: warning
-          service: router-service
+          service: router_service
           slo: decision_latency
         annotations:
           summary: "Router Service decision latency SLO breach"
           description: "Router Service P50 decision latency is {{ $value }}s above 50ms target"
-          runbook_url: "https://docs.example.com/runbooks/router-service-latency"
+          runbook_url: "https://docs.example.com/runbooks/router_service-latency"
 
       - alert: RouterServiceMisrouteRateSLO
-        expr: rate(router_misroutes_total{service="router-service"}[30d]) / rate(router_requests_total{service="router-service"}[30d]) > 0.05
+        expr: rate(router_misroutes_total{service="router_service"}[30d]) / rate(router_requests_total{service="router_service"}[30d]) > 0.05
         for: 5m
         labels:
           severity: critical
-          service: router-service
+          service: router_service
           slo: misroute_rate
         annotations:
           summary: "Router Service misroute rate SLO breach"
           description: "Router Service misroute rate is {{ $value | humanizePercentage }} above 5% target"
-          runbook_url: "https://docs.example.com/runbooks/router-service-misroute"
+          runbook_url: "https://docs.example.com/runbooks/router_service-misroute"
 
       # Orchestrator SLO Alerts
       - alert: OrchestratorAvailabilitySLO

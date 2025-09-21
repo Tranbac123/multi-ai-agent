@@ -117,7 +117,7 @@ build_and_push_containers() {
     local services=(
         "api-gateway"
         "orchestrator"
-        "router-service"
+        "router_service"
         "realtime-service"
         "analytics_service"
         "billing-service"
@@ -158,7 +158,7 @@ deploy_to_kubernetes() {
         "secrets.yaml"
         "api-gateway/"
         "orchestrator/"
-        "router-service/"
+        "router_service/"
         "realtime-service/"
         "analytics_service/"
         "billing-service/"

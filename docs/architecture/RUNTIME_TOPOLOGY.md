@@ -503,7 +503,7 @@ network_policies:
       - to:
           - namespaceSelector:
               matchLabels:
-                name: router-service
+                name: router_service
         ports:
           - protocol: TCP
             port: 8000

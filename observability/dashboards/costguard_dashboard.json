@@ -88,7 +88,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "cost_drift_percent{job=\"router-service\"}",
+            "expr": "cost_drift_percent{job=\"router_service\"}",
             "legendFormat": "{{tenant_id}} - {{service_type}}",
             "refId": "A"
           }
@@ -165,7 +165,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "sum(rate(safe_mode_requests_total{job=\"router-service\"}[5m]))",
+            "expr": "sum(rate(safe_mode_requests_total{job=\"router_service\"}[5m]))",
             "legendFormat": "Safe Mode Requests/sec",
             "refId": "A"
           }
@@ -217,7 +217,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "sum(cost_savings_total{job=\"router-service\"})",
+            "expr": "sum(cost_savings_total{job=\"router_service\"})",
             "legendFormat": "Total Savings ($)",
             "refId": "A"
           }
@@ -301,12 +301,12 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "expected_cost_usd{job=\"router-service\"}",
+            "expr": "expected_cost_usd{job=\"router_service\"}",
             "legendFormat": "Expected Cost - {{tenant_id}}",
             "refId": "A"
           },
           {
-            "expr": "actual_cost_usd{job=\"router-service\"}",
+            "expr": "actual_cost_usd{job=\"router_service\"}",
             "legendFormat": "Actual Cost - {{tenant_id}}",
             "refId": "B"
           }
@@ -375,7 +375,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "latency_drift_percent{job=\"router-service\"}",
+            "expr": "latency_drift_percent{job=\"router_service\"}",
             "legendFormat": "{{tenant_id}} - {{service_type}}",
             "refId": "A"
           }
@@ -452,7 +452,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "count(safe_mode_level{job=\"router-service\"}) by (level)",
+            "expr": "count(safe_mode_level{job=\"router_service\"}) by (level)",
             "legendFormat": "{{level}}",
             "refId": "A"
           }
@@ -552,7 +552,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(cost_optimization_events_total{job=\"router-service\"}[5m]))",
+            "expr": "sum(rate(cost_optimization_events_total{job=\"router_service\"}[5m]))",
             "legendFormat": "Optimization Events/sec",
             "refId": "A"
           }
@@ -655,7 +655,7 @@
           "name": "Cost Drift Events",
           "datasource": "prometheus",
           "enable": true,
-          "expr": "changes(cost_drift_percent{job=\"router-service\"}[1m]) > 20",
+          "expr": "changes(cost_drift_percent{job=\"router_service\"}[1m]) > 20",
           "iconColor": "orange",
           "tags": ["drift", "cost"]
         },
@@ -663,7 +663,7 @@
           "name": "Safe Mode Activations",
           "datasource": "prometheus",
           "enable": true,
-          "expr": "changes(safe_mode_level{job=\"router-service\"}[1m])",
+          "expr": "changes(safe_mode_level{job=\"router_service\"}[1m])",
           "iconColor": "yellow",
           "tags": ["safe-mode", "optimization"]
         }

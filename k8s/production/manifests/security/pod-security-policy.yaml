@@ -145,13 +145,13 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: router-service-pdb
+  name: router_service-pdb
   namespace: production
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: router-service
+      app: router_service
 
 ---
 apiVersion: policy/v1
@@ -234,10 +234,10 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: router-service-sa
+  name: router_service-sa
   namespace: production
   labels:
-    app: router-service
+    app: router_service
 
 ---
 apiVersion: v1
@@ -305,7 +305,7 @@ subjects:
 - kind: ServiceAccount
   name: api-gateway-sa
 - kind: ServiceAccount
-  name: router-service-sa
+  name: router_service-sa
 - kind: ServiceAccount
   name: orchestrator-sa
 - kind: ServiceAccount

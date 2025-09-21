@@ -548,7 +548,7 @@ UNIFIED_MESSAGE_QUEUE=nats://localhost:4222
       - TIKTOK_APP_ID=${TIKTOK_APP_ID}
     depends_on:
       - orchestrator
-      - router-service
+      - router_service
       - nats
     volumes:
       - ./apps/chat-adapters:/app

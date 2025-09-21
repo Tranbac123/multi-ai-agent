@@ -30,7 +30,7 @@
 | ----------------- | ---------------------------------------------------- | ------------------- | ------------------ | -------- |
 | api-gateway       | Auth, rate-limit, OpenAPI, JWT validation            | FastAPI + JWT       | HPA x3             | Team-A   |
 | orchestrator      | FSM/LangGraph, Saga compensation, workflow execution | Python + LangGraph  | KEDA (queue depth) | Team-B   |
-| router-service    | difficulty → tier, feature extraction, bandit policy | Python + ML         | HPA x2             | Team-B   |
+| router_service    | difficulty → tier, feature extraction, bandit policy | Python + ML         | HPA x2             | Team-B   |
 | realtime          | WebSocket + backpressure, session management         | ASGI + Redis        | HPA x3             | Team-C   |
 | ingestion         | chunk/embed/index, document processing               | Python Workers      | KEDA (doc queue)   | Team-D   |
 | analytics-service | read-only CQRS KPIs, reporting, dashboards           | Python + CQRS       | Read-replica x2    | Data     |

@@ -76,7 +76,7 @@ services:
       path: "/health"
       port: 8000
 
-  router-service:
+  router_service:
     replicas: 3
     resources:
       requests:
@@ -340,7 +340,7 @@ ingress:
           service: "api-gateway"
         - path: "/api/v1/router"
           pathType: "Prefix"
-          service: "router-service"
+          service: "router_service"
         - path: "/api/v1/analytics"
           pathType: "Prefix"
           service: "analytics_service"

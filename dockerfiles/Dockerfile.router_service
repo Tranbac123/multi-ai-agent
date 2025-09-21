@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements
 COPY libs/ libs/
-COPY apps/router-service/ apps/router-service/
+COPY apps/router_service/ apps/router_service/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
@@ -47,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/healthz || exit 1
 
 # Run the application
-CMD ["python", "-m", "apps.router-service.main"]
+CMD ["python", "-m", "apps.router_service.main"]
