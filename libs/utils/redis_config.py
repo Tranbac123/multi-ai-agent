@@ -81,3 +81,4 @@ async def get_redis_health() -> bool:
         return False
     
     return await _redis_config.health_check()
+

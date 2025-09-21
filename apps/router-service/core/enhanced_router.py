@@ -11,11 +11,13 @@ from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 import structlog
 from opentelemetry import trace
+import redis.asyncio as redis
 
 from .feature_extractor import FeatureExtractor, FeatureVector
 from .calibrated_classifier import CalibratedClassifier, RouterTier, ClassificationResult
 from .early_exit_manager import EarlyExitManager, EarlyExitResult
 from .canary_manager import CanaryManager
+from libs.router.router_base import EnhancedRouterBase
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -34,15 +36,17 @@ class RouterMetrics:
     canary_activity: Dict[str, Any]
 
 
-class EnhancedRouter:
+class EnhancedRouter(EnhancedRouterBase):
     """Enhanced router with comprehensive guarantees."""
     
     def __init__(
         self,
+        redis_client: redis.Redis,
         lambda_error: float = 1.0,
         exploration_rate: float = 0.1,
         early_exit_threshold: float = 0.85
     ):
+        super().__init__(redis_client, "enhanced_router")
         self.feature_extractor = FeatureExtractor()
         self.classifier = CalibratedClassifier(lambda_error, exploration_rate)
         self.early_exit_manager = EarlyExitManager(early_exit_threshold)

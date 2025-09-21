@@ -27,3 +27,4 @@ def configure_structured_logging() -> None:
 def get_logger(name: str) -> structlog.BoundLogger:
     """Get a structured logger instance."""
     return structlog.get_logger(name)
+

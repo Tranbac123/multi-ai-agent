@@ -13,6 +13,7 @@ from .bandit_policy import BanditPolicy
 from .early_exit_escalation import EarlyExitEscalation, EscalationDecision
 from .canary_manager import CanaryManager
 from .metrics import MetricsCollector
+from libs.router.router_base import EnhancedRouterBase, DomainFlag
 
 logger = structlog.get_logger(__name__)
 
@@ -31,11 +32,11 @@ class RouterDecision:
     classifier_info: Optional[Dict[str, Any]]
 
 
-class RouterV2:
+class RouterV2(EnhancedRouterBase):
     """Router v2 with calibrated bandit policy, early exit, and canary support."""
 
     def __init__(self, redis_client: redis.Redis):
-        self.redis = redis_client
+        super().__init__(redis_client, "router_v2")
         self.feature_extractor = FeatureExtractor(redis_client)
         self.classifier = CalibratedClassifier(redis_client)
         self.bandit_policy = BanditPolicy(redis_client)
@@ -50,10 +51,20 @@ class RouterV2:
         start_time = time.time()
 
         try:
+            # Comprehensive request analysis
+            analysis = await self.analyze_request(request, tenant_id)
+            
             # Extract features
             features = await self.feature_extractor.extract_features(
                 request, tenant_id, user_id
             )
+            
+            # Enhance features with new analysis
+            features.token_count = analysis.get("token_count")
+            features.json_schema_strictness = analysis.get("json_schema_strictness")
+            features.domain_flags = analysis.get("domain_flags", [])
+            features.novelty = analysis.get("novelty")
+            features.historical_failure_rate = analysis.get("historical_failure_rate", 0.0)
 
             # Check for canary first
             (
@@ -132,6 +143,14 @@ class RouterV2:
             await self.metrics_collector.record_decision(
                 tenant_id, final_tier, decision_time, True, expected_cost, actual_cost
             )
+            
+            # Track historical metrics
+            await self.historical_tracker.track_request(
+                tenant_id, user_id, final_tier.value, True, decision_time, actual_cost
+            )
+            
+            # Update router metrics
+            self.update_metrics(decision_time / 1000, final_tier.value, confidence)
 
             return RouterDecision(
                 tier=final_tier,

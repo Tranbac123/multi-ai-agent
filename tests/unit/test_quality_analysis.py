@@ -443,3 +443,4 @@ async def test_quality_analysis_workflow():
             assert (reports_dir / "duplication" / "duplication_report.json").exists()
             assert (reports_dir / "dead-code" / "dead_code_report.json").exists()
             assert (reports_dir / "complexity" / "complexity.json").exists()
+

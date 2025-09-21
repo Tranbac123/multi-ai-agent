@@ -7,14 +7,16 @@ import structlog
 from fastapi import APIRouter, Request, HTTPException, status
 
 from ..core.unified_message import UnifiedMessage, UnifiedResponse, UserProfile, MessageContent, Channel, MessageType
+from libs.resilience.tool_adapter_base import ResilientToolAdapter
 
 logger = structlog.get_logger(__name__)
 
 
-class FacebookMessengerAdapter:
+class FacebookMessengerAdapter(ResilientToolAdapter):
     """Facebook Messenger chat adapter for webhook handling and message sending."""
     
-    def __init__(self, page_access_token: str, webhook_verify_token: str):
+    def __init__(self, page_access_token: str, webhook_verify_token: str, **kwargs):
+        super().__init__(name="facebook_messenger", **kwargs)
         self.page_access_token = page_access_token
         self.webhook_verify_token = webhook_verify_token
         self.api_url = "https://graph.facebook.com/v18.0"
@@ -298,3 +300,54 @@ class FacebookMessengerAdapter:
                         recipient_id=recipient_id,
                         error=str(e))
             return {}
+    
+    async def execute_operation(self, operation: str, payload: Dict[str, Any], 
+                              headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Execute the actual Facebook API operation."""
+        if operation == "send_message":
+            return await self.send_message(
+                recipient_id=payload["recipient_id"],
+                message_text=payload["message_text"],
+                message_type=payload.get("message_type", "text")
+            )
+        elif operation == "set_typing":
+            return await self.set_typing_indicator(
+                recipient_id=payload["recipient_id"],
+                action=payload.get("action", "typing_on")
+            )
+        elif operation == "get_user_profile":
+            return await self.get_user_profile(payload["user_id"])
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+    
+    async def compensate(self, operation: str, payload: Dict[str, Any], 
+                        result: Dict[str, Any]) -> bool:
+        """Compensate for a completed Facebook operation (rollback side effects)."""
+        try:
+            if operation == "send_message":
+                # For Facebook messages, we can't actually unsend, but we can log the compensation
+                logger.info("Compensating Facebook message send", 
+                           message_id=result.get("message_id"),
+                           recipient_id=payload["recipient_id"])
+                return True
+            
+            elif operation == "set_typing":
+                # Turn off typing indicator as compensation
+                if payload.get("action") == "typing_on":
+                    await self.set_typing_indicator(
+                        recipient_id=payload["recipient_id"],
+                        action="typing_off"
+                    )
+                return True
+            
+            elif operation == "get_user_profile":
+                # No side effects to compensate for read operations
+                return True
+            
+            else:
+                logger.warning(f"No compensation logic for operation: {operation}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to compensate operation {operation}: {e}")
+            return False

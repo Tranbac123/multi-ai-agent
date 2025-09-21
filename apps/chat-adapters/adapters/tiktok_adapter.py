@@ -7,14 +7,16 @@ import structlog
 from fastapi import APIRouter, Request, HTTPException, status
 
 from ..core.unified_message import UnifiedMessage, UnifiedResponse, UserProfile, MessageContent, Channel, MessageType
+from libs.resilience.tool_adapter_base import ResilientToolAdapter
 
 logger = structlog.get_logger(__name__)
 
 
-class TikTokChatAdapter:
+class TikTokChatAdapter(ResilientToolAdapter):
     """TikTok chat adapter for social commerce and creator interactions."""
     
-    def __init__(self, app_id: str, app_secret: str):
+    def __init__(self, app_id: str, app_secret: str, **kwargs):
+        super().__init__(name="tiktok_chat", **kwargs)
         self.app_id = app_id
         self.app_secret = app_secret
         self.api_url = "https://business-api.tiktok.com/open_api/v1.3"
@@ -340,3 +342,53 @@ class TikTokChatAdapter:
                         category=category,
                         error=str(e))
             return {}
+    
+    async def execute_operation(self, operation: str, payload: Dict[str, Any], 
+                              headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Execute the actual TikTok API operation."""
+        if operation == "send_message":
+            return await self.send_message(
+                recipient_id=payload["recipient_id"],
+                message_text=payload["message_text"]
+            )
+        elif operation == "get_user_profile":
+            return await self.get_user_profile(payload["user_id"])
+        elif operation == "get_trending_content":
+            return await self.get_trending_content(payload.get("category", "general"))
+        elif operation == "create_live_session":
+            return await self.create_live_session(
+                creator_id=payload["creator_id"],
+                title=payload.get("title", "Live Session")
+            )
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+    
+    async def compensate(self, operation: str, payload: Dict[str, Any], 
+                        result: Dict[str, Any]) -> bool:
+        """Compensate for a completed TikTok operation (rollback side effects)."""
+        try:
+            if operation == "send_message":
+                # For TikTok messages, we can't actually unsend, but we can log the compensation
+                logger.info("Compensating TikTok message send", 
+                           message_id=result.get("message_id"),
+                           recipient_id=payload["recipient_id"])
+                return True
+            
+            elif operation == "create_live_session":
+                # End the live session as compensation
+                session_id = result.get("session_id")
+                if session_id:
+                    await self.end_live_session(session_id)
+                return True
+            
+            elif operation in ["get_user_profile", "get_trending_content"]:
+                # No side effects to compensate for read operations
+                return True
+            
+            else:
+                logger.warning(f"No compensation logic for operation: {operation}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to compensate operation {operation}: {e}")
+            return False

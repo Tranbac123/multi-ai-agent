@@ -6,7 +6,7 @@ No markdown-JSON tolerated, strict validation enforced.
 """
 
 from typing import Dict, List, Optional, Any, Union
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 import uuid
 from datetime import datetime, timezone
@@ -144,7 +144,8 @@ class ErrorDetails(BaseModel):
         ge=1
     )
     
-    @validator('suggestions')
+    @field_validator('suggestions')
+    @classmethod
     def validate_suggestions(cls, v):
         """Validate suggestions."""
         if not isinstance(v, list):
@@ -160,7 +161,8 @@ class ErrorDetails(BaseModel):
         
         return [suggestion.strip() for suggestion in v]
     
-    @validator('documentation_url')
+    @field_validator('documentation_url')
+    @classmethod
     def validate_documentation_url(cls, v):
         """Validate documentation URL."""
         if v is not None:
@@ -217,7 +219,8 @@ class ErrorSpec(BaseModel):
         description="Additional error metadata"
     )
     
-    @validator('error_id')
+    @field_validator('error_id')
+    @classmethod
     def validate_error_id(cls, v):
         """Validate error ID format."""
         try:
@@ -226,7 +229,8 @@ class ErrorSpec(BaseModel):
         except ValueError:
             raise ValueError('error_id must be a valid UUID')
     
-    @validator('parent_error_id')
+    @field_validator('parent_error_id')
+    @classmethod
     def validate_parent_error_id(cls, v):
         """Validate parent error ID format."""
         if v is not None:
@@ -237,14 +241,16 @@ class ErrorSpec(BaseModel):
                 raise ValueError('parent_error_id must be a valid UUID')
         return v
     
-    @validator('correlation_id')
+    @field_validator('correlation_id')
+    @classmethod
     def validate_correlation_id(cls, v):
         """Validate correlation ID format."""
         if v is not None and not v.strip():
             raise ValueError('correlation_id cannot be empty')
         return v.strip() if v else None
     
-    @validator('metadata')
+    @field_validator('metadata')
+    @classmethod
     def validate_metadata(cls, v):
         """Validate metadata."""
         if not isinstance(v, dict):
@@ -259,13 +265,13 @@ class ErrorSpec(BaseModel):
         
         return v
     
-    @root_validator
-    def validate_error_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_error_consistency(self):
         """Validate error specification consistency."""
-        error_code = values.get('error_code')
-        category = values.get('category')
-        severity = values.get('severity')
-        details = values.get('details')
+        error_code = self.error_code
+        category = self.category
+        severity = self.severity
+        details = self.details
         
         # Validate category matches error code
         if error_code and category:
@@ -305,7 +311,7 @@ class ErrorSpec(BaseModel):
             # Critical errors typically shouldn't suggest retries
             pass  # Could add warning here
         
-        return values
+        return self
     
     class Config:
         strict = True

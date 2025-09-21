@@ -1,6 +1,6 @@
 """Validation middleware for API Gateway with strict JSON validation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from datetime import datetime
@@ -94,8 +94,11 @@ class ValidationMiddleware:
             )
 
     def validate_response(self, response_data: Any, model_class: type) -> Any:
-        """Validate outgoing response against Pydantic model."""
+        """Validate outgoing response against Pydantic model with strict validation."""
         try:
+            # Strict validation checks
+            self._validate_strict_response(response_data, model_class)
+            
             if isinstance(response_data, dict):
                 return model_class(**response_data)
             return response_data
@@ -115,6 +118,70 @@ class ValidationMiddleware:
                 error=error,
                 validation_errors=self._extract_validation_errors(e),
             )
+    
+    def _validate_strict_response(self, response_data: Any, model_class: type) -> None:
+        """Perform strict validation on response data."""
+        if not isinstance(response_data, dict):
+            raise ValidationError("Response data must be a dictionary")
+        
+        # Check for required fields based on model schema
+        if hasattr(model_class, 'model_fields'):
+            required_fields = {
+                field_name for field_name, field_info in model_class.model_fields.items()
+                if field_info.is_required()
+            }
+            
+            missing_fields = required_fields - set(response_data.keys())
+            if missing_fields:
+                raise ValidationError(f"Missing required fields: {missing_fields}")
+        
+        # Check for unexpected fields
+        if hasattr(model_class, 'model_fields'):
+            allowed_fields = set(model_class.model_fields.keys())
+            extra_fields = set(response_data.keys()) - allowed_fields
+            if extra_fields:
+                logger.warning(
+                    "Extra fields in response",
+                    extra_fields=extra_fields,
+                    model_class=model_class.__name__
+                )
+        
+        # Validate data types and constraints
+        self._validate_data_constraints(response_data, model_class)
+    
+    def _validate_data_constraints(self, data: Dict[str, Any], model_class: type) -> None:
+        """Validate data constraints and types."""
+        if hasattr(model_class, 'model_fields'):
+            for field_name, field_info in model_class.model_fields.items():
+                if field_name in data:
+                    value = data[field_name]
+                    
+                    # Type validation
+                    if hasattr(field_info, 'annotation'):
+                        expected_type = field_info.annotation
+                        if not isinstance(value, expected_type):
+                            # Handle Optional types
+                            if hasattr(expected_type, '__origin__') and expected_type.__origin__ is Union:
+                                if type(None) not in expected_type.__args__ or not isinstance(value, expected_type.__args__[0]):
+                                    raise ValidationError(f"Field '{field_name}' must be of type {expected_type}")
+                    
+                    # String length validation
+                    if isinstance(value, str):
+                        if hasattr(field_info, 'constraints'):
+                            for constraint in field_info.constraints:
+                                if hasattr(constraint, 'min_length') and len(value) < constraint.min_length:
+                                    raise ValidationError(f"Field '{field_name}' is too short (minimum {constraint.min_length})")
+                                if hasattr(constraint, 'max_length') and len(value) > constraint.max_length:
+                                    raise ValidationError(f"Field '{field_name}' is too long (maximum {constraint.max_length})")
+                    
+                    # Numeric range validation
+                    if isinstance(value, (int, float)):
+                        if hasattr(field_info, 'constraints'):
+                            for constraint in field_info.constraints:
+                                if hasattr(constraint, 'ge') and value < constraint.ge:
+                                    raise ValidationError(f"Field '{field_name}' must be >= {constraint.ge}")
+                                if hasattr(constraint, 'le') and value > constraint.le:
+                                    raise ValidationError(f"Field '{field_name}' must be <= {constraint.le}")
 
     async def _check_markdown_json_injection(self, request: Request, body: Any) -> None:
         """Check for markdown-wrapped JSON injection attempts."""

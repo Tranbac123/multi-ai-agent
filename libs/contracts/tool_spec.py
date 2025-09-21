@@ -6,7 +6,7 @@ No markdown-JSON tolerated, strict validation enforced.
 """
 
 from typing import Dict, List, Optional, Any, Union, Callable
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 import uuid
 from datetime import datetime, timezone
@@ -42,12 +42,12 @@ class ToolParameter(BaseModel):
         description="Parameter name",
         min_length=1,
         max_length=50,
-        regex=r'^[a-zA-Z_][a-zA-Z0-9_]*$'
+        pattern=r'^[a-zA-Z_][a-zA-Z0-9_]*$'
     )
     type: str = Field(
         ..., 
         description="Parameter type",
-        regex=r'^(string|integer|float|boolean|object|array)$'
+        pattern=r'^(string|integer|float|boolean|object|array)$'
     )
     description: str = Field(
         ..., 
@@ -68,7 +68,8 @@ class ToolParameter(BaseModel):
         description="Parameter constraints"
     )
     
-    @validator('default_value')
+    @field_validator('default_value')
+    @classmethod
     def validate_default_value(cls, v, values):
         """Validate default value against type."""
         if v is None:
@@ -127,21 +128,24 @@ class ToolInput(BaseModel):
         description="Idempotency key for safe retries"
     )
     
-    @validator('tool_id')
+    @field_validator('tool_id')
+    @classmethod
     def validate_tool_id(cls, v):
         """Validate tool ID format."""
         if not v or not v.strip():
             raise ValueError('tool_id cannot be empty')
         return v.strip()
     
-    @validator('parameters')
+    @field_validator('parameters')
+    @classmethod
     def validate_parameters(cls, v):
         """Validate parameters."""
         if not isinstance(v, dict):
             raise ValueError('parameters must be a dictionary')
         return v
     
-    @validator('context')
+    @field_validator('context')
+    @classmethod
     def validate_context(cls, v):
         """Validate context."""
         if v is not None and not isinstance(v, dict):
@@ -192,14 +196,16 @@ class ToolOutput(BaseModel):
         description="Additional metadata"
     )
     
-    @validator('tool_id')
+    @field_validator('tool_id')
+    @classmethod
     def validate_tool_id(cls, v):
         """Validate tool ID format."""
         if not v or not v.strip():
             raise ValueError('tool_id cannot be empty')
         return v.strip()
     
-    @validator('error_message')
+    @field_validator('error_message')
+    @classmethod
     def validate_error_message(cls, v, values):
         """Validate error message presence for failed status."""
         status = values.get('status')
@@ -207,7 +213,8 @@ class ToolOutput(BaseModel):
             raise ValueError('error_message is required for failed status')
         return v
     
-    @validator('result')
+    @field_validator('result')
+    @classmethod
     def validate_result(cls, v, values):
         """Validate result presence for completed status."""
         status = values.get('status')
@@ -239,7 +246,7 @@ class ToolError(BaseModel):
     error_type: str = Field(
         ..., 
         description="Error type",
-        regex=r'^(validation|execution|timeout|network|permission|resource)$'
+        pattern=r'^(validation|execution|timeout|network|permission|resource)$'
     )
     stack_trace: Optional[str] = Field(
         None,
@@ -279,7 +286,7 @@ class ToolSpec(BaseModel):
         description="Tool name",
         min_length=1,
         max_length=100,
-        regex=r'^[a-zA-Z_][a-zA-Z0-9_-]*$'
+        pattern=r'^[a-zA-Z_][a-zA-Z0-9_-]*$'
     )
     description: str = Field(
         ..., 
@@ -298,7 +305,7 @@ class ToolSpec(BaseModel):
     version: str = Field(
         ..., 
         description="Tool version",
-        regex=r'^\d+\.\d+\.\d+$'
+        pattern=r'^\d+\.\d+\.\d+$'
     )
     timeout_seconds: int = Field(
         default=30,
@@ -334,7 +341,8 @@ class ToolSpec(BaseModel):
         description="Last update timestamp"
     )
     
-    @validator('tool_id')
+    @field_validator('tool_id')
+    @classmethod
     def validate_tool_id(cls, v):
         """Validate tool ID format."""
         try:
@@ -343,14 +351,16 @@ class ToolSpec(BaseModel):
         except ValueError:
             raise ValueError('tool_id must be a valid UUID')
     
-    @validator('tenant_id')
+    @field_validator('tenant_id')
+    @classmethod
     def validate_tenant_id(cls, v):
         """Validate tenant ID format."""
         if not v or not v.strip():
             raise ValueError('tenant_id cannot be empty')
         return v.strip()
     
-    @validator('parameters')
+    @field_validator('parameters')
+    @classmethod
     def validate_parameters(cls, v):
         """Validate parameters."""
         if not isinstance(v, list):
@@ -363,7 +373,8 @@ class ToolSpec(BaseModel):
         
         return v
     
-    @validator('tags')
+    @field_validator('tags')
+    @classmethod
     def validate_tags(cls, v):
         """Validate tool tags."""
         if not isinstance(v, list):
@@ -379,12 +390,12 @@ class ToolSpec(BaseModel):
         
         return [tag.strip() for tag in v]
     
-    @root_validator
-    def validate_tool_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_tool_consistency(self):
         """Validate tool specification consistency."""
-        tool_type = values.get('tool_type')
-        parameters = values.get('parameters', [])
-        requires_approval = values.get('requires_approval', False)
+        tool_type = self.tool_type
+        parameters = self.parameters
+        requires_approval = self.requires_approval
         
         # Validate parameters based on tool type
         if tool_type == ToolType.API_CALL:

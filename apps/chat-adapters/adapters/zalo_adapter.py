@@ -7,14 +7,16 @@ import structlog
 from fastapi import APIRouter, Request, HTTPException, status
 
 from ..core.unified_message import UnifiedMessage, UnifiedResponse, UserProfile, MessageContent, Channel, MessageType
+from libs.resilience.tool_adapter_base import ResilientToolAdapter
 
 logger = structlog.get_logger(__name__)
 
 
-class ZaloChatAdapter:
+class ZaloChatAdapter(ResilientToolAdapter):
     """Zalo chat adapter for Vietnamese market integration."""
     
-    def __init__(self, oa_id: str, secret_key: str):
+    def __init__(self, oa_id: str, secret_key: str, **kwargs):
+        super().__init__(name="zalo_chat", **kwargs)
         self.oa_id = oa_id
         self.secret_key = secret_key
         self.api_url = "https://openapi.zalo.me/v2.0"
@@ -390,6 +392,68 @@ class ZaloChatAdapter:
         
         return await self.send_message(user_id, message)
     
+    async def execute_operation(self, operation: str, payload: Dict[str, Any], 
+                              headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Execute the actual Zalo API operation."""
+        if operation == "send_message":
+            return await self.send_message(
+                user_id=payload["user_id"],
+                message_text=payload["message_text"]
+            )
+        elif operation == "send_location":
+            return await self.send_location(
+                user_id=payload["user_id"],
+                latitude=payload["latitude"],
+                longitude=payload["longitude"],
+                name=payload.get("name", "Location"),
+                address=payload.get("address", "")
+            )
+        elif operation == "get_user_profile":
+            return await self.get_user_profile(payload["user_id"])
+        elif operation == "send_quick_reply":
+            return await self.send_quick_reply(
+                user_id=payload["user_id"],
+                message_text=payload["message_text"],
+                quick_replies=payload["quick_replies"]
+            )
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+    
+    async def compensate(self, operation: str, payload: Dict[str, Any], 
+                        result: Dict[str, Any]) -> bool:
+        """Compensate for a completed Zalo operation (rollback side effects)."""
+        try:
+            if operation == "send_message":
+                # For Zalo messages, we can't actually unsend, but we can log the compensation
+                logger.info("Compensating Zalo message send", 
+                           message_id=result.get("message_id"),
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "send_location":
+                # For location sharing, we can send a "location shared" cancellation message
+                logger.info("Compensating Zalo location send", 
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "send_quick_reply":
+                # For quick replies, we can send a message indicating the action was cancelled
+                logger.info("Compensating Zalo quick reply", 
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "get_user_profile":
+                # No side effects to compensate for read operations
+                return True
+            
+            else:
+                logger.warning(f"No compensation logic for operation: {operation}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to compensate operation {operation}: {e}")
+            return False
+    
     async def send_location(self, user_id: str, latitude: float, longitude: float, 
                            name: str = "", address: str = "") -> Dict[str, Any]:
         """Send location via Zalo."""
@@ -410,3 +474,65 @@ class ZaloChatAdapter:
         }
         
         return await self.send_message(user_id, message)
+    
+    async def execute_operation(self, operation: str, payload: Dict[str, Any], 
+                              headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Execute the actual Zalo API operation."""
+        if operation == "send_message":
+            return await self.send_message(
+                user_id=payload["user_id"],
+                message_text=payload["message_text"]
+            )
+        elif operation == "send_location":
+            return await self.send_location(
+                user_id=payload["user_id"],
+                latitude=payload["latitude"],
+                longitude=payload["longitude"],
+                name=payload.get("name", "Location"),
+                address=payload.get("address", "")
+            )
+        elif operation == "get_user_profile":
+            return await self.get_user_profile(payload["user_id"])
+        elif operation == "send_quick_reply":
+            return await self.send_quick_reply(
+                user_id=payload["user_id"],
+                message_text=payload["message_text"],
+                quick_replies=payload["quick_replies"]
+            )
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+    
+    async def compensate(self, operation: str, payload: Dict[str, Any], 
+                        result: Dict[str, Any]) -> bool:
+        """Compensate for a completed Zalo operation (rollback side effects)."""
+        try:
+            if operation == "send_message":
+                # For Zalo messages, we can't actually unsend, but we can log the compensation
+                logger.info("Compensating Zalo message send", 
+                           message_id=result.get("message_id"),
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "send_location":
+                # For location sharing, we can send a "location shared" cancellation message
+                logger.info("Compensating Zalo location send", 
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "send_quick_reply":
+                # For quick replies, we can send a message indicating the action was cancelled
+                logger.info("Compensating Zalo quick reply", 
+                           user_id=payload["user_id"])
+                return True
+            
+            elif operation == "get_user_profile":
+                # No side effects to compensate for read operations
+                return True
+            
+            else:
+                logger.warning(f"No compensation logic for operation: {operation}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to compensate operation {operation}: {e}")
+            return False

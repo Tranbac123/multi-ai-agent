@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-09-17T13:25:08.050717",
+  "timestamp": "2025-09-17T18:27:01.047935",
   "tool": "jscpd",
   "exit_code": 0,
-  "stdout": "\u001b[3m\u001b[90mDetection time:\u001b[39m\u001b[23m: 0.586ms\n",
+  "stdout": "\u001b[3m\u001b[90mDetection time:\u001b[39m\u001b[23m: 0.167ms\n",
   "stderr": "",
   "summary": {
     "duplication_percentage": 0.0,

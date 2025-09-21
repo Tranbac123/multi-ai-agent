@@ -118,3 +118,4 @@ def add_common_routes(app: FastAPI, service_name: str) -> None:
             "version": app.version,
             "docs": "/docs"
         }
+

@@ -89,3 +89,4 @@ async def get_database_health() -> bool:
         return False
     
     return await _db_config.health_check()
+

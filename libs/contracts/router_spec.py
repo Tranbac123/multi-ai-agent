@@ -6,7 +6,7 @@ No markdown-JSON tolerated, strict validation enforced.
 """
 
 from typing import Dict, List, Optional, Any, Union
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 import uuid
 from datetime import datetime, timezone
@@ -47,7 +47,7 @@ class FeatureVector(BaseModel):
     domain_flags: List[str] = Field(
         ..., 
         description="Domain classification flags",
-        min_items=1
+        min_length=1
     )
     novelty: float = Field(
         ..., 
@@ -80,7 +80,8 @@ class FeatureVector(BaseModel):
         le=1.0
     )
     
-    @validator('domain_flags')
+    @field_validator('domain_flags')
+    @classmethod
     def validate_domain_flags(cls, v):
         """Validate domain flags."""
         if not isinstance(v, list):
@@ -141,14 +142,16 @@ class RoutingContext(BaseModel):
         le=60000
     )
     
-    @validator('tenant_id')
+    @field_validator('tenant_id')
+    @classmethod
     def validate_tenant_id(cls, v):
         """Validate tenant ID format."""
         if not v or not v.strip():
             raise ValueError('tenant_id cannot be empty')
         return v.strip()
     
-    @validator('request_id')
+    @field_validator('request_id')
+    @classmethod
     def validate_request_id(cls, v):
         """Validate request ID format."""
         try:
@@ -182,7 +185,7 @@ class RouterDecisionRequest(BaseModel):
     available_tiers: List[RouterTier] = Field(
         ..., 
         description="Available routing tiers",
-        min_items=1
+        min_length=1
     )
     early_exit_threshold: Optional[float] = Field(
         None,
@@ -201,14 +204,16 @@ class RouterDecisionRequest(BaseModel):
         ge=100
     )
     
-    @validator('input_text')
+    @field_validator('input_text')
+    @classmethod
     def validate_input_text(cls, v):
         """Validate input text."""
         if not v or not v.strip():
             raise ValueError('input_text cannot be empty')
         return v.strip()
     
-    @validator('available_tiers')
+    @field_validator('available_tiers')
+    @classmethod
     def validate_available_tiers(cls, v):
         """Validate available tiers."""
         if not isinstance(v, list):
@@ -219,37 +224,34 @@ class RouterDecisionRequest(BaseModel):
         
         return v
     
-    @root_validator
-    def validate_request_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_request_consistency(self):
         """Validate request consistency."""
-        features = values.get('features')
-        context = values.get('context')
-        max_cost_usd = values.get('max_cost_usd')
-        max_latency_ms = values.get('max_latency_ms')
-        
         # Validate cost constraints
-        if max_cost_usd and context and context.cost_budget_remaining > max_cost_usd:
+        if self.max_cost_usd and self.context and self.context.cost_budget_remaining > self.max_cost_usd:
             raise ValueError('cost_budget_remaining cannot exceed max_cost_usd')
         
         # Validate latency constraints
-        if max_latency_ms and context and context.latency_budget_ms > max_latency_ms:
+        if self.max_latency_ms and self.context and self.context.latency_budget_ms > self.max_latency_ms:
             raise ValueError('latency_budget_ms cannot exceed max_latency_ms')
         
         # Validate feature consistency
-        if features and context:
-            if features.cost_sensitivity > 0.8 and context.cost_budget_remaining < 0.2:
+        if self.features and self.context:
+            if self.features.cost_sensitivity > 0.8 and self.context.cost_budget_remaining < 0.2:
                 # High cost sensitivity with low budget - might want to warn
                 pass
         
-        return values
+        return self
     
-    class Config:
-        strict = True
-        forbid_extra = True
-        use_enum_values = True
-        json_encoders = {
+    model_config = {
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "extra": "forbid",
+        "use_enum_values": True,
+        "json_encoders": {
             datetime: lambda v: v.isoformat()
         }
+    }
 
 
 class RouterDecisionResponse(BaseModel):
@@ -302,14 +304,16 @@ class RouterDecisionResponse(BaseModel):
         description="Decision timestamp"
     )
     
-    @validator('reasoning')
+    @field_validator('reasoning')
+    @classmethod
     def validate_reasoning(cls, v):
         """Validate reasoning."""
         if not v or not v.strip():
             raise ValueError('reasoning cannot be empty')
         return v.strip()
     
-    @validator('alternative_tiers')
+    @field_validator('alternative_tiers')
+    @classmethod
     def validate_alternative_tiers(cls, v):
         """Validate alternative tiers."""
         if not isinstance(v, list):
@@ -320,7 +324,8 @@ class RouterDecisionResponse(BaseModel):
         
         return v
     
-    @validator('decision_metadata')
+    @field_validator('decision_metadata')
+    @classmethod
     def validate_decision_metadata(cls, v):
         """Validate decision metadata."""
         if not isinstance(v, dict):
@@ -335,40 +340,36 @@ class RouterDecisionResponse(BaseModel):
         
         return v
     
-    @root_validator
-    def validate_response_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_response_consistency(self):
         """Validate response consistency."""
-        confidence = values.get('confidence')
-        confidence_level = values.get('confidence_level')
-        early_exit = values.get('early_exit', False)
-        alternative_tiers = values.get('alternative_tiers', [])
-        selected_tier = values.get('selected_tier')
-        
         # Validate confidence level mapping
-        if confidence is not None and confidence_level is not None:
-            if confidence < 0.3 and confidence_level != RouterConfidence.LOW:
+        if self.confidence is not None and self.confidence_level is not None:
+            if self.confidence < 0.3 and self.confidence_level != RouterConfidence.LOW:
                 pass  # Could add warning here
-            elif 0.3 <= confidence < 0.6 and confidence_level != RouterConfidence.MEDIUM:
+            elif 0.3 <= self.confidence < 0.6 and self.confidence_level != RouterConfidence.MEDIUM:
                 pass  # Could add warning here
-            elif 0.6 <= confidence < 0.8 and confidence_level != RouterConfidence.HIGH:
+            elif 0.6 <= self.confidence < 0.8 and self.confidence_level != RouterConfidence.HIGH:
                 pass  # Could add warning here
-            elif confidence >= 0.8 and confidence_level != RouterConfidence.VERY_HIGH:
+            elif self.confidence >= 0.8 and self.confidence_level != RouterConfidence.VERY_HIGH:
                 pass  # Could add warning here
         
         # Validate early exit consistency
-        if early_exit and confidence < 0.8:
+        if self.early_exit and self.confidence < 0.8:
             pass  # Early exit with low confidence might be suspicious
         
         # Validate alternative tiers don't include selected tier
-        if selected_tier in alternative_tiers:
+        if self.selected_tier in self.alternative_tiers:
             raise ValueError('selected_tier cannot be in alternative_tiers')
         
-        return values
+        return self
     
-    class Config:
-        strict = True
-        forbid_extra = True
-        use_enum_values = True
-        json_encoders = {
+    model_config = {
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "extra": "forbid",
+        "use_enum_values": True,
+        "json_encoders": {
             datetime: lambda v: v.isoformat()
         }
+    }

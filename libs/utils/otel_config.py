@@ -47,3 +47,4 @@ def create_span(name: str, attributes: Optional[dict] = None):
             span.set_attribute(key, value)
     
     return span
+

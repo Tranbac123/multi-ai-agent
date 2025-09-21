@@ -6,7 +6,7 @@ No markdown-JSON tolerated, strict validation enforced.
 """
 
 from typing import Dict, List, Optional, Any, Union
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 import uuid
 from datetime import datetime, timezone
@@ -41,7 +41,7 @@ class AgentCapabilities(BaseModel):
     capabilities: List[AgentCapability] = Field(
         ..., 
         description="List of agent capabilities",
-        min_items=1
+        min_length=1
     )
     max_context_length: int = Field(
         ..., 
@@ -78,12 +78,12 @@ class AgentMetadata(BaseModel):
         description="Agent name",
         min_length=1,
         max_length=100,
-        regex=r'^[a-zA-Z0-9_-]+$'
+        pattern=r'^[a-zA-Z0-9_-]+$'
     )
     version: str = Field(
         ..., 
         description="Agent version",
-        regex=r'^\d+\.\d+\.\d+$'
+        pattern=r'^\d+\.\d+\.\d+$'
     )
     description: str = Field(
         ..., 
@@ -144,7 +144,8 @@ class AgentSpec(BaseModel):
         description="Performance metrics"
     )
     
-    @validator('agent_id')
+    @field_validator('agent_id')
+    @classmethod
     def validate_agent_id(cls, v):
         """Validate agent ID format."""
         try:
@@ -153,14 +154,16 @@ class AgentSpec(BaseModel):
         except ValueError:
             raise ValueError('agent_id must be a valid UUID')
     
-    @validator('tenant_id')
+    @field_validator('tenant_id')
+    @classmethod
     def validate_tenant_id(cls, v):
         """Validate tenant ID format."""
         if not v or not v.strip():
             raise ValueError('tenant_id cannot be empty')
         return v.strip()
     
-    @validator('configuration')
+    @field_validator('configuration')
+    @classmethod
     def validate_configuration(cls, v):
         """Validate configuration is JSON-serializable."""
         if not isinstance(v, dict):
@@ -175,7 +178,8 @@ class AgentSpec(BaseModel):
         
         return v
     
-    @validator('performance_metrics')
+    @field_validator('performance_metrics')
+    @classmethod
     def validate_performance_metrics(cls, v):
         """Validate performance metrics."""
         if not isinstance(v, dict):
@@ -189,12 +193,12 @@ class AgentSpec(BaseModel):
         
         return v
     
-    @root_validator
-    def validate_agent_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_agent_consistency(self):
         """Validate agent specification consistency."""
-        capabilities = values.get('capabilities')
-        metadata = values.get('metadata')
-        configuration = values.get('configuration', {})
+        capabilities = self.capabilities
+        metadata = self.metadata
+        configuration = self.configuration
         
         if capabilities and metadata:
             # Check if agent name matches capability requirements
@@ -204,7 +208,7 @@ class AgentSpec(BaseModel):
                 if config_max > capability_max:
                     raise ValueError('configuration max_context_length cannot exceed capability limit')
         
-        return values
+        return self
     
     class Config:
         strict = True

@@ -6,7 +6,7 @@ No markdown-JSON tolerated, strict validation enforced.
 """
 
 from typing import Dict, List, Optional, Any, Union
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 import uuid
 from datetime import datetime, timezone
@@ -49,21 +49,24 @@ class MessageContent(BaseModel):
         description="Message attachments"
     )
     
-    @validator('text')
+    @field_validator('text')
+    @classmethod
     def validate_text(cls, v):
         """Validate text content."""
         if v is not None and not v.strip():
             return None
         return v
     
-    @validator('data')
+    @field_validator('data')
+    @classmethod
     def validate_data(cls, v):
         """Validate structured data."""
         if v is not None and not isinstance(v, dict):
             raise ValueError('data must be a dictionary or None')
         return v
     
-    @validator('attachments')
+    @field_validator('attachments')
+    @classmethod
     def validate_attachments(cls, v):
         """Validate attachments."""
         if not isinstance(v, list):
@@ -80,17 +83,17 @@ class MessageContent(BaseModel):
         
         return v
     
-    @root_validator
-    def validate_content_presence(cls, values):
+    @model_validator(mode='after')
+    def validate_content_presence(self):
         """Ensure at least one content type is present."""
-        text = values.get('text')
-        data = values.get('data')
-        attachments = values.get('attachments', [])
+        text = self.text
+        data = self.data
+        attachments = self.attachments
         
         if not text and not data and not attachments:
             raise ValueError('At least one content type must be provided')
         
-        return values
+        return self
 
 
 class MessageMetadata(BaseModel):
@@ -166,7 +169,8 @@ class MessageSpec(BaseModel):
         description="Message expiration timestamp"
     )
     
-    @validator('message_id')
+    @field_validator('message_id')
+    @classmethod
     def validate_message_id(cls, v):
         """Validate message ID format."""
         try:
@@ -175,14 +179,16 @@ class MessageSpec(BaseModel):
         except ValueError:
             raise ValueError('message_id must be a valid UUID')
     
-    @validator('tenant_id')
+    @field_validator('tenant_id')
+    @classmethod
     def validate_tenant_id(cls, v):
         """Validate tenant ID format."""
         if not v or not v.strip():
             raise ValueError('tenant_id cannot be empty')
         return v.strip()
     
-    @validator('tags')
+    @field_validator('tags')
+    @classmethod
     def validate_tags(cls, v):
         """Validate message tags."""
         if not isinstance(v, list):
@@ -198,7 +204,8 @@ class MessageSpec(BaseModel):
         
         return [tag.strip() for tag in v]
     
-    @validator('expires_at')
+    @field_validator('expires_at')
+    @classmethod
     def validate_expires_at(cls, v):
         """Validate expiration timestamp."""
         if v is not None:
@@ -207,12 +214,12 @@ class MessageSpec(BaseModel):
                 raise ValueError('expires_at must be in the future')
         return v
     
-    @root_validator
-    def validate_message_consistency(cls, values):
+    @model_validator(mode='after')
+    def validate_message_consistency(self):
         """Validate message specification consistency."""
-        message_type = values.get('message_type')
-        content = values.get('content')
-        metadata = values.get('metadata')
+        message_type = self.message_type
+        content = self.content
+        metadata = self.metadata
         
         if message_type and content:
             # Validate content based on message type
@@ -229,11 +236,11 @@ class MessageSpec(BaseModel):
                     raise ValueError('error_message must have text content')
         
         if metadata and metadata.timestamp:
-            expires_at = values.get('expires_at')
+            expires_at = self.expires_at
             if expires_at and expires_at <= metadata.timestamp:
                 raise ValueError('expires_at must be after message timestamp')
         
-        return values
+        return self
     
     class Config:
         strict = True

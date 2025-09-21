@@ -45,9 +45,21 @@ class WebSocketManager:
         self.connections: Dict[str, WebSocketConnection] = {}
         self.tenant_connections: Dict[str, Set[str]] = {}  # tenant_id -> connection_ids
         
-        # Metrics
+        # Enhanced metrics
+        self.ws_active_connections = 0
+        self.ws_backpressure_drops = 0
+        self.ws_send_errors = 0
         self.total_connections = 0
         self.active_connections = 0
+        
+        # Backpressure policy configuration
+        self.backpressure_policy = {
+            "max_queue_size": 1000,
+            "drop_threshold": 0.8,
+            "rate_limit_per_connection": 100,  # messages per minute
+            "burst_limit": 50,  # messages in burst
+            "circuit_breaker_threshold": 10  # consecutive failures
+        }
         self.total_messages_sent = 0
         self.total_messages_received = 0
         self.total_bytes_sent = 0
@@ -80,6 +92,7 @@ class WebSocketManager:
         self.connections[connection_id] = connection
         self.total_connections += 1
         self.active_connections += 1
+        self.ws_active_connections += 1
         
         # Add to tenant connections
         if tenant_id not in self.tenant_connections:
@@ -126,6 +139,7 @@ class WebSocketManager:
         
         del self.connections[connection_id]
         self.active_connections -= 1
+        self.ws_active_connections -= 1
         
         logger.info("WebSocket connection closed", 
                    connection_id=connection_id,
@@ -153,29 +167,72 @@ class WebSocketManager:
             logger.warning("Connection is not active", connection_id=connection_id)
             return False
         
+        # Check backpressure policy before sending
+        if not self._check_backpressure_policy(connection_id):
+            self.ws_backpressure_drops += 1
+            logger.warning("Message dropped due to backpressure policy", 
+                          connection_id=connection_id)
+            return False
+        
         # Use backpressure manager to send
-        success = await self.backpressure_manager.send_message(
-            connection_id=connection_id,
-            content=content,
-            message_type=message_type,
-            priority=priority,
-            is_final=is_final,
-            metadata=metadata
-        )
-        
-        if success:
-            self.total_messages_sent += 1
+        try:
+            success = await self.backpressure_manager.send_message(
+                connection_id=connection_id,
+                content=content,
+                message_type=message_type,
+                priority=priority,
+                is_final=is_final,
+                metadata=metadata
+            )
             
-            # Try to send immediately if possible
-            try:
-                await self._flush_connection_queue(connection_id)
-            except Exception as e:
-                logger.error("Error flushing connection queue", 
-                           connection_id=connection_id,
-                           error=str(e))
-                self.total_send_errors += 1
+            if not success:
+                self.ws_send_errors += 1
+            
+            return success
+            
+        except Exception as e:
+            self.ws_send_errors += 1
+            logger.error("Error sending message", 
+                        connection_id=connection_id,
+                        error=str(e))
+            return False
+    
+    def _check_backpressure_policy(self, connection_id: str) -> bool:
+        """Check if message sending is allowed based on backpressure policy."""
+        if connection_id not in self.connections:
+            return False
         
-        return success
+        connection = self.connections[connection_id]
+        
+        # Check rate limiting
+        # This is a simplified implementation - in production you'd use a proper rate limiter
+        current_time = datetime.now()
+        if not hasattr(connection, 'message_history'):
+            connection.message_history = []
+        
+        # Clean old messages (older than 1 minute)
+        connection.message_history = [
+            msg_time for msg_time in connection.message_history
+            if (current_time - msg_time).total_seconds() < 60
+        ]
+        
+        # Check rate limit
+        if len(connection.message_history) >= self.backpressure_policy["rate_limit_per_connection"]:
+            return False
+        
+        # Check burst limit (last 10 seconds)
+        recent_messages = [
+            msg_time for msg_time in connection.message_history
+            if (current_time - msg_time).total_seconds() < 10
+        ]
+        
+        if len(recent_messages) >= self.backpressure_policy["burst_limit"]:
+            return False
+        
+        # Add current message to history
+        connection.message_history.append(current_time)
+        
+        return True
     
     async def send_to_tenant(
         self, 
@@ -449,6 +506,9 @@ class WebSocketManager:
         return {
             "total_connections": self.total_connections,
             "active_connections": self.active_connections,
+            "ws_active_connections": self.ws_active_connections,
+            "ws_backpressure_drops": self.ws_backpressure_drops,
+            "ws_send_errors": self.ws_send_errors,
             "total_messages_sent": self.total_messages_sent,
             "total_messages_received": self.total_messages_received,
             "total_bytes_sent": self.total_bytes_sent,
@@ -456,5 +516,6 @@ class WebSocketManager:
             "total_send_errors": self.total_send_errors,
             "total_receive_errors": self.total_receive_errors,
             "tenants_count": len(self.tenant_connections),
+            "backpressure_policy": self.backpressure_policy,
             "backpressure_metrics": backpressure_metrics
         }

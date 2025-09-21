@@ -51,7 +51,11 @@ def validate_contract(
                 raise ContractValidationError(f"Invalid JSON: {e}")
         
         # Validate against contract
-        instance = contract_class(**data)
+        if isinstance(data, dict):
+            instance = contract_class(**data)
+        else:
+            # For non-dict data, pass as a single argument
+            instance = contract_class.model_validate(data)
         
         # Additional strict validation
         if strict:

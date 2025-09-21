@@ -111,12 +111,227 @@ async def upgrade(db: AsyncSession) -> None:
             "credentials": credentials
         })
     
+    # Enable Row Level Security (RLS) patterns
+    await _setup_rls_patterns(db)
+    
     await db.commit()
-    logger.info("Migration 006 completed: Regional schema and providers created")
+    logger.info("Migration 006 completed: Regional schema and providers created with RLS patterns")
+
+
+async def _setup_rls_patterns(db: AsyncSession) -> None:
+    """Setup Row Level Security patterns for multi-tenant data isolation."""
+    
+    # Enable RLS on tenants table
+    await db.execute(text("ALTER TABLE tenants ENABLE ROW LEVEL SECURITY"))
+    
+    # Create RLS policy for tenants (users can only access their own tenant)
+    await db.execute(text("""
+        CREATE POLICY tenant_isolation_policy ON tenants
+        FOR ALL TO authenticated_users
+        USING (tenant_id = current_setting('app.current_tenant_id')::uuid)
+    """))
+    
+    # Enable RLS on regional_providers table
+    await db.execute(text("ALTER TABLE regional_providers ENABLE ROW LEVEL SECURITY"))
+    
+    # Create RLS policy for regional providers (tenants can only access their region's providers)
+    await db.execute(text("""
+        CREATE POLICY regional_provider_access_policy ON regional_providers
+        FOR SELECT TO authenticated_users
+        USING (
+            region = (
+                SELECT data_region 
+                FROM tenants 
+                WHERE tenant_id = current_setting('app.current_tenant_id')::uuid
+            )
+        )
+    """))
+    
+    # Enable RLS on analytics_events table
+    await db.execute(text("ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY"))
+    
+    # Create RLS policy for analytics events (tenants can only access their own events)
+    await db.execute(text("""
+        CREATE POLICY analytics_tenant_isolation_policy ON analytics_events
+        FOR ALL TO authenticated_users
+        USING (tenant_id = current_setting('app.current_tenant_id')::uuid)
+    """))
+    
+    # Enable RLS on analytics_events_regional table
+    await db.execute(text("ALTER TABLE analytics_events_regional ENABLE ROW LEVEL SECURITY"))
+    
+    # Create RLS policy for regional analytics events
+    await db.execute(text("""
+        CREATE POLICY regional_analytics_access_policy ON analytics_events_regional
+        FOR ALL TO authenticated_users
+        USING (
+            tenant_id = current_setting('app.current_tenant_id')::uuid
+            AND data_region = (
+                SELECT data_region 
+                FROM tenants 
+                WHERE tenant_id = current_setting('app.current_tenant_id')::uuid
+            )
+        )
+    """))
+    
+    # Enable RLS on any existing user-related tables
+    await _enable_rls_on_user_tables(db)
+    
+    # Create security context functions
+    await _create_security_context_functions(db)
+    
+    logger.info("RLS patterns configured successfully")
+
+
+async def _enable_rls_on_user_tables(db: AsyncSession) -> None:
+    """Enable RLS on user-related tables."""
+    
+    # List of tables that should have tenant isolation
+    user_tables = [
+        'users', 'user_sessions', 'user_preferences', 'user_activity',
+        'conversations', 'messages', 'agent_runs', 'tool_calls',
+        'workflows', 'sagas', 'events'
+    ]
+    
+    for table_name in user_tables:
+        try:
+            # Check if table exists
+            result = await db.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = :table_name
+                )
+            """), {"table_name": table_name})
+            
+            table_exists = result.scalar()
+            
+            if table_exists:
+                # Enable RLS
+                await db.execute(text(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY"))
+                
+                # Create tenant isolation policy
+                await db.execute(text(f"""
+                    CREATE POLICY tenant_isolation_policy ON {table_name}
+                    FOR ALL TO authenticated_users
+                    USING (tenant_id = current_setting('app.current_tenant_id')::uuid)
+                """))
+                
+                logger.info(f"RLS enabled on table: {table_name}")
+        except Exception as e:
+            logger.warning(f"Failed to enable RLS on table {table_name}: {e}")
+
+
+async def _create_security_context_functions(db: AsyncSession) -> None:
+    """Create security context functions for RLS."""
+    
+    # Function to set current tenant context
+    await db.execute(text("""
+        CREATE OR REPLACE FUNCTION set_current_tenant(tenant_uuid uuid)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+            PERFORM set_config('app.current_tenant_id', tenant_uuid::text, true);
+            PERFORM set_config('app.current_tenant_region', (
+                SELECT data_region 
+                FROM tenants 
+                WHERE tenant_id = tenant_uuid
+            ), true);
+        END;
+        $$;
+    """))
+    
+    # Function to get current tenant
+    await db.execute(text("""
+        CREATE OR REPLACE FUNCTION get_current_tenant()
+        RETURNS uuid
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+            RETURN current_setting('app.current_tenant_id')::uuid;
+        EXCEPTION
+            WHEN OTHERS THEN
+                RETURN NULL;
+        END;
+        $$;
+    """))
+    
+    # Function to get current tenant region
+    await db.execute(text("""
+        CREATE OR REPLACE FUNCTION get_current_tenant_region()
+        RETURNS text
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+            RETURN current_setting('app.current_tenant_region');
+        EXCEPTION
+            WHEN OTHERS THEN
+                RETURN 'us-east-1';
+        END;
+        $$;
+    """))
+    
+    # Function to check if user belongs to tenant
+    await db.execute(text("""
+        CREATE OR REPLACE FUNCTION user_belongs_to_tenant(user_uuid uuid, tenant_uuid uuid)
+        RETURNS boolean
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+            RETURN EXISTS (
+                SELECT 1 FROM users 
+                WHERE user_id = user_uuid 
+                AND tenant_id = tenant_uuid
+            );
+        END;
+        $$;
+    """))
+    
+    # Function to validate regional data access
+    await db.execute(text("""
+        CREATE OR REPLACE FUNCTION validate_regional_access(requested_region text)
+        RETURNS boolean
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        DECLARE
+            tenant_region text;
+            allowed_regions text[];
+        BEGIN
+            -- Get tenant's data region and allowed regions
+            SELECT data_region, allowed_regions 
+            INTO tenant_region, allowed_regions
+            FROM tenants 
+            WHERE tenant_id = current_setting('app.current_tenant_id')::uuid;
+            
+            -- Check if requested region matches tenant's data region
+            IF requested_region = tenant_region THEN
+                RETURN true;
+            END IF;
+            
+            -- Check if requested region is in allowed regions
+            IF requested_region = ANY(allowed_regions) THEN
+                RETURN true;
+            END IF;
+            
+            RETURN false;
+        END;
+        $$;
+    """))
+    
+    logger.info("Security context functions created successfully")
 
 
 async def downgrade(db: AsyncSession) -> None:
-    """Remove regional configuration."""
+    """Remove regional configuration and RLS patterns."""
+    
+    # Remove RLS patterns first
+    await _cleanup_rls_patterns(db)
     
     # Drop regional analytics partitions
     regions = ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1', 'ap-northeast-1']
@@ -140,4 +355,51 @@ async def downgrade(db: AsyncSession) -> None:
     await db.execute(text("ALTER TABLE analytics_events DROP COLUMN IF EXISTS data_region"))
     
     await db.commit()
-    logger.info("Migration 006 downgrade completed: Regional schema removed")
+    logger.info("Migration 006 downgrade completed: Regional schema and RLS patterns removed")
+
+
+async def _cleanup_rls_patterns(db: AsyncSession) -> None:
+    """Clean up RLS patterns and security functions."""
+    
+    # Drop security context functions
+    security_functions = [
+        'set_current_tenant', 'get_current_tenant', 'get_current_tenant_region',
+        'user_belongs_to_tenant', 'validate_regional_access'
+    ]
+    
+    for func_name in security_functions:
+        try:
+            await db.execute(text(f"DROP FUNCTION IF EXISTS {func_name} CASCADE"))
+        except Exception as e:
+            logger.warning(f"Failed to drop function {func_name}: {e}")
+    
+    # Disable RLS on tables
+    tables_with_rls = [
+        'tenants', 'regional_providers', 'analytics_events', 'analytics_events_regional',
+        'users', 'user_sessions', 'user_preferences', 'user_activity',
+        'conversations', 'messages', 'agent_runs', 'tool_calls',
+        'workflows', 'sagas', 'events'
+    ]
+    
+    for table_name in tables_with_rls:
+        try:
+            await db.execute(text(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"))
+            
+            # Drop RLS policies
+            await db.execute(text(f"""
+                DROP POLICY IF EXISTS tenant_isolation_policy ON {table_name}
+            """))
+            await db.execute(text(f"""
+                DROP POLICY IF EXISTS regional_provider_access_policy ON {table_name}
+            """))
+            await db.execute(text(f"""
+                DROP POLICY IF EXISTS analytics_tenant_isolation_policy ON {table_name}
+            """))
+            await db.execute(text(f"""
+                DROP POLICY IF EXISTS regional_analytics_access_policy ON {table_name}
+            """))
+            
+        except Exception as e:
+            logger.warning(f"Failed to clean up RLS on table {table_name}: {e}")
+    
+    logger.info("RLS patterns cleaned up successfully")
