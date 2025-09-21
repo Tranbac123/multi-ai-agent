@@ -147,7 +147,7 @@ python scripts/verify_production_setup.py
 docker build -t your-registry/multi-ai-agent-api-gateway:latest apps/api-gateway/
 docker build -t your-registry/multi-ai-agent-orchestrator:latest apps/orchestrator/
 docker build -t your-registry/multi-ai-agent-router:latest apps/router_service/
-docker build -t your-registry/multi-ai-agent-realtime:latest apps/realtime-service/
+docker build -t your-registry/multi-ai-agent-realtime:latest apps/realtime/
 docker build -t your-registry/multi-ai-agent-analytics:latest apps/analytics-service/
 docker build -t your-registry/multi-ai-agent-billing:latest apps/billing-service/
 docker build -t your-registry/multi-ai-agent-ingestion:latest apps/ingestion/
@@ -191,7 +191,7 @@ kubectl apply -f k8s/production/secrets.yaml
 kubectl apply -f k8s/production/api-gateway/
 kubectl apply -f k8s/production/orchestrator/
 kubectl apply -f k8s/production/router_service/
-kubectl apply -f k8s/production/realtime-service/
+kubectl apply -f k8s/production/realtime/
 kubectl apply -f k8s/production/analytics-service/
 kubectl apply -f k8s/production/billing-service/
 kubectl apply -f k8s/production/ingestion/

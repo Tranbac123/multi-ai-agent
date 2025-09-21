@@ -84,7 +84,7 @@ services:
       retries: 3
 
   # Realtime Service
-  realtime-service:
+  realtime:
     build:
       context: .
       dockerfile: apps/realtime/Dockerfile

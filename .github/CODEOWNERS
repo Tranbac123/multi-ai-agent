@@ -28,7 +28,7 @@ libs/ @Tranbac123 @org/backend-team
 # Specific backend service ownership
 apps/api-gateway/ @Tranbac123 @org/backend-team
 apps/orchestrator/ @Tranbac123 @org/backend-team
-apps/realtime-service/ @Tranbac123 @org/backend-team
+apps/realtime/ @Tranbac123 @org/backend-team
 apps/router_service/ @Tranbac123 @org/backend-team
 
 # Chat adapters (social media integrations)

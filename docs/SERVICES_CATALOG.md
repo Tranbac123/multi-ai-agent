@@ -66,7 +66,7 @@ This document provides a comprehensive overview of all services in the Multi-AI-
 
 ### **4. Realtime Service**
 
-- **Location**: `apps/realtime-service/` + `apps/realtime/`
+- **Location**: `apps/realtime/`
 - **Port**: `8000` (WebSocket), `8001` (HTTP)
 - **Purpose**: WebSocket service with backpressure handling and session management
 - **Key Features**:

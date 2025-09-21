@@ -52,7 +52,7 @@ class HealthCheckValidator:
             "api-gateway",
             "orchestrator", 
             "router_service",
-            "realtime-service",
+            "realtime",
             "analytics-service",
             "billing-service",
             "ingestion",

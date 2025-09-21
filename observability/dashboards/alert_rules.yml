@@ -101,7 +101,7 @@ groups:
         annotations:
           summary: "Realtime Service availability SLO breach"
           description: "Realtime Service availability is {{ $value | humanizePercentage }} below 99.9% target"
-          runbook_url: "https://docs.example.com/runbooks/realtime-service-availability"
+          runbook_url: "https://docs.example.com/runbooks/realtime-availability"
 
       - alert: RealtimeServiceBackpressureSLO
         expr: rate(websocket_backpressure_drops_total{service="realtime"}[30d]) / rate(websocket_messages_total{service="realtime"}[30d]) > 0.01
@@ -113,7 +113,7 @@ groups:
         annotations:
           summary: "Realtime Service backpressure SLO breach"
           description: "Realtime Service backpressure drop rate is {{ $value | humanizePercentage }} above 1% target"
-          runbook_url: "https://docs.example.com/runbooks/realtime-service-backpressure"
+          runbook_url: "https://docs.example.com/runbooks/realtime-backpressure"
 
       # Analytics Service SLO Alerts
       - alert: AnalyticsServiceAvailabilitySLO

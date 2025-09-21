@@ -165,7 +165,7 @@ The Multi-AI-Agent Platform has been comprehensively hardened through **11 produ
 
 **Files Created**:
 
-- `apps/realtime-service/core/backpressure_manager.py` - Backpressure management
+- `apps/realtime/core/backpressure_manager.py` - Backpressure management
 - `tests/integration/test_realtime_backpressure.py` - Backpressure testing
 
 **Acceptance Criteria Met**:

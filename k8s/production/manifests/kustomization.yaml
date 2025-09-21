@@ -6,7 +6,7 @@ resources:
   - api-gateway.yaml
   - orchestrator.yaml
   - router_service.yaml
-  - realtime-service.yaml
+  - realtime.yaml
   - ingestion-service.yaml
   - billing-service.yaml
   - ingress.yaml

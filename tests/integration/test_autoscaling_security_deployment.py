@@ -222,7 +222,7 @@ class TestAutoscalingSecurityDeployment:
             "api-gateway-netpol",
             "orchestrator-netpol",
             "router_service-netpol",
-            "realtime-service-netpol",
+            "realtime-netpol",
             "analytics-service-netpol",
             "billing-service-netpol",
             "database-netpol",
@@ -275,7 +275,7 @@ class TestAutoscalingSecurityDeployment:
         # Expected HPAs
         expected_hpas = [
             "router_service-hpa",
-            "realtime-service-hpa",
+            "realtime-hpa",
             "analytics-service-hpa",
             "billing-service-hpa",
         ]

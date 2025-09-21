@@ -49,7 +49,7 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: realtime-service-hpa
+  name: realtime-hpa
   namespace: production
 spec:
   scaleTargetRef:

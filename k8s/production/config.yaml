@@ -96,7 +96,7 @@ services:
       path: "/health"
       port: 8000
 
-  realtime-service:
+  realtime:
     replicas: 3
     resources:
       requests:

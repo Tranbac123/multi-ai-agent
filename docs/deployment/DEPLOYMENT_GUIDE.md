@@ -323,7 +323,7 @@ kubectl apply -f k8s/router_service.yaml
 
 # Deploy Realtime Service
 kubectl apply -f k8s/realtime-deployment.yaml
-kubectl apply -f k8s/realtime-service.yaml
+kubectl apply -f k8s/realtime.yaml
 
 # Deploy Analytics Service
 kubectl apply -f k8s/analytics-deployment.yaml

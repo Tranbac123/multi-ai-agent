@@ -34,7 +34,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: realtime-service
+                name: realtime
                 port:
                   number: 8003
 ---
