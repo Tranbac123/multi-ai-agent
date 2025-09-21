@@ -68,14 +68,16 @@ This document provides a comprehensive overview of all services in the Multi-AI-
 
 - **Location**: `apps/realtime/`
 - **Port**: `8000` (WebSocket), `8001` (HTTP)
-- **Purpose**: WebSocket service with backpressure handling and session management
+- **Purpose**: Production-grade WebSocket service with advanced backpressure management and Redis persistence
 - **Key Features**:
-  - WebSocket connection management
-  - Backpressure handling with drop policies
-  - Multi-tenant session isolation
-  - Real-time message broadcasting
-  - Connection pooling and scaling
-  - Message queuing and buffering
+  - **Advanced Backpressure Management**: Per-connection Redis outbound queues with sticky sessions
+  - **Intelligent Message Dropping**: Sophisticated policies for intermediate vs final messages
+  - **Sequence Tracking**: Message acknowledgments and ordered delivery guarantees
+  - **Slow Client Detection**: Adaptive handling for clients with poor connectivity  
+  - **Resume on Reconnect**: Persistent message queues survive connection drops
+  - **Multi-tenant Isolation**: Complete tenant-level message and connection isolation
+  - **Production Monitoring**: Comprehensive metrics, health checks, and connection statistics
+  - **Priority Queuing**: Message prioritization with TTL and overflow handling
 - **Dependencies**: Redis, NATS
 - **Endpoints**:
   - `WS /ws/{tenant_id}` - WebSocket connections
