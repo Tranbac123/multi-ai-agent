@@ -10,8 +10,8 @@ from enum import Enum
 import structlog
 import redis.asyncio as redis
 
-from apps.billing_service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
-from apps.billing_service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus
+from apps.billing-service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
+from apps.billing-service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus
 
 logger = structlog.get_logger(__name__)
 

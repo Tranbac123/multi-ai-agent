@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-from apps.billing_service.core.budget_manager import BudgetManager, BudgetPeriod, BudgetStatus
+from apps.billing-service.core.budget_manager import BudgetManager, BudgetPeriod, BudgetStatus
 from apps.router_service.core.cost_drift_detector import CostDriftDetector, DriftType, DriftSeverity
 from apps.router_service.core.safe_mode_router import SafeModeRouter, SafeModeLevel
-from apps.billing_service.jobs.drift_detection_job import DriftDetectionJob
+from apps.billing-service.jobs.drift_detection_job import DriftDetectionJob
 from libs.contracts.billing import BudgetConfig, BudgetUsage
 from libs.contracts.router import RouterRequest, LLMTier
 

@@ -6,8 +6,8 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timezone
 
-from apps.billing_service.core.billing_engine import BillingEngine, InvoiceStatus
-from apps.billing_service.core.usage_tracker import UsageTracker, UsageType
+from apps.billing-service.core.billing_engine import BillingEngine, InvoiceStatus
+from apps.billing-service.core.usage_tracker import UsageTracker, UsageType
 
 
 class TestBillingE2E:
@@ -85,7 +85,7 @@ class TestBillingE2E:
         # Step 4: Verify invoice was created
         with patch.object(billing_engine, '_get_invoice') as mock_get_invoice:
             # Mock invoice data
-            from apps.billing_service.core.billing_engine import Invoice, BillingItem
+            from apps.billing-service.core.billing_engine import Invoice, BillingItem
             
             mock_invoice = Invoice(
                 invoice_id=invoice_id,
@@ -177,7 +177,7 @@ class TestBillingE2E:
         tenant_id = "tenant_123"
         
         # Mock multiple invoices
-        from apps.billing_service.core.billing_engine import Invoice
+        from apps.billing-service.core.billing_engine import Invoice
         
         invoice_1 = Invoice(
             invoice_id="inv_1",

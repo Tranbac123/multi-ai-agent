@@ -329,4 +329,4 @@ async def daily_rollup():
 
 
 if __name__ == "__main__":
-    uvicorn.run("apps.billing_service.main:app", host="0.0.0.0", port=8006, reload=True)
+    uvicorn.run("apps.billing-service.main:app", host="0.0.0.0", port=8006, reload=True)

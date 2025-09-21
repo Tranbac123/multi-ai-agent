@@ -4,7 +4,7 @@ import pytest
 import time
 from unittest.mock import Mock, AsyncMock
 
-from apps.billing_service.core.usage_tracker import (
+from apps.billing-service.core.usage_tracker import (
     UsageTracker,
     UsageType,
     UsageRecord,

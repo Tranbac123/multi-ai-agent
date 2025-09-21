@@ -5,14 +5,14 @@ import time
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, timezone
 
-from apps.billing_service.core.billing_engine import (
+from apps.billing-service.core.billing_engine import (
     BillingEngine,
     BillingStatus,
     InvoiceStatus,
     BillingItem,
     Invoice,
 )
-from apps.billing_service.core.usage_tracker import UsageTracker, UsageType
+from apps.billing-service.core.usage_tracker import UsageTracker, UsageType
 
 
 class TestBillingEngine:

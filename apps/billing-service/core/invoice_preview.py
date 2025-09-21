@@ -9,8 +9,8 @@ import structlog
 import redis.asyncio as redis
 from datetime import datetime, timezone, timedelta
 
-from apps.billing_service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
-from apps.billing_service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus, BillingItem
+from apps.billing-service.core.usage_tracker import UsageTracker, UsageType, UsageRecord
+from apps.billing-service.core.billing_engine import BillingEngine, Invoice, InvoiceStatus, BillingItem
 
 logger = structlog.get_logger(__name__)
 
