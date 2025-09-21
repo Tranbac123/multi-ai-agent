@@ -15,8 +15,8 @@ class TestKEDAConfiguration:
 
     def test_keda_scaled_objects_valid(self):
         """Test that KEDA ScaledObjects are valid YAML."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        enhanced_keda_file = Path("infra/k8s/autoscaling/enhanced-keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        enhanced_keda_file = Path("k8s/production/manifests/autoscaling/enhanced-keda.yaml")
 
         for file_path in [keda_file, enhanced_keda_file]:
             if file_path.exists():
@@ -68,8 +68,8 @@ class TestHPAConfiguration:
 
     def test_hpa_configurations_valid(self):
         """Test that HPA configurations are valid YAML."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        enhanced_hpa_file = Path("infra/k8s/autoscaling/enhanced-hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
+        enhanced_hpa_file = Path("k8s/production/manifests/autoscaling/enhanced-hpa.yaml")
 
         for file_path in [hpa_file, enhanced_hpa_file]:
             if file_path.exists():
@@ -115,7 +115,7 @@ class TestNetworkPolicyConfiguration:
 
     def test_network_policies_valid(self):
         """Test that NetworkPolicies are valid YAML."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         if netpol_file.exists():
             with open(netpol_file, "r") as f:

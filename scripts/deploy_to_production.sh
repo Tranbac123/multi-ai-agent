@@ -148,9 +148,9 @@ deploy_to_kubernetes() {
     log_info "Deploying to Kubernetes..."
     
     # Update image tags in deployment files
-    find k8s/production -name "*.yaml" -exec sed -i "s|your-registry.com|$REGISTRY|g" {} \;
-    find k8s/production -name "*.yaml" -exec sed -i "s|your-domain.com|$DOMAIN|g" {} \;
-    find k8s/production -name "*.yaml" -exec sed -i "s|latest|$TAG|g" {} \;
+    find k8s/production/manifests -name "*.yaml" -exec sed -i "s|your-registry.com|$REGISTRY|g" {} \;
+    find k8s/production/manifests -name "*.yaml" -exec sed -i "s|your-domain.com|$DOMAIN|g" {} \;
+    find k8s/production/manifests -name "*.yaml" -exec sed -i "s|latest|$TAG|g" {} \;
     
     # Deploy services in dependency order
     local deployment_order=(
@@ -174,9 +174,9 @@ deploy_to_kubernetes() {
         log_info "Deploying $item..."
         
         if [[ "$item" == *.yaml ]]; then
-            kubectl apply -f "k8s/production/$item" -n "$NAMESPACE"
+            kubectl apply -f "k8s/production/manifests/$item" -n "$NAMESPACE"
         else
-            kubectl apply -f "k8s/production/$item" -n "$NAMESPACE"
+            kubectl apply -f "k8s/production/manifests/$item" -n "$NAMESPACE"
         fi
         
         if [[ $? -eq 0 ]]; then

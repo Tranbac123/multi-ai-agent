@@ -11,10 +11,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_are_valid_yaml(self):
         """Test all configurations are valid YAML."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -41,10 +41,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_api_versions(self):
         """Test all configurations have valid API versions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -62,10 +62,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_kinds(self):
         """Test all configurations have valid kinds."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         valid_kinds = [
@@ -95,10 +95,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_metadata(self):
         """Test all configurations have valid metadata."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -117,10 +117,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_no_duplicate_names(self):
         """Test all configurations have no duplicate names."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -138,10 +138,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_specs(self):
         """Test all configurations have valid specs."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -158,10 +158,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_labels(self):
         """Test all configurations have valid labels."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -193,10 +193,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_valid_annotations(self):
         """Test all configurations have valid annotations."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -226,10 +226,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_namespaces(self):
         """Test all configurations have consistent namespaces."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -247,10 +247,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_versions(self):
         """Test all configurations have consistent versions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all versions
@@ -276,10 +276,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_managed_by(self):
         """Test all configurations have consistent managed-by."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all managed-by values
@@ -307,10 +307,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_part_of(self):
         """Test all configurations have consistent part-of."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all part-of values
@@ -336,10 +336,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_created_by(self):
         """Test all configurations have consistent created-by."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all created-by values
@@ -367,10 +367,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_descriptions(self):
         """Test all configurations have consistent descriptions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all descriptions
@@ -397,10 +397,10 @@ class TestAutoscalingSecurityValidationIntegration:
     def test_all_configurations_have_consistent_metadata_structure(self):
         """Test all configurations have consistent metadata structure."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:

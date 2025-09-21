@@ -10,7 +10,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_required_fields(self):
         """Test all health probe configurations have required fields."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -39,7 +39,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_paths(self):
         """Test health probe paths are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -60,7 +60,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_ports(self):
         """Test health probe ports are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -89,7 +89,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_timing(self):
         """Test health probe timing is valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -114,7 +114,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_timeouts(self):
         """Test health probe timeouts are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -137,7 +137,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_failure_thresholds(self):
         """Test health probe failure thresholds are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -160,7 +160,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_success_thresholds(self):
         """Test health probe success thresholds are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -183,7 +183,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_http_headers(self):
         """Test health probe HTTP headers are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -216,7 +216,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_schemes(self):
         """Test health probe schemes are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -237,7 +237,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_initial_delay_relationships(self):
         """Test health probe initial delay relationships are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -258,7 +258,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_period_relationships(self):
         """Test health probe period relationships are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -279,7 +279,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_http_get_configuration(self):
         """Test health probe HTTP GET configuration is valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -302,7 +302,7 @@ class TestHealthProbesValidation:
 
     def test_health_probes_have_valid_probe_types(self):
         """Test health probe types are valid."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 

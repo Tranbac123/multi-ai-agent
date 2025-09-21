@@ -10,7 +10,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_required_fields(self):
         """Test all NetworkPolicies have required fields."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -32,7 +32,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_unique_names(self):
         """Test NetworkPolicies have unique names."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -43,7 +43,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_proper_namespace(self):
         """Test NetworkPolicies are in the correct namespace."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -57,7 +57,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_proper_labels(self):
         """Test NetworkPolicies have proper labels."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -76,7 +76,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_proper_annotations(self):
         """Test NetworkPolicies have proper annotations."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -91,7 +91,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_ingress_rules(self):
         """Test NetworkPolicies have valid ingress rules."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -133,7 +133,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_egress_rules(self):
         """Test NetworkPolicies have valid egress rules."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -178,7 +178,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_pod_selectors(self):
         """Test NetworkPolicies have valid pod selectors."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -200,7 +200,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_namespace_selectors(self):
         """Test NetworkPolicies have valid namespace selectors."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -243,7 +243,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_ports(self):
         """Test NetworkPolicies have valid ports."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -284,7 +284,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_policy_types(self):
         """Test NetworkPolicies have valid policy types."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -305,7 +305,7 @@ class TestNetworkPolicyValidation:
 
     def test_network_policies_have_valid_ingress_egress_consistency(self):
         """Test NetworkPolicies have consistent ingress/egress rules."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 

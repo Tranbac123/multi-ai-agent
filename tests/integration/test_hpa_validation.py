@@ -10,7 +10,7 @@ class TestHPAValidation:
 
     def test_hpa_has_required_fields(self):
         """Test all HPAs have required fields."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -33,7 +33,7 @@ class TestHPAValidation:
 
     def test_hpa_targets_existing_deployments(self):
         """Test HPAs target existing deployments."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -52,7 +52,7 @@ class TestHPAValidation:
 
     def test_hpa_has_unique_names(self):
         """Test HPAs have unique names."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -63,7 +63,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_namespace(self):
         """Test HPAs are in the correct namespace."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -77,7 +77,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_labels(self):
         """Test HPAs have proper labels."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -96,7 +96,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_annotations(self):
         """Test HPAs have proper annotations."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -111,7 +111,7 @@ class TestHPAValidation:
 
     def test_hpa_has_resource_metrics(self):
         """Test HPAs have resource metrics configured."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -149,7 +149,7 @@ class TestHPAValidation:
 
     def test_hpa_has_behavior_configuration(self):
         """Test HPAs have behavior configuration."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -176,7 +176,7 @@ class TestHPAValidation:
 
     def test_hpa_has_reasonable_scaling_limits(self):
         """Test HPAs have reasonable scaling limits."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -207,7 +207,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_metric_targets(self):
         """Test HPAs have proper metric targets."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -240,7 +240,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_metric_selectors(self):
         """Test HPAs have proper metric selectors."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -267,7 +267,7 @@ class TestHPAValidation:
 
     def test_hpa_has_proper_behavior_policies(self):
         """Test HPAs have proper behavior policies."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 

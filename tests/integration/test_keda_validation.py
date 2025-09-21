@@ -10,7 +10,7 @@ class TestKEDAValidation:
 
     def test_keda_scaled_objects_have_required_fields(self):
         """Test all KEDA ScaledObjects have required fields."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -34,7 +34,7 @@ class TestKEDAValidation:
 
     def test_nats_jetstream_triggers_configured(self):
         """Test NATS JetStream triggers are properly configured."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -62,7 +62,7 @@ class TestKEDAValidation:
 
     def test_redis_triggers_configured(self):
         """Test Redis triggers are properly configured."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -88,7 +88,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_target_existing_deployments(self):
         """Test ScaledObjects target existing deployments."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -107,7 +107,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_have_unique_names(self):
         """Test ScaledObjects have unique names."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -118,7 +118,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_have_proper_namespace(self):
         """Test ScaledObjects are in the correct namespace."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -132,7 +132,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_have_proper_labels(self):
         """Test ScaledObjects have proper labels."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -151,7 +151,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_have_proper_annotations(self):
         """Test ScaledObjects have proper annotations."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -166,7 +166,7 @@ class TestKEDAValidation:
 
     def test_scaled_objects_have_cooldown_periods(self):
         """Test ScaledObjects have cooldown periods configured."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 

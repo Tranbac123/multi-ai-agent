@@ -555,7 +555,7 @@ Implement multi-region active-active deployment with disaster recovery capabilit
 ##### **6.1 NATS Cross-Region Mirroring**
 
 ```yaml
-# infra/k8s/helm/nats-cluster/templates/configmap.yaml
+# k8s/production/manifests/helm/nats-cluster/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -672,7 +672,7 @@ class DRDrill:
 
 #### **Files to Create/Modify**
 
-- `infra/k8s/helm/nats-cluster/templates/configmap.yaml`
+- `k8s/production/manifests/helm/nats-cluster/templates/configmap.yaml`
 - `data-plane/migrations/008_replication_setup.sql`
 - `apps/api-gateway/core/region_failover.py`
 - `scripts/dr_drill.py`

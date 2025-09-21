@@ -10,7 +10,7 @@ class TestSecurityContextValidation:
 
     def test_all_services_have_security_context(self):
         """Test all services have security context configured."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -26,7 +26,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_required_fields(self):
         """Test security context has required fields."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -46,7 +46,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_correct_values(self):
         """Test security context has correct values."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -73,7 +73,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_capabilities_drop(self):
         """Test security context has capabilities drop configured."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -97,7 +97,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_add_capabilities(self):
         """Test security context has no add capabilities."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -117,7 +117,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_valid_user_id(self):
         """Test security context has valid user ID."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -135,7 +135,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_valid_group_id(self):
         """Test security context has valid group ID."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -153,7 +153,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_valid_boolean_values(self):
         """Test security context has valid boolean values."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -170,7 +170,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_valid_capabilities_format(self):
         """Test security context has valid capabilities format."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -195,7 +195,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_required_capabilities_dropped(self):
         """Test security context has required capabilities dropped."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -287,7 +287,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_privileged_mode(self):
         """Test security context has no privileged mode."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -303,7 +303,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_sysctls(self):
         """Test security context has no sysctls."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -319,7 +319,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_seccomp_profile(self):
         """Test security context has no seccomp profile."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -337,7 +337,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_selinux_options(self):
         """Test security context has no selinux options."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -355,7 +355,7 @@ class TestSecurityContextValidation:
 
     def test_security_context_has_no_windows_options(self):
         """Test security context has no windows options."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 

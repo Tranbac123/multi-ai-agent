@@ -10,15 +10,15 @@ class TestAutoscalingConfigurationValidation:
 
     def test_keda_and_hpa_configurations_exist(self):
         """Test KEDA and HPA configuration files exist."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         assert keda_file.exists(), "KEDA configuration file should exist"
         assert hpa_file.exists(), "HPA configuration file should exist"
 
     def test_keda_configuration_is_valid_yaml(self):
         """Test KEDA configuration is valid YAML."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
 
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -34,7 +34,7 @@ class TestAutoscalingConfigurationValidation:
 
     def test_hpa_configuration_is_valid_yaml(self):
         """Test HPA configuration is valid YAML."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -50,7 +50,7 @@ class TestAutoscalingConfigurationValidation:
 
     def test_keda_has_required_components(self):
         """Test KEDA configuration has required components."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
 
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -73,7 +73,7 @@ class TestAutoscalingConfigurationValidation:
 
     def test_hpa_has_required_components(self):
         """Test HPA configuration has required components."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -84,8 +84,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_consistent_namespaces(self):
         """Test autoscaling configurations have consistent namespaces."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -111,8 +111,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_consistent_labels(self):
         """Test autoscaling configurations have consistent labels."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -144,8 +144,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_consistent_annotations(self):
         """Test autoscaling configurations have consistent annotations."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -169,8 +169,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_valid_api_versions(self):
         """Test autoscaling configurations have valid API versions."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -196,8 +196,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_valid_kinds(self):
         """Test autoscaling configurations have valid kinds."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -228,8 +228,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_valid_metadata(self):
         """Test autoscaling configurations have valid metadata."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -257,8 +257,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_no_duplicate_names(self):
         """Test autoscaling configurations have no duplicate names."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -284,8 +284,8 @@ class TestAutoscalingConfigurationValidation:
 
     def test_autoscaling_configurations_have_valid_specs(self):
         """Test autoscaling configurations have valid specs."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))

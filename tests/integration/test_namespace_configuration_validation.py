@@ -10,7 +10,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_all_namespaces_have_required_fields(self):
         """Test all namespaces have required fields."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -26,7 +26,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_unique_names(self):
         """Test namespaces have unique names."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -37,7 +37,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_labels(self):
         """Test namespaces have proper labels."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -57,7 +57,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_annotations(self):
         """Test namespaces have proper annotations."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -72,7 +72,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_valid_names(self):
         """Test namespaces have valid names."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -90,7 +90,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_valid_label_values(self):
         """Test namespaces have valid label values."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -122,7 +122,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_valid_annotation_values(self):
         """Test namespaces have valid annotation values."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -151,7 +151,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_required_namespace_labels(self):
         """Test namespaces have required namespace labels for network policies."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -173,7 +173,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_consistent_label_values(self):
         """Test namespaces have consistent label values."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -199,7 +199,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_consistent_annotation_values(self):
         """Test namespaces have consistent annotation values."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -217,7 +217,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_managed_by_label(self):
         """Test namespaces have proper managed-by label."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -233,7 +233,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_part_of_label(self):
         """Test namespaces have proper part-of label."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -253,7 +253,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_version_label(self):
         """Test namespaces have proper version label."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -271,7 +271,7 @@ class TestNamespaceConfigurationValidation:
 
     def test_namespaces_have_proper_instance_label(self):
         """Test namespaces have proper instance label."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 

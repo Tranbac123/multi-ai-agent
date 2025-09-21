@@ -10,7 +10,7 @@ class TestAutoscalingSecurityMonitoringIntegration:
 
     def test_keda_monitoring_integration(self):
         """Test KEDA monitoring integration."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -48,7 +48,7 @@ class TestAutoscalingSecurityMonitoringIntegration:
 
     def test_hpa_monitoring_integration(self):
         """Test HPA monitoring integration."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -68,7 +68,7 @@ class TestAutoscalingSecurityMonitoringIntegration:
 
     def test_health_probes_monitoring_integration(self):
         """Test health probes monitoring integration."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -134,7 +134,7 @@ class TestAutoscalingSecurityMonitoringIntegration:
 
     def test_networkpolicy_monitoring_integration(self):
         """Test NetworkPolicy monitoring integration."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -168,10 +168,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_monitoring_annotations(self):
         """Test all configurations have monitoring annotations."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -188,10 +188,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_monitoring_labels(self):
         """Test all configurations have monitoring labels."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -212,10 +212,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_metadata(self):
         """Test all configurations have consistent monitoring metadata."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all metadata
@@ -265,10 +265,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_versions(self):
         """Test all configurations have consistent monitoring versions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all versions
@@ -294,10 +294,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_managed_by(self):
         """Test all configurations have consistent monitoring managed-by."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all managed-by values
@@ -325,10 +325,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_part_of(self):
         """Test all configurations have consistent monitoring part-of."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all part-of values
@@ -354,10 +354,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_namespaces(self):
         """Test all configurations have consistent monitoring namespaces."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all namespaces
@@ -382,10 +382,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_created_by(self):
         """Test all configurations have consistent monitoring created-by."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all created-by values
@@ -413,10 +413,10 @@ class TestAutoscalingSecurityMonitoringIntegration:
     def test_all_configurations_have_consistent_monitoring_descriptions(self):
         """Test all configurations have consistent monitoring descriptions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         # Collect all descriptions

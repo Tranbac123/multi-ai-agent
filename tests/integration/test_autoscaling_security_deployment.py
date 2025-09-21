@@ -10,7 +10,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_keda_deployment_has_required_components(self):
         """Test KEDA deployment has required components."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -47,7 +47,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_hpa_deployment_has_required_components(self):
         """Test HPA deployment has required components."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -64,7 +64,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_health_probes_deployment_has_required_components(self):
         """Test health probes deployment has required components."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -97,7 +97,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_networkpolicy_deployment_has_required_components(self):
         """Test NetworkPolicy deployment has required components."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -125,7 +125,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_services(self):
         """Test all deployments have required services."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -146,7 +146,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_configmaps(self):
         """Test all deployments have required ConfigMaps."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -167,7 +167,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_secrets(self):
         """Test all deployments have required Secrets."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -188,7 +188,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_serviceaccounts(self):
         """Test all deployments have required ServiceAccounts."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -209,7 +209,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_networkpolicies(self):
         """Test all deployments have required NetworkPolicies."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -239,7 +239,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_scaled_objects(self):
         """Test all deployments have required ScaledObjects."""
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
         with open(keda_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -264,7 +264,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_hpas(self):
         """Test all deployments have required HPAs."""
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
         with open(hpa_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -285,7 +285,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_namespaces(self):
         """Test all deployments have required namespaces."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -309,7 +309,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_health_probes(self):
         """Test all deployments have required health probes."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -339,7 +339,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_resources(self):
         """Test all deployments have required resources."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -363,7 +363,7 @@ class TestAutoscalingSecurityDeployment:
 
     def test_all_deployments_have_required_security_context(self):
         """Test all deployments have required security context."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 

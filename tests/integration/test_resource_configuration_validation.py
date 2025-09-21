@@ -10,7 +10,7 @@ class TestResourceConfigurationValidation:
 
     def test_all_services_have_resource_limits(self):
         """Test all services have resource limits configured."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -32,7 +32,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_are_valid_cpu_format(self):
         """Test resource CPU limits are in valid format."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -62,7 +62,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_are_valid_memory_format(self):
         """Test resource memory limits are in valid format."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -92,7 +92,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_are_reasonable_cpu(self):
         """Test resource CPU limits are reasonable."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -134,7 +134,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_are_reasonable_memory(self):
         """Test resource memory limits are reasonable."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -176,7 +176,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_are_consistent(self):
         """Test resource limits are consistent with requests."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -212,7 +212,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_have_required_units(self):
         """Test resource limits have required units."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -240,7 +240,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_have_valid_numeric_values(self):
         """Test resource limits have valid numeric values."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -270,7 +270,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_have_positive_values(self):
         """Test resource limits have positive values."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 
@@ -322,7 +322,7 @@ class TestResourceConfigurationValidation:
 
     def test_resource_limits_have_consistent_units(self):
         """Test resource limits have consistent units within each resource type."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
 

@@ -10,12 +10,12 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_exists(self):
         """Test network policy configuration file exists."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
         assert netpol_file.exists(), "Network policy configuration file should exist"
 
     def test_networkpolicy_configuration_is_valid_yaml(self):
         """Test network policy configuration is valid YAML."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -33,7 +33,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_required_components(self):
         """Test network policy configuration has required components."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -52,7 +52,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_consistent_namespaces(self):
         """Test network policy configuration has consistent namespaces."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -67,7 +67,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_consistent_labels(self):
         """Test network policy configuration has consistent labels."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -85,7 +85,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_consistent_annotations(self):
         """Test network policy configuration has consistent annotations."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -99,7 +99,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_api_versions(self):
         """Test network policy configuration has valid API versions."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -114,7 +114,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_kinds(self):
         """Test network policy configuration has valid kinds."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -128,7 +128,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_metadata(self):
         """Test network policy configuration has valid metadata."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -144,7 +144,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_no_duplicate_names(self):
         """Test network policy configuration has no duplicate names."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -159,7 +159,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_specs(self):
         """Test network policy configuration has valid specs."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -173,7 +173,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_networkpolicy_specs(self):
         """Test network policy configuration has valid NetworkPolicy specs."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -198,7 +198,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_namespace_specs(self):
         """Test network policy configuration has valid Namespace specs."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -213,7 +213,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_ingress_rules(self):
         """Test network policy configuration has valid ingress rules."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -247,7 +247,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_egress_rules(self):
         """Test network policy configuration has valid egress rules."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -284,7 +284,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_pod_selectors(self):
         """Test network policy configuration has valid pod selectors."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -307,7 +307,7 @@ class TestNetworkPolicyConfigurationValidation:
 
     def test_networkpolicy_configuration_has_valid_namespace_selectors(self):
         """Test network policy configuration has valid namespace selectors."""
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(netpol_file) as f:
             docs = list(yaml.safe_load_all(f))

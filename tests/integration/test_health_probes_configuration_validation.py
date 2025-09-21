@@ -10,12 +10,12 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_exists(self):
         """Test health probes configuration file exists."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
         assert probes_file.exists(), "Health probes configuration file should exist"
 
     def test_health_probes_configuration_is_valid_yaml(self):
         """Test health probes configuration is valid YAML."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -33,7 +33,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_required_components(self):
         """Test health probes configuration has required components."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -50,7 +50,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_consistent_namespaces(self):
         """Test health probes configuration has consistent namespaces."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -65,7 +65,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_consistent_labels(self):
         """Test health probes configuration has consistent labels."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -83,7 +83,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_consistent_annotations(self):
         """Test health probes configuration has consistent annotations."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -97,7 +97,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_api_versions(self):
         """Test health probes configuration has valid API versions."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -112,7 +112,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_kinds(self):
         """Test health probes configuration has valid kinds."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -126,7 +126,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_metadata(self):
         """Test health probes configuration has valid metadata."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -142,7 +142,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_no_duplicate_names(self):
         """Test health probes configuration has no duplicate names."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -157,7 +157,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_specs(self):
         """Test health probes configuration has valid specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -171,7 +171,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_deployment_specs(self):
         """Test health probes configuration has valid deployment specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -201,7 +201,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_service_specs(self):
         """Test health probes configuration has valid service specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -224,7 +224,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_configmap_specs(self):
         """Test health probes configuration has valid ConfigMap specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -237,7 +237,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_secret_specs(self):
         """Test health probes configuration has valid Secret specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))
@@ -250,7 +250,7 @@ class TestHealthProbesConfigurationValidation:
 
     def test_health_probes_configuration_has_valid_serviceaccount_specs(self):
         """Test health probes configuration has valid ServiceAccount specs."""
-        probes_file = Path("infra/k8s/health/probes.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
 
         with open(probes_file) as f:
             docs = list(yaml.safe_load_all(f))

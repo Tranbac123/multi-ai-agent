@@ -11,10 +11,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_exist(self):
         """Test all autoscaling and security configuration files exist."""
         required_files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in required_files:
@@ -23,10 +23,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_are_valid_yaml(self):
         """Test all autoscaling and security configuration files are valid YAML."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -53,10 +53,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_consistent_namespaces(self):
         """Test all autoscaling and security configuration files have consistent namespaces."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -74,10 +74,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_consistent_labels(self):
         """Test all autoscaling and security configuration files have consistent labels."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -98,10 +98,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_consistent_annotations(self):
         """Test all autoscaling and security configuration files have consistent annotations."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -118,10 +118,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_valid_api_versions(self):
         """Test all autoscaling and security configuration files have valid API versions."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -139,10 +139,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_valid_kinds(self):
         """Test all autoscaling and security configuration files have valid kinds."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         valid_kinds = [
@@ -172,10 +172,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_valid_metadata(self):
         """Test all autoscaling and security configuration files have valid metadata."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -194,10 +194,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_no_duplicate_names(self):
         """Test all autoscaling and security configuration files have no duplicate names."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -215,10 +215,10 @@ class TestAutoscalingSecurityIntegration:
     def test_all_autoscaling_security_files_have_valid_specs(self):
         """Test all autoscaling and security configuration files have valid specs."""
         files = [
-            "infra/k8s/autoscaling/keda.yaml",
-            "infra/k8s/autoscaling/hpa.yaml",
-            "infra/k8s/health/probes.yaml",
-            "infra/k8s/security/networkpolicy.yaml",
+            "k8s/production/manifests/autoscaling/keda.yaml",
+            "k8s/production/manifests/autoscaling/hpa.yaml",
+            "k8s/production/manifests/health/probes.yaml",
+            "k8s/production/manifests/security/networkpolicy.yaml",
         ]
 
         for file_path in files:
@@ -235,10 +235,10 @@ class TestAutoscalingSecurityIntegration:
     def test_autoscaling_security_configurations_are_consistent(self):
         """Test autoscaling and security configurations are consistent with each other."""
         # Load all configurations
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -265,10 +265,10 @@ class TestAutoscalingSecurityIntegration:
     def test_autoscaling_security_configurations_have_consistent_versions(self):
         """Test autoscaling and security configurations have consistent versions."""
         # Load all configurations
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -303,10 +303,10 @@ class TestAutoscalingSecurityIntegration:
     def test_autoscaling_security_configurations_have_consistent_managed_by(self):
         """Test autoscaling and security configurations have consistent managed-by."""
         # Load all configurations
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
@@ -341,10 +341,10 @@ class TestAutoscalingSecurityIntegration:
     def test_autoscaling_security_configurations_have_consistent_part_of(self):
         """Test autoscaling and security configurations have consistent part-of."""
         # Load all configurations
-        keda_file = Path("infra/k8s/autoscaling/keda.yaml")
-        hpa_file = Path("infra/k8s/autoscaling/hpa.yaml")
-        probes_file = Path("infra/k8s/health/probes.yaml")
-        netpol_file = Path("infra/k8s/security/networkpolicy.yaml")
+        keda_file = Path("k8s/production/manifests/autoscaling/keda.yaml")
+        hpa_file = Path("k8s/production/manifests/autoscaling/hpa.yaml")
+        probes_file = Path("k8s/production/manifests/health/probes.yaml")
+        netpol_file = Path("k8s/production/manifests/security/networkpolicy.yaml")
 
         with open(keda_file) as f:
             keda_docs = list(yaml.safe_load_all(f))
