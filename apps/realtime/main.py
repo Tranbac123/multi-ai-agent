@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 
 from .core.backpressure_handler import BackpressureHandler, BackpressureMetrics
 from .core.connection_manager import ConnectionManager
+from .core.backpressure_manager import BackpressureManager, MessageType
+from .core.websocket_manager import WebSocketManager
 
 logger = structlog.get_logger(__name__)
 
@@ -20,6 +22,10 @@ redis_client: Optional[redis.Redis] = None
 connection_manager: Optional[ConnectionManager] = None
 backpressure_handler: Optional[BackpressureHandler] = None
 metrics_collector: Optional[BackpressureMetrics] = None
+
+# Enhanced components
+backpressure_manager: Optional[BackpressureManager] = None
+websocket_manager: Optional[WebSocketManager] = None
 
 
 @asynccontextmanager
