@@ -76,7 +76,7 @@ services:
   test-runner:
     build:
       context: .
-      dockerfile: Dockerfile.test
+      dockerfile: dockerfiles/Dockerfile.test
     environment:
       TEST_MODE: ${TEST_MODE:-MOCK}
       TEST_DATABASE_URL: postgresql://test_user:test_password@postgres-test:5432/test_db
