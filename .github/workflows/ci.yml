@@ -132,7 +132,7 @@ jobs:
           pytest tests/performance/ -v --tb=short
           python scripts/performance_regression_check.py
       - name: Upload performance reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: performance-reports
           path: reports/performance/
@@ -154,7 +154,7 @@ jobs:
         run: |
           python scripts/flakiness_ci_integration.py --max-retries 3
       - name: Upload flakiness reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flakiness-reports
           path: reports/flakiness/
@@ -177,7 +177,7 @@ jobs:
       - name: Run Safety dependency scan
         run: safety check --json --output reports/security/safety-report.json || true
       - name: Upload security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-reports
           path: reports/security/

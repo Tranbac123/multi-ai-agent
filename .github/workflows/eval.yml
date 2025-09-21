@@ -92,7 +92,7 @@ jobs:
             --ci-mode
       
       - name: Upload evaluation results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: eval-results-nightly
           path: eval-results.json
@@ -194,7 +194,7 @@ jobs:
             --ci-mode
       
       - name: Upload evaluation results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: eval-results-pr
           path: eval-results.json
@@ -295,7 +295,7 @@ jobs:
             --ci-mode
       
       - name: Upload evaluation results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: eval-results-manual
           path: eval-results.json

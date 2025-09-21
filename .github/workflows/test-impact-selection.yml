@@ -182,7 +182,7 @@ jobs:
           esac
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results-${{ matrix.test-suite }}
@@ -292,7 +292,7 @@ jobs:
           python scripts/performance_regression_check.py
 
       - name: Upload performance artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: performance-results

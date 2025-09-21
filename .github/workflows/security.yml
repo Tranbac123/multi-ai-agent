@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload dependency scan results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dependency-scan-results
           path: |
@@ -126,7 +126,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Kube-score results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kube-score-results
           path: kube-score-results.json
@@ -165,7 +165,7 @@ jobs:
           cmd_options: "-a"
 
       - name: Upload ZAP results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zap-results
           path: zap-results.html
