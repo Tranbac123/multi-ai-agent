@@ -1,32 +1,52 @@
 groups:
-  - name: orchestrator_alerts
-    rules:
-      - alert: OrchestratorHighErrorRate
-        expr: rate(http_requests_total{service="orchestrator",status=~"5.."}[5m]) / rate(http_requests_total{service="orchestrator"}[5m]) > 0.01
-        for: 5m
-        labels:
-          severity: critical
-          service: orchestrator
-        annotations:
-          summary: "High error rate on orchestrator"
-          description: "Error rate is above 1% for 5 minutes"
-
-      - alert: OrchestratorHighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="orchestrator"}[5m])) > 1.0
-        for: 5m
-        labels:
-          severity: warning
-          service: orchestrator
-        annotations:
-          summary: "High latency on orchestrator"
-          description: "P95 latency is above 1 second for 5 minutes"
-
-      - alert: OrchestratorServiceDown
-        expr: up{service="orchestrator"} == 0
-        for: 2m
-        labels:
-          severity: critical
-          service: orchestrator
-        annotations:
-          summary: "orchestrator service is down"
-          description: "Service has been down for more than 2 minutes"
+- name: orchestrator-alerts
+  rules:
+  - alert: OrchestratorHighErrorRate
+    expr: rate(http_requests_total{service="orchestrator",status=~"5.."}[5m]) / rate(http_requests_total{service="orchestrator"}[5m])
+      * 100 > 5
+    for: 2m
+    labels:
+      severity: critical
+      service: orchestrator
+      team: platform
+    annotations:
+      summary: orchestrator has high error rate
+      description: Error rate for orchestrator is { $value }% which is above the 5%
+        threshold.
+      runbook_url: https://runbooks.company.com/orchestrator#high-error-rate
+  - alert: OrchestratorHighLatency
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="orchestrator"}[5m]))
+      > 0.5
+    for: 5m
+    labels:
+      severity: warning
+      service: orchestrator
+      team: platform
+    annotations:
+      summary: orchestrator has high latency
+      description: P95 latency for orchestrator is { $value }s which is above the
+        500ms threshold.
+      runbook_url: https://runbooks.company.com/orchestrator#high-latency
+  - alert: OrchestratorServiceDown
+    expr: up{service="orchestrator"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: orchestrator
+      team: platform
+    annotations:
+      summary: orchestrator is down
+      description: orchestrator has been down for more than 1 minute.
+      runbook_url: https://runbooks.company.com/orchestrator#service-down
+  - alert: OrchestratorHighMemoryUsage
+    expr: container_memory_usage_bytes{container="orchestrator"} / container_spec_memory_limit_bytes{container="orchestrator"}
+      * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      service: orchestrator
+      team: platform
+    annotations:
+      summary: orchestrator has high memory usage
+      description: Memory usage for orchestrator is { $value }% which is above 80%.
+      runbook_url: https://runbooks.company.com/orchestrator#high-memory

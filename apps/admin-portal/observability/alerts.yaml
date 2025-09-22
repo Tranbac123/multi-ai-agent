@@ -1,32 +1,52 @@
 groups:
-  - name: admin-portal_alerts
-    rules:
-      - alert: Admin_PortalHighErrorRate
-        expr: rate(http_requests_total{service="admin-portal",status=~"5.."}[5m]) / rate(http_requests_total{service="admin-portal"}[5m]) > 0.01
-        for: 5m
-        labels:
-          severity: critical
-          service: admin-portal
-        annotations:
-          summary: "High error rate on admin-portal"
-          description: "Error rate is above 1% for 5 minutes"
-
-      - alert: Admin_PortalHighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="admin-portal"}[5m])) > 1.0
-        for: 5m
-        labels:
-          severity: warning
-          service: admin-portal
-        annotations:
-          summary: "High latency on admin-portal"
-          description: "P95 latency is above 1 second for 5 minutes"
-
-      - alert: Admin_PortalServiceDown
-        expr: up{service="admin-portal"} == 0
-        for: 2m
-        labels:
-          severity: critical
-          service: admin-portal
-        annotations:
-          summary: "admin-portal service is down"
-          description: "Service has been down for more than 2 minutes"
+- name: admin-portal-alerts
+  rules:
+  - alert: Admin_PortalHighErrorRate
+    expr: rate(http_requests_total{service="admin-portal",status=~"5.."}[5m]) / rate(http_requests_total{service="admin-portal"}[5m])
+      * 100 > 5
+    for: 2m
+    labels:
+      severity: critical
+      service: admin-portal
+      team: platform
+    annotations:
+      summary: admin-portal has high error rate
+      description: Error rate for admin-portal is { $value }% which is above the 5%
+        threshold.
+      runbook_url: https://runbooks.company.com/admin-portal#high-error-rate
+  - alert: Admin_PortalHighLatency
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="admin-portal"}[5m]))
+      > 0.5
+    for: 5m
+    labels:
+      severity: warning
+      service: admin-portal
+      team: platform
+    annotations:
+      summary: admin-portal has high latency
+      description: P95 latency for admin-portal is { $value }s which is above the
+        500ms threshold.
+      runbook_url: https://runbooks.company.com/admin-portal#high-latency
+  - alert: Admin_PortalServiceDown
+    expr: up{service="admin-portal"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: admin-portal
+      team: platform
+    annotations:
+      summary: admin-portal is down
+      description: admin-portal has been down for more than 1 minute.
+      runbook_url: https://runbooks.company.com/admin-portal#service-down
+  - alert: Admin_PortalHighMemoryUsage
+    expr: container_memory_usage_bytes{container="admin-portal"} / container_spec_memory_limit_bytes{container="admin-portal"}
+      * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      service: admin-portal
+      team: platform
+    annotations:
+      summary: admin-portal has high memory usage
+      description: Memory usage for admin-portal is { $value }% which is above 80%.
+      runbook_url: https://runbooks.company.com/admin-portal#high-memory

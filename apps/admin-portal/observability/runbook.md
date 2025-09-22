@@ -1,88 +1,235 @@
-# Admin-Portal Service Runbook
+# Admin Portal Service Runbook
 
 ## Service Overview
-Backend admin interface for tenant management
+- **Service**: admin-portal
+- **Purpose**: Administrative dashboard and tenant management
+- **Port**: 8012
+- **Type**: http
+- **SLO Target**: 99.0%
 
-**Technology**: FastAPI + Jinja2
-**Port**: 8100
+## Quick Links
+- **Dashboard**: [Grafana Dashboard](https://grafana.company.com/d/admin-portal)
+- **Logs**: [Loki Logs](https://grafana.company.com/explore?query={service="admin-portal"})
+- **Traces**: [Jaeger UI](https://jaeger.company.com/search?service=admin-portal)
+- **Alerts**: [AlertManager](https://alertmanager.company.com/#/alerts?filter={service="admin-portal"})
 
-## Common Issues
+## Common Issues and Solutions
 
-### High Error Rate (5xx responses)
-
-**Symptoms:**
-- Increased 5xx error rate
-- Client complaints about service unavailability
-
-**Investigation:**
-1. Check service logs: `kubectl logs -l app=admin-portal -n production`
-2. Verify database connectivity
-3. Check Redis connectivity (if applicable)
-4. Review recent deployments
-
-**Resolution:**
-- If database issues: Check connection pool settings
-- If Redis issues: Restart Redis or check memory usage
-- If application issues: Rollback recent deployment
-
-### High Latency
+### 🚨 High Error Rate (5xx errors > 5%)
 
 **Symptoms:**
-- P95 latency > 1000ms
-- Slow response times reported by clients
+- Increase in 5xx status code responses
+- Customer complaints about service unavailability
+- Alert: `Admin_PortalHighErrorRate`
 
-**Investigation:**
-1. Check downstream service health
-2. Review database query performance
-3. Examine Redis response times (if applicable)
-4. Check CPU/Memory utilization
+**Investigation Steps:**
+1. **Check Service Health**
+   ```bash
+   # Check if service is up
+   kubectl get pods -l app=admin-portal -n production
+   
+   # Check recent logs for errors
+   kubectl logs -l app=admin-portal -n production --tail=100 | grep ERROR
+   ```
+
+2. **Review Error Patterns**
+   ```promql
+   # Top error endpoints
+   topk(10, sum by (endpoint) (rate(http_requests_total{service="admin-portal",status=~"5.."}[5m])))
+   
+   # Error breakdown by status code
+   sum by (status) (rate(http_requests_total{service="admin-portal",status=~"5.."}[5m]))
+   ```
+
+3. **Check Dependencies**
+   ```bash
+   # Database connectivity
+   kubectl exec -n production deployment/admin-portal -- ping database-host
+   
+   # External service health
+   curl -H "Authorization: Bearer $TOKEN" https://external-api.com/health
+   ```
 
 **Resolution:**
-- Scale up replicas if CPU/Memory high
-- Optimize slow queries
-- Add caching for frequently accessed data
+- If database issues: Check connection pool, query performance
+- If external API issues: Implement circuit breaker, check API limits
+- If memory issues: Scale up pods or optimize memory usage
+- If code issues: Deploy hotfix or rollback to previous version
 
-### Service Down
+### ⚡ High Latency (P95 > 500ms)
+
+**Symptoms:**
+- Slow response times
+- Timeout errors from clients
+- Alert: `Admin_PortalHighLatency`
+
+**Investigation Steps:**
+1. **Identify Slow Endpoints**
+   ```promql
+   # Slowest endpoints (P95)
+   topk(10, histogram_quantile(0.95, sum by (endpoint) (rate(http_request_duration_seconds_bucket{service="admin-portal"}[5m]))))
+   ```
+
+2. **Check Resource Usage**
+   ```promql
+   # CPU usage
+   rate(container_cpu_usage_seconds_total{container="admin-portal"}[5m]) * 100
+   
+   # Memory usage
+   container_memory_usage_bytes{container="admin-portal"} / 1024/1024/1024
+   ```
+
+3. **Database Performance**
+   ```sql
+   -- Check slow queries (PostgreSQL)
+   SELECT query, mean_time, calls 
+   FROM pg_stat_statements 
+   WHERE mean_time > 1000 
+   ORDER BY mean_time DESC LIMIT 10;
+   ```
+
+**Resolution:**
+- Scale horizontally: Increase replica count
+- Optimize database queries: Add indexes, optimize joins
+- Implement caching: Redis for frequently accessed data
+- Review and optimize critical code paths
+
+### 💥 Service Down (Service unavailable)
 
 **Symptoms:**
 - Service not responding to health checks
-- 0% availability
+- 0 successful requests
+- Alert: `Admin_PortalServiceDown`
 
-**Investigation:**
-1. Check pod status: `kubectl get pods -l app=admin-portal -n production`
-2. Check logs: `kubectl logs -l app=admin-portal -n production --tail=100`
-3. Check resource limits and usage
-4. Verify configuration
+**Investigation Steps:**
+1. **Check Pod Status**
+   ```bash
+   kubectl describe pod -l app=admin-portal -n production
+   kubectl get events -n production --sort-by='.lastTimestamp' | grep admin-portal
+   ```
+
+2. **Review Startup Logs**
+   ```bash
+   kubectl logs -l app=admin-portal -n production --previous
+   ```
+
+3. **Check Resource Limits**
+   ```bash
+   kubectl top pod -l app=admin-portal -n production
+   ```
 
 **Resolution:**
-- Restart service: `kubectl rollout restart deployment/admin-portal -n production`
-- Scale up if resource constrained
-- Fix configuration issues if found
+- If pod crash: Check logs for errors, review resource limits
+- If node issues: Check node health, consider pod rescheduling  
+- If deployment issues: Rollback to previous working version
+- If resource exhaustion: Scale up resources or optimize usage
 
-## Emergency Procedures
+### 🧠 High Memory Usage (> 80%)
 
-### Circuit Breaker Activation
+**Symptoms:**
+- Memory usage consistently high
+- Potential OOM kills
+- Alert: `Admin_PortalHighMemoryUsage`
+
+**Investigation Steps:**
+1. **Memory Usage Breakdown**
+   ```promql
+   container_memory_usage_bytes{container="admin-portal"} / container_spec_memory_limit_bytes{container="admin-portal"} * 100
+   ```
+
+2. **Check for Memory Leaks**
+   ```bash
+   # Profile memory usage (if profiling enabled)
+   curl http://admin-portal:6060/debug/pprof/heap
+   ```
+
+**Resolution:**
+- Increase memory limits if justified by usage patterns
+- Identify and fix memory leaks in application code
+- Implement proper connection pooling and resource cleanup
+- Consider horizontal scaling instead of vertical scaling
+
+## Monitoring and Observability
+
+### Key Metrics to Monitor
+- **Request Rate**: `rate(http_requests_total{service="admin-portal"}[5m])`
+- **Error Rate**: `rate(http_requests_total{service="admin-portal",status=~"5.."}[5m])`
+- **Latency P95**: `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="admin-portal"}[5m]))`
+- **CPU Usage**: `rate(container_cpu_usage_seconds_total{container="admin-portal"}[5m]) * 100`
+- **Memory Usage**: `container_memory_usage_bytes{container="admin-portal"}`
+
+### Log Locations
+- **Application Logs**: `kubectl logs -l app=admin-portal -n production`
+- **Access Logs**: Available in Grafana Loki with label `{service="admin-portal"}`
+- **Error Logs**: Filter by level=ERROR in log aggregation
+
+### Trace Locations
+- **Jaeger UI**: Search by service name `admin-portal`
+- **Trace sampling**: 1% of requests (configurable)
+- **Key operations**: HTTP requests, database queries, external API calls
+
+## Escalation
+
+### On-Call Rotation
+- **Primary**: Platform Team oncall
+- **Secondary**: Admin Portal Service Owner
+- **Manager**: Platform Engineering Manager
+
+### Escalation Triggers
+- Multiple alerts firing simultaneously
+- Customer-impacting outage > 15 minutes
+- Data loss or corruption suspected
+- Security incident suspected
+
+### Emergency Contacts
+- **Slack**: #platform-alerts, #incident-response
+- **PagerDuty**: Platform Engineering team
+- **Phone**: Emergency contact list in PagerDuty
+
+## Deployment and Rollback
+
+### Safe Deployment Practices
 ```bash
-# Enable maintenance mode
-kubectl patch configmap admin-portal-config -p '{"data":{"MAINTENANCE_MODE":"true"}}'
-kubectl rollout restart deployment/admin-portal
+# Check current version
+kubectl get deployment admin-portal -n production -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Deploy new version (canary)
+kubectl set image deployment/admin-portal admin-portal=new-image:tag -n production
+
+# Monitor deployment
+kubectl rollout status deployment/admin-portal -n production
+
+# Rollback if needed
+kubectl rollout undo deployment/admin-portal -n production
 ```
 
-### Scaling Under Load
+### Health Check Verification
 ```bash
-# Emergency scale up
-kubectl scale deployment admin-portal --replicas=10
+# Test health endpoint
+curl -f http://admin-portal.production.svc.cluster.local:8012/healthz
+
+# Verify metrics endpoint
+curl http://admin-portal.production.svc.cluster.local:8012/metrics
 ```
 
-## Monitoring Links
-- [Grafana Dashboard](http://grafana.company.com/d/admin-portal)
-- [Prometheus Alerts](http://prometheus.company.com/alerts)
-- [Log Aggregation](http://logs.company.com/admin-portal)
+## Maintenance
 
-## On-call Checklist
-- [ ] Check service health endpoint
-- [ ] Verify database connectivity
-- [ ] Check Redis connectivity (if applicable)
-- [ ] Review recent deployments
-- [ ] Check resource utilization
-- [ ] Verify downstream service health
+### Regular Maintenance Tasks
+- **Weekly**: Review error trends and performance metrics
+- **Monthly**: Update dependencies and security patches
+- **Quarterly**: Load testing and capacity planning review
+
+### Capacity Planning
+- Monitor resource utilization trends
+- Plan for traffic growth (20% monthly growth assumed)
+- Review and update resource requests/limits
+
+## Related Documentation
+- [Service Level Objectives](./SLO.md)
+- [API Documentation](../contracts/)
+- [Deployment Guide](../deploy/)
+- [Architecture Overview](../README.md)
+
+---
+*Last Updated: $(date)*
+*Next Review: Monthly*

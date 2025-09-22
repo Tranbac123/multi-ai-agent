@@ -1,99 +1,235 @@
-# API Gateway Runbook
+# Api Gateway Service Runbook
 
 ## Service Overview
+- **Service**: api-gateway
+- **Purpose**: Main entry point with authentication, rate limiting, and routing
+- **Port**: 8000
+- **Type**: http
+- **SLO Target**: 99.9%
 
-The API Gateway serves as the main entry point for all client requests, providing authentication, rate limiting, and intelligent routing to backend services.
+## Quick Links
+- **Dashboard**: [Grafana Dashboard](https://grafana.company.com/d/api-gateway)
+- **Logs**: [Loki Logs](https://grafana.company.com/explore?query={service="api-gateway"})
+- **Traces**: [Jaeger UI](https://jaeger.company.com/search?service=api-gateway)
+- **Alerts**: [AlertManager](https://alertmanager.company.com/#/alerts?filter={service="api-gateway"})
 
-## Common Issues
+## Common Issues and Solutions
 
-### High Error Rate (5xx responses)
-
-**Symptoms:**
-
-- Increased 5xx error rate
-- Client complaints about service unavailability
-
-**Investigation:**
-
-1. Check service logs: `kubectl logs -l app=api-gateway -n production`
-2. Verify database connectivity: Check DATABASE_URL connection
-3. Check Redis connectivity: Verify rate limiting and session storage
-4. Review recent deployments
-
-**Resolution:**
-
-- If database issues: Scale read replicas or check connection pool
-- If Redis issues: Restart Redis or check memory usage
-- If application issues: Rollback recent deployment
-
-### High Latency
+### 🚨 High Error Rate (5xx errors > 5%)
 
 **Symptoms:**
+- Increase in 5xx status code responses
+- Customer complaints about service unavailability
+- Alert: `Api_GatewayHighErrorRate`
 
-- P95 latency > 1000ms
-- Slow response times reported by clients
+**Investigation Steps:**
+1. **Check Service Health**
+   ```bash
+   # Check if service is up
+   kubectl get pods -l app=api-gateway -n production
+   
+   # Check recent logs for errors
+   kubectl logs -l app=api-gateway -n production --tail=100 | grep ERROR
+   ```
 
-**Investigation:**
+2. **Review Error Patterns**
+   ```promql
+   # Top error endpoints
+   topk(10, sum by (endpoint) (rate(http_requests_total{service="api-gateway",status=~"5.."}[5m])))
+   
+   # Error breakdown by status code
+   sum by (status) (rate(http_requests_total{service="api-gateway",status=~"5.."}[5m]))
+   ```
 
-1. Check downstream service health
-2. Review database query performance
-3. Examine Redis response times
-4. Check CPU/Memory utilization
+3. **Check Dependencies**
+   ```bash
+   # Database connectivity
+   kubectl exec -n production deployment/api-gateway -- ping database-host
+   
+   # External service health
+   curl -H "Authorization: Bearer $TOKEN" https://external-api.com/health
+   ```
 
 **Resolution:**
+- If database issues: Check connection pool, query performance
+- If external API issues: Implement circuit breaker, check API limits
+- If memory issues: Scale up pods or optimize memory usage
+- If code issues: Deploy hotfix or rollback to previous version
 
-- Scale up replicas if CPU/Memory high
-- Optimize slow database queries
-- Add Redis cluster if memory pressure
-- Enable caching for frequently accessed data
-
-### Authentication Failures
+### ⚡ High Latency (P95 > 100ms)
 
 **Symptoms:**
+- Slow response times
+- Timeout errors from clients
+- Alert: `Api_GatewayHighLatency`
 
-- Increased 401/403 responses
-- Users unable to login
+**Investigation Steps:**
+1. **Identify Slow Endpoints**
+   ```promql
+   # Slowest endpoints (P95)
+   topk(10, histogram_quantile(0.95, sum by (endpoint) (rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m]))))
+   ```
 
-**Investigation:**
+2. **Check Resource Usage**
+   ```promql
+   # CPU usage
+   rate(container_cpu_usage_seconds_total{container="api-gateway"}[5m]) * 100
+   
+   # Memory usage
+   container_memory_usage_bytes{container="api-gateway"} / 1024/1024/1024
+   ```
 
-1. Check JWT secret configuration
-2. Verify token expiration settings
-3. Check user database connectivity
-4. Review authentication logs
+3. **Database Performance**
+   ```sql
+   -- Check slow queries (PostgreSQL)
+   SELECT query, mean_time, calls 
+   FROM pg_stat_statements 
+   WHERE mean_time > 1000 
+   ORDER BY mean_time DESC LIMIT 10;
+   ```
 
 **Resolution:**
+- Scale horizontally: Increase replica count
+- Optimize database queries: Add indexes, optimize joins
+- Implement caching: Redis for frequently accessed data
+- Review and optimize critical code paths
 
-- Rotate JWT secrets if compromised
-- Update token expiration if too short
-- Scale authentication service
-- Clear invalid sessions from Redis
+### 💥 Service Down (Service unavailable)
 
-## Emergency Procedures
+**Symptoms:**
+- Service not responding to health checks
+- 0 successful requests
+- Alert: `Api_GatewayServiceDown`
 
-### Circuit Breaker Activation
+**Investigation Steps:**
+1. **Check Pod Status**
+   ```bash
+   kubectl describe pod -l app=api-gateway -n production
+   kubectl get events -n production --sort-by='.lastTimestamp' | grep api-gateway
+   ```
 
+2. **Review Startup Logs**
+   ```bash
+   kubectl logs -l app=api-gateway -n production --previous
+   ```
+
+3. **Check Resource Limits**
+   ```bash
+   kubectl top pod -l app=api-gateway -n production
+   ```
+
+**Resolution:**
+- If pod crash: Check logs for errors, review resource limits
+- If node issues: Check node health, consider pod rescheduling  
+- If deployment issues: Rollback to previous working version
+- If resource exhaustion: Scale up resources or optimize usage
+
+### 🧠 High Memory Usage (> 80%)
+
+**Symptoms:**
+- Memory usage consistently high
+- Potential OOM kills
+- Alert: `Api_GatewayHighMemoryUsage`
+
+**Investigation Steps:**
+1. **Memory Usage Breakdown**
+   ```promql
+   container_memory_usage_bytes{container="api-gateway"} / container_spec_memory_limit_bytes{container="api-gateway"} * 100
+   ```
+
+2. **Check for Memory Leaks**
+   ```bash
+   # Profile memory usage (if profiling enabled)
+   curl http://api-gateway:6060/debug/pprof/heap
+   ```
+
+**Resolution:**
+- Increase memory limits if justified by usage patterns
+- Identify and fix memory leaks in application code
+- Implement proper connection pooling and resource cleanup
+- Consider horizontal scaling instead of vertical scaling
+
+## Monitoring and Observability
+
+### Key Metrics to Monitor
+- **Request Rate**: `rate(http_requests_total{service="api-gateway"}[5m])`
+- **Error Rate**: `rate(http_requests_total{service="api-gateway",status=~"5.."}[5m])`
+- **Latency P95**: `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m]))`
+- **CPU Usage**: `rate(container_cpu_usage_seconds_total{container="api-gateway"}[5m]) * 100`
+- **Memory Usage**: `container_memory_usage_bytes{container="api-gateway"}`
+
+### Log Locations
+- **Application Logs**: `kubectl logs -l app=api-gateway -n production`
+- **Access Logs**: Available in Grafana Loki with label `{service="api-gateway"}`
+- **Error Logs**: Filter by level=ERROR in log aggregation
+
+### Trace Locations
+- **Jaeger UI**: Search by service name `api-gateway`
+- **Trace sampling**: 1% of requests (configurable)
+- **Key operations**: HTTP requests, database queries, external API calls
+
+## Escalation
+
+### On-Call Rotation
+- **Primary**: Platform Team oncall
+- **Secondary**: Api Gateway Service Owner
+- **Manager**: Platform Engineering Manager
+
+### Escalation Triggers
+- Multiple alerts firing simultaneously
+- Customer-impacting outage > 15 minutes
+- Data loss or corruption suspected
+- Security incident suspected
+
+### Emergency Contacts
+- **Slack**: #platform-alerts, #incident-response
+- **PagerDuty**: Platform Engineering team
+- **Phone**: Emergency contact list in PagerDuty
+
+## Deployment and Rollback
+
+### Safe Deployment Practices
 ```bash
-# Enable maintenance mode
-kubectl patch configmap api-gateway-config -p '{"data":{"MAINTENANCE_MODE":"true"}}'
-kubectl rollout restart deployment/api-gateway
+# Check current version
+kubectl get deployment api-gateway -n production -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Deploy new version (canary)
+kubectl set image deployment/api-gateway api-gateway=new-image:tag -n production
+
+# Monitor deployment
+kubectl rollout status deployment/api-gateway -n production
+
+# Rollback if needed
+kubectl rollout undo deployment/api-gateway -n production
 ```
 
-### Traffic Rerouting
-
+### Health Check Verification
 ```bash
-# Route traffic to backup region
-kubectl patch ingress api-gateway -p '{"spec":{"rules":[{"host":"api.company.com","http":{"paths":[{"path":"/","backend":{"serviceName":"api-gateway-backup","servicePort":8000}}]}}]}}'
+# Test health endpoint
+curl -f http://api-gateway.production.svc.cluster.local:8000/healthz
+
+# Verify metrics endpoint
+curl http://api-gateway.production.svc.cluster.local:8000/metrics
 ```
 
-### Scaling Under Load
+## Maintenance
 
-```bash
-# Emergency scale up
-kubectl scale deployment api-gateway --replicas=10
-```
+### Regular Maintenance Tasks
+- **Weekly**: Review error trends and performance metrics
+- **Monthly**: Update dependencies and security patches
+- **Quarterly**: Load testing and capacity planning review
 
-## Monitoring Links
+### Capacity Planning
+- Monitor resource utilization trends
+- Plan for traffic growth (20% monthly growth assumed)
+- Review and update resource requests/limits
 
-- [Grafana Dashboard](http://grafana.company.com/d/api-gateway)
-- [Prometheus Alerts](http://prometheus.company.com/alerts)
-- [Log Aggregation](http://logs.company.com/api-gateway)
+## Related Documentation
+- [Service Level Objectives](./SLO.md)
+- [API Documentation](../contracts/)
+- [Deployment Guide](../deploy/)
+- [Architecture Overview](../README.md)
+
+---
+*Last Updated: $(date)*
+*Next Review: Monthly*

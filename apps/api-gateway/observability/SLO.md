@@ -1,61 +1,91 @@
-# API Gateway Service Level Objectives (SLO)
+# Api Gateway Service Level Objectives (SLO)
 
-## Service Level Indicators (SLIs)
+## Overview
+This document defines the Service Level Objectives (SLOs) for the api-gateway service.
 
-| Metric            | Description                       | Target  | Error Budget |
-| ----------------- | --------------------------------- | ------- | ------------ |
-| **Availability**  | Percentage of successful requests | 99.9%   | 0.1%         |
-| **Latency (p50)** | 50th percentile response time     | < 100ms | < 200ms      |
-| **Latency (p95)** | 95th percentile response time     | < 500ms | < 1000ms     |
-| **Error Rate**    | Percentage of 5xx responses       | < 0.1%  | < 1%         |
+**Service Purpose**: Main entry point with authentication, rate limiting, and routing
 
-## Monitoring Queries
+## SLO Definitions
 
-### Availability
+### 1. Availability SLO
+- **Objective**: 99.9% availability over a 30-day rolling window
+- **SLI**: Percentage of successful requests (non-5xx responses)
+- **Error Budget**: 0.1% (0.1 hours downtime per month)
 
+**PromQL Query**:
 ```promql
+# Success Rate (SLI)
 (
-  sum(rate(http_requests_total{service="api-gateway",status!~"5.."}[5m])) /
-  sum(rate(http_requests_total{service="api-gateway"}[5m]))
+  sum(rate(http_requests_total{service="api-gateway",status!~"5.."}[30d])) /
+  sum(rate(http_requests_total{service="api-gateway"}[30d]))
+) * 100
+
+# Error Budget Burn Rate (1h window)
+(
+  1 - (
+    sum(rate(http_requests_total{service="api-gateway",status!~"5.."}[1h])) /
+    sum(rate(http_requests_total{service="api-gateway"}[1h]))
+  )
+) / (1 - 0.9990000000000001)
+```
+
+### 2. Latency SLO
+- **Objective**: 95% of requests complete within 100ms
+- **SLI**: P95 latency of successful requests
+
+**PromQL Query**:
+```promql
+# P95 Latency (SLI)
+histogram_quantile(0.95, 
+  rate(http_request_duration_seconds_bucket{service="api-gateway",status!~"5.."}[5m])
+)
+
+# Latency SLO Compliance (percentage of requests under threshold)
+(
+  sum(rate(http_request_duration_seconds_bucket{service="api-gateway",status!~"5..",le="0.1"}[5m])) /
+  sum(rate(http_request_duration_seconds_count{service="api-gateway",status!~"5.."}[5m]))
 ) * 100
 ```
 
-### Latency P95
+### 3. Error Rate SLO
+- **Objective**: Less than 1% error rate over a 1-hour rolling window
+- **SLI**: Percentage of requests returning 5xx status codes
 
+**PromQL Query**:
 ```promql
-histogram_quantile(0.95,
-  rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m])
-) * 1000
-```
-
-### Error Rate
-
-```promql
+# Error Rate (SLI)
 (
-  sum(rate(http_requests_total{service="api-gateway",status=~"5.."}[5m])) /
-  sum(rate(http_requests_total{service="api-gateway"}[5m]))
+  sum(rate(http_requests_total{service="api-gateway",status=~"5.."}[1h])) /
+  sum(rate(http_requests_total{service="api-gateway"}[1h]))
 ) * 100
 ```
 
-## Alerting Rules
+## SLO Monitoring and Alerting
 
-### Critical Alerts
+### Error Budget Alerts
+- **Fast Burn**: Error budget consumption > 2% in 1 hour
+- **Slow Burn**: Error budget consumption > 5% in 6 hours
 
-- **High Error Rate**: Error rate > 1% for 5 minutes
-- **High Latency**: P95 latency > 1000ms for 5 minutes
-- **Service Down**: Availability < 95% for 2 minutes
+### SLO Dashboard
+- **Grafana Dashboard**: `api-gateway-slo-dashboard`
+- **Metrics**: Availability, Latency P95/P99, Error Rate, Error Budget Burn Rate
 
-### Warning Alerts
+## SLO Review Process
+- **Review Frequency**: Monthly
+- **Stakeholders**: Platform Team, Service Owners, Product Team
+- **Review Criteria**: 
+  - SLO achievement vs. target
+  - Error budget consumption
+  - Alert noise vs. actionable incidents
+  - Customer impact correlation
 
-- **Elevated Error Rate**: Error rate > 0.5% for 10 minutes
-- **Elevated Latency**: P95 latency > 500ms for 10 minutes
-- **Low Availability**: Availability < 99% for 5 minutes
+## Historical Performance
+<!-- Update monthly with actual performance data -->
+| Month | Availability | P95 Latency | Error Rate | SLO Met |
+|-------|-------------|-------------|------------|---------|
+| TBD   | TBD         | TBD         | TBD        | TBD     |
 
-## Error Budget Burn Rate
-
-| Period   | Budget Consumption | Alert Threshold  |
-| -------- | ------------------ | ---------------- |
-| 1 hour   | 5%                 | Page immediately |
-| 6 hours  | 10%                | Page immediately |
-| 24 hours | 25%                | Ticket creation  |
-| 72 hours | 50%                | Review required  |
+## Related Documents
+- [Runbook](./api-gateway-runbook.md)
+- [Service Architecture](../README.md)
+- [Incident Response](https://docs.company.com/incident-response)

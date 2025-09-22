@@ -1,32 +1,53 @@
 groups:
-  - name: capacity-monitor_alerts
-    rules:
-      - alert: Capacity_MonitorHighErrorRate
-        expr: rate(http_requests_total{service="capacity-monitor",status=~"5.."}[5m]) / rate(http_requests_total{service="capacity-monitor"}[5m]) > 0.01
-        for: 5m
-        labels:
-          severity: critical
-          service: capacity-monitor
-        annotations:
-          summary: "High error rate on capacity-monitor"
-          description: "Error rate is above 1% for 5 minutes"
-
-      - alert: Capacity_MonitorHighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="capacity-monitor"}[5m])) > 1.0
-        for: 5m
-        labels:
-          severity: warning
-          service: capacity-monitor
-        annotations:
-          summary: "High latency on capacity-monitor"
-          description: "P95 latency is above 1 second for 5 minutes"
-
-      - alert: Capacity_MonitorServiceDown
-        expr: up{service="capacity-monitor"} == 0
-        for: 2m
-        labels:
-          severity: critical
-          service: capacity-monitor
-        annotations:
-          summary: "capacity-monitor service is down"
-          description: "Service has been down for more than 2 minutes"
+- name: capacity-monitor-alerts
+  rules:
+  - alert: Capacity_MonitorHighErrorRate
+    expr: rate(http_requests_total{service="capacity-monitor",status=~"5.."}[5m])
+      / rate(http_requests_total{service="capacity-monitor"}[5m]) * 100 > 5
+    for: 2m
+    labels:
+      severity: critical
+      service: capacity-monitor
+      team: platform
+    annotations:
+      summary: capacity-monitor has high error rate
+      description: Error rate for capacity-monitor is { $value }% which is above the
+        5% threshold.
+      runbook_url: https://runbooks.company.com/capacity-monitor#high-error-rate
+  - alert: Capacity_MonitorHighLatency
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="capacity-monitor"}[5m]))
+      > 0.1
+    for: 5m
+    labels:
+      severity: warning
+      service: capacity-monitor
+      team: platform
+    annotations:
+      summary: capacity-monitor has high latency
+      description: P95 latency for capacity-monitor is { $value }s which is above
+        the 100ms threshold.
+      runbook_url: https://runbooks.company.com/capacity-monitor#high-latency
+  - alert: Capacity_MonitorServiceDown
+    expr: up{service="capacity-monitor"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: capacity-monitor
+      team: platform
+    annotations:
+      summary: capacity-monitor is down
+      description: capacity-monitor has been down for more than 1 minute.
+      runbook_url: https://runbooks.company.com/capacity-monitor#service-down
+  - alert: Capacity_MonitorHighMemoryUsage
+    expr: container_memory_usage_bytes{container="capacity-monitor"} / container_spec_memory_limit_bytes{container="capacity-monitor"}
+      * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      service: capacity-monitor
+      team: platform
+    annotations:
+      summary: capacity-monitor has high memory usage
+      description: Memory usage for capacity-monitor is { $value }% which is above
+        80%.
+      runbook_url: https://runbooks.company.com/capacity-monitor#high-memory
