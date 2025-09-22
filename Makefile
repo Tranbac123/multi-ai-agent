@@ -20,10 +20,15 @@ help:
 # List of all backend services
 BACKEND_SERVICES := api-gateway analytics-service orchestrator router-service realtime \
                     ingestion billing-service tenant-service chat-adapters tool-service \
-                    eval-service capacity-monitor admin-portal
+                    eval-service capacity-monitor
 
-# List of all frontend services  
-FRONTEND_SERVICES := web-frontend
+# List of all frontend services (SPA + BFF)
+FRONTEND_SERVICES := web-frontend admin-portal
+
+# Note: admin-portal is a BFF (Backend for Frontend) pattern:
+# - Server-side FastAPI application with Jinja2 templates
+# - Serves both backend logic and frontend presentation
+# - Deployed as a microservice but serves frontend functionality
 
 # All services
 SERVICES := $(BACKEND_SERVICES) $(FRONTEND_SERVICES)

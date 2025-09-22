@@ -67,3 +67,20 @@ buf-breaking: ## Check for breaking changes
 
 clean-generated: ## Clean generated client code
 	rm -rf gen/
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for orchestrator..."
+	docker build -t orchestrator:latest .
+	docker build -t orchestrator:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: orchestrator:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for orchestrator..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag orchestrator:latest $${DOCKER_REGISTRY}/orchestrator:latest
+	docker tag orchestrator:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/orchestrator:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/orchestrator:latest
+	docker push $${DOCKER_REGISTRY}/orchestrator:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/orchestrator:latest"

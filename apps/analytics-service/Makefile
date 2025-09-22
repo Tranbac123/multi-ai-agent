@@ -68,3 +68,20 @@ generate-orval: ## Generate TypeScript client using Orval
 
 clean-generated: ## Clean generated client code
 	rm -rf gen/
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for analytics-service..."
+	docker build -t analytics-service:latest .
+	docker build -t analytics-service:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: analytics-service:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for analytics-service..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag analytics-service:latest $${DOCKER_REGISTRY}/analytics-service:latest
+	docker tag analytics-service:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/analytics-service:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/analytics-service:latest
+	docker push $${DOCKER_REGISTRY}/analytics-service:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/analytics-service:latest"

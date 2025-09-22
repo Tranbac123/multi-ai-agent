@@ -42,3 +42,24 @@ build:
 # Clean artifacts
 clean:
 	rm -rf dist/ node_modules/ .vite/
+
+migrate: ## No-op migrate for frontend service
+	@echo "⚠️ No database migrations needed for frontend service"
+
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for web-frontend..."
+	docker build -t web-frontend:latest .
+	docker build -t web-frontend:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: web-frontend:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for web-frontend..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag web-frontend:latest $${DOCKER_REGISTRY}/web-frontend:latest
+	docker tag web-frontend:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/web-frontend:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/web-frontend:latest
+	docker push $${DOCKER_REGISTRY}/web-frontend:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/web-frontend:latest"

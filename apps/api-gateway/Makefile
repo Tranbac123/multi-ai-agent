@@ -69,3 +69,20 @@ generate-orval: ## Generate TypeScript client using Orval
 
 clean-generated: ## Clean generated client code
 	rm -rf gen/
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for api-gateway..."
+	docker build -t api-gateway:latest .
+	docker build -t api-gateway:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: api-gateway:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for api-gateway..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag api-gateway:latest $${DOCKER_REGISTRY}/api-gateway:latest
+	docker tag api-gateway:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/api-gateway:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/api-gateway:latest
+	docker push $${DOCKER_REGISTRY}/api-gateway:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/api-gateway:latest"

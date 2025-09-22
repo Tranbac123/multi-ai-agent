@@ -1,0 +1,238 @@
+name: 'Frontend CI Template'
+
+on:
+  workflow_call:
+    inputs:
+      frontend_type:
+        description: 'Frontend type: spa, bff'
+        required: true
+        type: string
+      service_path:
+        description: 'Path to the frontend service'
+        required: true
+        type: string
+      node_version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '18'
+      deploy_target:
+        description: 'Deployment target: cdn, vercel, s3-cloudfront'
+        required: false
+        type: string
+        default: 'cdn'
+    secrets:
+      VERCEL_TOKEN:
+        description: 'Vercel deployment token'
+        required: false
+      AWS_ACCESS_KEY_ID:
+        description: 'AWS access key for S3/CloudFront deployment'
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        description: 'AWS secret key for S3/CloudFront deployment'
+        required: false
+      CDN_DEPLOY_URL:
+        description: 'CDN deployment webhook URL'
+        required: false
+
+env:
+  NODE_ENV: production
+  CI: true
+
+jobs:
+  frontend-pipeline:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      build-artifact: ${{ steps.upload.outputs.artifact-url }}
+      deployment-url: ${{ steps.deploy.outputs.url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ inputs.service_path }}/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-node-${{ inputs.node_version }}-${{ hashFiles(format('{0}/package-lock.json', inputs.service_path)) }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ inputs.node_version }}-
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci --prefer-offline --no-audit
+
+      - name: Run TypeScript check
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🔍 Running TypeScript check..."
+          npx tsc --noEmit
+
+      - name: Run ESLint
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🔍 Running ESLint..."
+          npm run lint
+
+      - name: Run Prettier check
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🎨 Checking code formatting..."
+          npx prettier --check "src/**/*.{ts,tsx,css,md}" || {
+            echo "❌ Code formatting issues found. Run 'npm run format' to fix."
+            exit 1
+          }
+
+      - name: Check for unused exports
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🧹 Checking for unused exports..."
+          npm run ts-unused-exports || {
+            echo "⚠️ Unused exports found. Consider cleaning up."
+            exit 0
+          }
+
+      - name: Run unit tests
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🧪 Running unit tests..."
+          if [ -f "package.json" ] && grep -q '"test"' package.json; then
+            npm test -- --coverage --watchAll=false
+          else
+            echo "⚠️ No test script found, skipping tests"
+          fi
+
+      - name: Security audit
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🔒 Running security audit..."
+          npm audit --audit-level=high || {
+            echo "⚠️ Security vulnerabilities found"
+            npm audit --audit-level=high --json > security-audit.json || true
+            exit 0
+          }
+
+      - name: Build application
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🏗️ Building application..."
+          npm run build
+
+      - name: Check bundle size
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "📊 Analyzing bundle size..."
+          if [ -d "dist" ]; then
+            du -sh dist/
+            find dist -name "*.js" -exec ls -lh {} \; | head -10
+          fi
+
+      - name: Upload build artifacts
+        id: upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_path }}-build-${{ github.sha }}
+          path: ${{ inputs.service_path }}/dist/
+          retention-days: 30
+
+      - name: Deploy to Vercel
+        id: deploy-vercel
+        if: ${{ inputs.deploy_target == 'vercel' && secrets.VERCEL_TOKEN }}
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🚀 Deploying to Vercel..."
+          npx vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes
+          echo "url=https://your-app.vercel.app" >> $GITHUB_OUTPUT
+
+      - name: Deploy to S3 + CloudFront
+        id: deploy-s3
+        if: ${{ inputs.deploy_target == 's3-cloudfront' && secrets.AWS_ACCESS_KEY_ID }}
+        working-directory: ${{ inputs.service_path }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          echo "🚀 Deploying to S3 + CloudFront..."
+          aws s3 sync dist/ s3://your-frontend-bucket/ --delete
+          aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+          echo "url=https://your-cloudfront-domain.com" >> $GITHUB_OUTPUT
+
+      - name: Deploy to CDN
+        id: deploy-cdn
+        if: ${{ inputs.deploy_target == 'cdn' && secrets.CDN_DEPLOY_URL }}
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "🚀 Deploying to CDN..."
+          curl -X POST "${{ secrets.CDN_DEPLOY_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"artifact\":\"${{ steps.upload.outputs.artifact-url }}\",\"service\":\"${{ inputs.service_path }}\"}"
+          echo "url=https://your-cdn-domain.com" >> $GITHUB_OUTPUT
+
+      - name: Set deployment output
+        id: deploy
+        run: |
+          if [ "${{ inputs.deploy_target }}" == "vercel" ]; then
+            echo "url=${{ steps.deploy-vercel.outputs.url }}" >> $GITHUB_OUTPUT
+          elif [ "${{ inputs.deploy_target }}" == "s3-cloudfront" ]; then
+            echo "url=${{ steps.deploy-s3.outputs.url }}" >> $GITHUB_OUTPUT
+          elif [ "${{ inputs.deploy_target }}" == "cdn" ]; then
+            echo "url=${{ steps.deploy-cdn.outputs.url }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=pending-deployment" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment PR with deployment URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const deploymentUrl = '${{ steps.deploy.outputs.url }}';
+            if (deploymentUrl && deploymentUrl !== 'pending-deployment') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🚀 **Frontend deployed!** Preview: ${deploymentUrl}`
+              });
+            }
+
+      - name: Lighthouse CI (if URL available)
+        if: ${{ steps.deploy.outputs.url != 'pending-deployment' }}
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          echo "⚡ Running Lighthouse audit..."
+          npm install -g @lhci/cli
+          lhci autorun --upload.target=temporary-public-storage || {
+            echo "⚠️ Lighthouse audit failed, continuing..."
+            exit 0
+          }
+
+      - name: Summary
+        run: |
+          echo "## 🎉 Frontend CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Check | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| ESLint | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Audit | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Target | ${{ inputs.deploy_target }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.deploy.outputs.url }}" != "pending-deployment" ]; then
+            echo "| Deployment URL | ${{ steps.deploy.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
+          fi

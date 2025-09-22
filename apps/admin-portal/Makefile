@@ -69,3 +69,20 @@ generate-orval: ## Generate TypeScript client using Orval
 
 clean-generated: ## Clean generated client code
 	rm -rf gen/
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for admin-portal..."
+	docker build -t admin-portal:latest .
+	docker build -t admin-portal:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: admin-portal:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for admin-portal..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag admin-portal:latest $${DOCKER_REGISTRY}/admin-portal:latest
+	docker tag admin-portal:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/admin-portal:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/admin-portal:latest
+	docker push $${DOCKER_REGISTRY}/admin-portal:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/admin-portal:latest"

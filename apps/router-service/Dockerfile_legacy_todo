@@ -1,3 +1,9 @@
+# TODO: Legacy Dockerfile for router-service - review for useful configurations
+# Date: 2025-09-22
+# Owner: Platform Team
+# Priority: Low
+# Action: Review and either integrate useful parts or delete
+
 """Dockerfile for Router Service."""
 
 FROM python:3.11-slim

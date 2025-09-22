@@ -1,52 +1,42 @@
-name: "Web Frontend CI/CD"
+name: 'Web Frontend CI'
 
 on:
   push:
+    branches: [ main, develop ]
     paths:
-      - "apps/web-frontend/**"
-      - "libs/**"
-      - "contracts/**"
-      - "platform/ci-templates/**"
-      - ".github/workflows/web-frontend-*.yaml"
+      - 'apps/web-frontend/**'
+      - 'platform/ci-templates/frontend-ci.yaml'
   pull_request:
+    branches: [ main, develop ]
     paths:
-      - "apps/web-frontend/**"
-      - "libs/**"
-      - "contracts/**"
+      - 'apps/web-frontend/**'
+      - 'platform/ci-templates/frontend-ci.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: "Build and Test Web Frontend"
-    uses: ./platform/ci-templates/service-ci.yaml
+  frontend-ci:
+    name: 'React SPA CI/CD Pipeline'
+    uses: ./.github/workflows/../../../platform/ci-templates/frontend-ci.yaml
     with:
-      language: "node"
-      service_path: "apps/web-frontend"
-      service_name: "web-frontend"
-      enable_docker: true
-      enable_sbom: true
+      frontend_type: 'spa'
+      service_path: 'apps/web-frontend'
+      node_version: '18'
+      deploy_target: 'vercel'  # Can be: vercel, s3-cloudfront, cdn
     secrets:
-      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CDN_DEPLOY_URL: ${{ secrets.CDN_DEPLOY_URL }}
 
-  # Optional: Service-specific deployment to dev environment
-  deploy-dev:
-    name: "Deploy to Development"
-    needs: ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  notify-success:
+    needs: frontend-ci
     runs-on: ubuntu-latest
-    environment: development
+    if: success()
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to development
+      - name: Notify deployment success
         run: |
-          echo "Deploying web-frontend to development environment"
-          # Add your deployment logic here
-          # cd apps/web-frontend/deploy
-          # make deploy ENV=dev IMAGE_TAG=${{ github.sha }}
+          echo "🎉 Web Frontend deployment successful!"
+          echo "📱 Preview URL: ${{ needs.frontend-ci.outputs.deployment-url }}"

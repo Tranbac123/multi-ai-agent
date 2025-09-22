@@ -67,3 +67,20 @@ buf-breaking: ## Check for breaking changes
 
 clean-generated: ## Clean generated client code
 	rm -rf gen/
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image for router-service..."
+	docker build -t router-service:latest .
+	docker build -t router-service:$$(git rev-parse --short HEAD) .
+	@echo "✅ Docker image built: router-service:latest"
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "🚀 Pushing Docker image for router-service..."
+	@if [ -z "$${DOCKER_REGISTRY}" ]; then \
+		echo "❌ DOCKER_REGISTRY environment variable not set"; \
+		exit 1; \
+	fi
+	docker tag router-service:latest $${DOCKER_REGISTRY}/router-service:latest
+	docker tag router-service:$$(git rev-parse --short HEAD) $${DOCKER_REGISTRY}/router-service:$$(git rev-parse --short HEAD)
+	docker push $${DOCKER_REGISTRY}/router-service:latest
+	docker push $${DOCKER_REGISTRY}/router-service:$$(git rev-parse --short HEAD)
+	@echo "✅ Docker image pushed: $${DOCKER_REGISTRY}/router-service:latest"

@@ -1,52 +1,93 @@
-name: "Admin Portal CI/CD"
+name: 'Admin Portal CI'
 
 on:
   push:
+    branches: [ main, develop ]
     paths:
-      - "apps/admin-portal/**"
-      - "libs/**"
-      - "contracts/**"
-      - "platform/ci-templates/**"
-      - ".github/workflows/admin-portal-*.yaml"
+      - 'apps/admin-portal/**'
+      - 'platform/ci-templates/service-ci.yaml'
   pull_request:
+    branches: [ main, develop ]
     paths:
-      - "apps/admin-portal/**"
-      - "libs/**"
-      - "contracts/**"
+      - 'apps/admin-portal/**'
+      - 'platform/ci-templates/service-ci.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: "Build and Test Admin Portal"
-    uses: ./platform/ci-templates/service-ci.yaml
+  # Admin Portal is a BFF (Backend for Frontend) - Python FastAPI with templates
+  backend-ci:
+    name: 'Admin Portal BFF CI/CD'
+    uses: ./.github/workflows/../../../platform/ci-templates/service-ci.yaml
     with:
-      language: "python"
-      service_path: "apps/admin-portal"
-      service_name: "admin-portal"
-      enable_docker: true
-      enable_sbom: true
-    secrets:
-      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      language: 'python'
+      service_path: 'apps/admin-portal'
+    secrets: inherit
 
-  # Optional: Service-specific deployment to dev environment
-  deploy-dev:
-    name: "Deploy to Development"
-    needs: ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  # Also treat it as a frontend for template/static assets
+  frontend-assets:
+    name: 'Admin Portal Frontend Assets'
     runs-on: ubuntu-latest
-    environment: development
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to development
+      - name: Setup Node.js (for asset processing)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Process static assets
+        working-directory: apps/admin-portal
         run: |
-          echo "Deploying admin-portal to development environment"
-          # Add your deployment logic here
-          # cd apps/admin-portal/deploy
-          # make deploy ENV=dev IMAGE_TAG=${{ github.sha }}
+          echo "🎨 Processing static assets..."
+          # Check if we have any frontend assets to process
+          if [ -d "static" ] || [ -d "templates" ]; then
+            echo "📁 Found frontend assets"
+            # Add asset optimization here (CSS minification, etc.)
+            find . -name "*.css" -o -name "*.js" | head -5
+          else
+            echo "⚠️ No frontend assets found, creating placeholder"
+            mkdir -p static/css static/js
+            echo "/* Admin Portal CSS */" > static/css/admin.css
+          fi
+
+      - name: Validate templates
+        working-directory: apps/admin-portal
+        run: |
+          echo "🔍 Validating Jinja2 templates..."
+          if [ -d "src/templates" ]; then
+            # Basic template syntax validation
+            python3 -c "
+            import os
+            from jinja2 import Environment, FileSystemLoader, TemplateSyntaxError
+            
+            template_dir = 'src/templates'
+            if os.path.exists(template_dir):
+                env = Environment(loader=FileSystemLoader(template_dir))
+                for root, dirs, files in os.walk(template_dir):
+                    for file in files:
+                        if file.endswith('.html'):
+                            try:
+                                template_path = os.path.relpath(os.path.join(root, file), template_dir)
+                                env.get_template(template_path)
+                                print(f'✅ {template_path}')
+                            except TemplateSyntaxError as e:
+                                print(f'❌ {template_path}: {e}')
+                                exit(1)
+            else:
+                print('⚠️ No templates directory found')
+            "
+          fi
+
+  notify-success:
+    needs: [backend-ci, frontend-assets]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Notify deployment success
+        run: |
+          echo "🎉 Admin Portal (BFF) deployment successful!"
+          echo "🔧 Backend service deployed with frontend templates"

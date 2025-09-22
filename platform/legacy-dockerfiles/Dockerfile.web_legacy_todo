@@ -1,3 +1,9 @@
+# TODO: Legacy platform Dockerfile.web - consolidate or remove
+# Date: 2025-09-22
+# Owner: Platform Team
+# Priority: Low
+# Action: Review and either integrate useful parts or delete
+
 FROM node:18-alpine
 
 WORKDIR /app
