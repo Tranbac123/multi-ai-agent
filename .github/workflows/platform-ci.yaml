@@ -1,0 +1,162 @@
+name: "Platform CI/CD"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.changes.outputs.changes }}
+      contracts: ${{ steps.changes.outputs.contracts }}
+      platform: ${{ steps.changes.outputs.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            contracts:
+              - 'contracts/**'
+            platform:
+              - 'platform/**'
+              - 'libs/**'
+              - '.github/workflows/**'
+            api-gateway:
+              - 'apps/api-gateway/**'
+            analytics-service:
+              - 'apps/analytics-service/**'
+            orchestrator:
+              - 'apps/orchestrator/**'
+            router-service:
+              - 'apps/router-service/**'
+            realtime:
+              - 'apps/realtime/**'
+            ingestion:
+              - 'apps/ingestion/**'
+            billing-service:
+              - 'apps/billing-service/**'
+            tenant-service:
+              - 'apps/tenant-service/**'
+            chat-adapters:
+              - 'apps/chat-adapters/**'
+            tool-service:
+              - 'apps/tool-service/**'
+            eval-service:
+              - 'apps/eval-service/**'
+            capacity-monitor:
+              - 'apps/capacity-monitor/**'
+            admin-portal:
+              - 'apps/admin-portal/**'
+            web-frontend:
+              - 'apps/web-frontend/**'
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  contracts-validation:
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate OpenAPI specs
+        run: |
+          npm install -g @apidevtools/swagger-parser
+          find contracts/ -name "*.yaml" -exec swagger-parser validate {} \;
+
+  # Dynamic job matrix for changed services
+  service-tests:
+    needs: changes
+    if: ${{ needs.changes.outputs.services != '[]' && needs.changes.outputs.services != '' }}
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
+    uses: ./.github/workflows/service-ci.yaml
+    with:
+      service-name: ${{ matrix.service }}
+      service-path: apps/${{ matrix.service }}
+    secrets:
+      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  integration-tests:
+    needs: [service-tests, contracts-validation]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Run integration tests
+        run: |
+          cd platform/integration-tests
+          pip install -r requirements.txt
+          pytest -v --tb=short
+
+  performance-tests:
+    needs: [service-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run load tests
+        run: |
+          cd platform/load_tests
+          pip install -r requirements.txt
+          python run_load_tests.py --environment=staging
+
+  deploy-staging:
+    needs: [integration-tests, performance-tests]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          # Deploy all changed services to staging
+          echo "Deploying to staging environment"
+
+  deploy-production:
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          # Deploy all changed services to production
+          echo "Deploying to production environment"

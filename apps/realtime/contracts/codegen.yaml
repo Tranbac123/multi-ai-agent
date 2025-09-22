@@ -1,0 +1,21 @@
+generators:
+  go-client:
+    config:
+      moduleName: github.com/company/multi-ai-agent/realtime/gen/go-client
+      packageName: realtime
+    generator: go
+    output: ../gen/go-client
+  python-client:
+    config:
+      packageName: realtime_client
+      packageVersion: 1.0.0
+      projectName: realtime-client
+    generator: python
+    output: ../gen/python-client
+  typescript-client:
+    config:
+      npmName: '@company/realtime-client'
+      npmVersion: 1.0.0
+      supportsES6: true
+    generator: typescript-axios
+    output: ../gen/typescript-client

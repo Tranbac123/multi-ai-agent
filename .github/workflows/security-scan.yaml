@@ -1,0 +1,122 @@
+name: "Platform Security Scan"
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "platform/**"
+      - "libs/**"
+      - ".github/workflows/security-scan.yaml"
+
+jobs:
+  dependency-scan:
+    name: "Dependency Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Scan Python dependencies
+        run: |
+          echo "## Security Scan Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Python Dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          pip install safety
+
+          # Scan each service's requirements
+          SERVICES="api-gateway analytics-service orchestrator router-service realtime ingestion billing-service tenant-service chat-adapters tool-service eval-service capacity-monitor admin-portal"
+
+          for service in $SERVICES; do
+            if [ -f "apps/$service/requirements.txt" ]; then
+              echo "Scanning $service dependencies..."
+              if safety check --file apps/$service/requirements.txt --output text > safety-$service.txt 2>&1; then
+                echo "- ✅ **$service** - No known vulnerabilities" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ⚠️ **$service** - Potential vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+                echo "  \`\`\`" >> $GITHUB_STEP_SUMMARY
+                head -10 safety-$service.txt >> $GITHUB_STEP_SUMMARY
+                echo "  \`\`\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+      - name: Scan Node.js dependencies
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Node.js Dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check web-frontend
+          if [ -f "apps/web-frontend/package.json" ]; then
+            cd apps/web-frontend
+            if npm audit --audit-level high; then
+              echo "- ✅ **web-frontend** - No high-severity vulnerabilities" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ⚠️ **web-frontend** - High-severity vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+            fi
+            cd ../..
+          fi
+
+  secret-scan:
+    name: "Secret Detection"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  license-scan:
+    name: "License Compliance"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check license compatibility
+        run: |
+          echo "## License Compliance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Install license checker for Python
+          pip install pip-licenses
+
+          # Check each Python service
+          SERVICES="api-gateway analytics-service orchestrator router-service realtime ingestion billing-service tenant-service chat-adapters tool-service eval-service capacity-monitor admin-portal"
+
+          for service in $SERVICES; do
+            if [ -f "apps/$service/requirements.txt" ]; then
+              echo "### 📄 $service Licenses" >> $GITHUB_STEP_SUMMARY
+              pip install -r apps/$service/requirements.txt > /dev/null 2>&1
+              pip-licenses --format=markdown >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              break  # Just show one example to avoid huge output
+            fi
+          done

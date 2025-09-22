@@ -1,0 +1,253 @@
+openapi: 3.0.3
+info:
+  title: Capacity Monitor Service
+  description: Resource monitoring and capacity planning
+  version: 1.0.0
+  contact:
+    name: Platform Team
+    email: platform@company.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+- url: http://localhost:8012
+  description: Development server
+- url: https://api.company.com
+  description: Production server
+security:
+- BearerAuth: []
+paths:
+  /healthz:
+    get:
+      summary: Health check endpoint
+      operationId: health_check
+      tags:
+      - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /v1/info:
+    get:
+      summary: Service information
+      operationId: get_info
+      tags:
+      - Info
+      security: []
+      responses:
+        '200':
+          description: Service information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoResponse'
+  /v1/metrics:
+    get:
+      summary: Get system metrics
+      operationId: get__v1_metrics
+      tags:
+      - Capacity Monitor
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/capacity/forecast:
+    get:
+      summary: Get capacity forecast
+      operationId: get__v1_capacity_forecast
+      tags:
+      - Capacity Monitor
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/alerts:
+    get:
+      summary: List active alerts
+      operationId: get__v1_alerts
+      tags:
+      - Capacity Monitor
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/resources/{resource_id}/usage:
+    get:
+      summary: Get resource usage
+      operationId: get__v1_resources_resource_id_usage
+      tags:
+      - Capacity Monitor
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+      - status
+      - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+          - healthy
+          - degraded
+          - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        components:
+          type: object
+          additionalProperties:
+            type: string
+    InfoResponse:
+      type: object
+      required:
+      - service
+      - version
+      properties:
+        service:
+          type: string
+          example: capacity-monitor
+        version:
+          type: string
+          example: 1.0.0
+        description:
+          type: string
+          example: Resource monitoring and capacity planning
+        build_time:
+          type: string
+          format: date-time
+        commit_sha:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        trace_id:
+          type: string

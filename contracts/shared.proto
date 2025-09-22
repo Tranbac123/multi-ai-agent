@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package platform.shared.v1;
+option go_package = "github.com/company/multi-ai-agent/contracts/gen/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Tenant context information
+message TenantContext {
+  string tenant_id = 1;
+  PlanTier plan_tier = 2;
+  string region = 3;
+  repeated string features = 4;
+}
+
+// Subscription plan tiers
+enum PlanTier {
+  PLAN_TIER_UNSPECIFIED = 0;
+  PLAN_TIER_FREE = 1;
+  PLAN_TIER_PRO = 2;
+  PLAN_TIER_ENTERPRISE = 3;
+}
+
+// Standard error response
+message ErrorResponse {
+  string error = 1;
+  string message = 2;
+  map<string, string> details = 3;
+  string trace_id = 4;
+}
+
+// Pagination request
+message PaginationRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string sort = 3;
+}
+
+// Pagination response
+message PaginationResponse {
+  int32 total = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  int32 pages = 4;
+}
+
+// Audit metadata
+message AuditMetadata {
+  google.protobuf.Timestamp created_at = 1;
+  string created_by = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string updated_by = 4;
+}

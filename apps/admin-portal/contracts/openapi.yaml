@@ -1,0 +1,262 @@
+openapi: 3.0.3
+info:
+  title: Admin Portal Service
+  description: Backend admin interface for tenant management
+  version: 1.0.0
+  contact:
+    name: Platform Team
+    email: platform@company.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+- url: http://localhost:8100
+  description: Development server
+- url: https://api.company.com
+  description: Production server
+security:
+- BearerAuth: []
+paths:
+  /healthz:
+    get:
+      summary: Health check endpoint
+      operationId: health_check
+      tags:
+      - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /v1/info:
+    get:
+      summary: Service information
+      operationId: get_info
+      tags:
+      - Info
+      security: []
+      responses:
+        '200':
+          description: Service information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoResponse'
+  /v1/admin/tenants:
+    get:
+      summary: List all tenants
+      operationId: get__v1_admin_tenants
+      tags:
+      - Admin Portal
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/tenants/{tenant_id}/suspend:
+    post:
+      summary: Suspend tenant
+      operationId: post__v1_admin_tenants_tenant_id_suspend
+      tags:
+      - Admin Portal
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+  /v1/admin/system/status:
+    get:
+      summary: Get system status
+      operationId: get__v1_admin_system_status
+      tags:
+      - Admin Portal
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/reports:
+    get:
+      summary: Get admin reports
+      operationId: get__v1_admin_reports
+      tags:
+      - Admin Portal
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+      - status
+      - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+          - healthy
+          - degraded
+          - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        components:
+          type: object
+          additionalProperties:
+            type: string
+    InfoResponse:
+      type: object
+      required:
+      - service
+      - version
+      properties:
+        service:
+          type: string
+          example: admin-portal
+        version:
+          type: string
+          example: 1.0.0
+        description:
+          type: string
+          example: Backend admin interface for tenant management
+        build_time:
+          type: string
+          format: date-time
+        commit_sha:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        trace_id:
+          type: string

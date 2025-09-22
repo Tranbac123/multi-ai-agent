@@ -1,0 +1,16 @@
+plugins:
+- opt:
+  - paths=source_relative
+  out: ../gen/go
+  plugin: buf.build/protocolbuffers/go
+- opt:
+  - paths=source_relative
+  out: ../gen/go
+  plugin: buf.build/grpc/go
+- out: ../gen/python
+  plugin: buf.build/protocolbuffers/python
+- out: ../gen/python
+  plugin: buf.build/grpc/python
+- out: ../gen/typescript
+  plugin: buf.build/timostamm/protobuf-ts
+version: v1

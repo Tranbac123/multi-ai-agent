@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package router_service.v1;
+option go_package = "github.com/company/multi-ai-agent/router-service/gen/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Intelligent request routing with feature store and bandit policy
+service RouterService {
+  rpc Route(RouteRequest) returns (RouteResponse);\n  rpc GetRouteStats(GetRouteStatsRequest) returns (GetRouteStatsResponse);\n  rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse);\n}\n\nmessage RouteRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message RouteResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GetRouteStatsRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message GetRouteStatsResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message UpdatePolicyRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message UpdatePolicyResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+// Intelligent request routing with feature store and bandit policy
+service FeatureService {
+  rpc ExtractFeatures(ExtractFeaturesRequest) returns (ExtractFeaturesResponse);\n  rpc GetFeatureStore(GetFeatureStoreRequest) returns (GetFeatureStoreResponse);\n}\n\nmessage ExtractFeaturesRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message ExtractFeaturesResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GetFeatureStoreRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message GetFeatureStoreResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+

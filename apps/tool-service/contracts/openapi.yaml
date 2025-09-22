@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Tool-Service Service
+  description: Tool execution and management
+  version: 1.0.0
+  contact:
+    name: Platform Team
+    email: platform@company.com
+
+servers:
+  - url: http://localhost:8010
+    description: Development server
+  - url: https://api.company.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: health_check
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string

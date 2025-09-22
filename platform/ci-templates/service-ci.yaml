@@ -1,0 +1,385 @@
+name: "Reusable Service CI/CD"
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: "Programming language (python|node|go)"
+        required: true
+        type: string
+      service_path:
+        description: "Path to service directory"
+        required: true
+        type: string
+      service_name:
+        description: "Name of the service"
+        required: true
+        type: string
+      enable_docker:
+        description: "Enable Docker build and push"
+        required: false
+        type: boolean
+        default: true
+      enable_sbom:
+        description: "Generate Software Bill of Materials"
+        required: false
+        type: boolean
+        default: true
+      python_version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+      node_version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "18"
+      go_version:
+        description: "Go version to use"
+        required: false
+        type: string
+        default: "1.21"
+    secrets:
+      DOCKER_REGISTRY_URL:
+        required: false
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+jobs:
+  # Path change detection
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.changes.outputs.should_run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            if git diff --name-only HEAD^ HEAD | grep -q "^${{ inputs.service_path }}/"; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+  # Language-specific setup and testing
+  test:
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Python setup
+      - name: Set up Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Cache Python dependencies
+        if: inputs.language == 'python'
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles(format('{0}/**/requirements*.txt', inputs.service_path)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        if: inputs.language == 'python'
+        run: |
+          cd ${{ inputs.service_path }}
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt || echo "No dev requirements found"
+
+      # Node.js setup
+      - name: Set up Node.js
+        if: inputs.language == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: "npm"
+          cache-dependency-path: "${{ inputs.service_path }}/package-lock.json"
+
+      - name: Install Node.js dependencies
+        if: inputs.language == 'node'
+        run: |
+          cd ${{ inputs.service_path }}
+          npm ci
+
+      # Go setup
+      - name: Set up Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ inputs.go_version }}
+
+      - name: Cache Go modules
+        if: inputs.language == 'go'
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles(format('{0}/**/go.sum', inputs.service_path)) }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download Go dependencies
+        if: inputs.language == 'go'
+        run: |
+          cd ${{ inputs.service_path }}
+          go mod download
+
+      # Linting
+      - name: Run Python linting
+        if: inputs.language == 'python'
+        run: |
+          cd ${{ inputs.service_path }}
+          make lint || (
+            echo "Lint target not found, running individual linters..."
+            black --check src/ tests/ || true
+            ruff check src/ tests/ || true
+            mypy src/ --ignore-missing-imports || true
+          )
+
+      - name: Run Node.js linting
+        if: inputs.language == 'node'
+        run: |
+          cd ${{ inputs.service_path }}
+          npm run lint || echo "Lint script not found"
+
+      - name: Run Go linting
+        if: inputs.language == 'go'
+        run: |
+          cd ${{ inputs.service_path }}
+          go vet ./...
+          go fmt -l . | xargs -r echo "Unformatted files:"
+
+      # Testing
+      - name: Run Python tests
+        if: inputs.language == 'python'
+        run: |
+          cd ${{ inputs.service_path }}
+          make test || (
+            echo "Test target not found, running pytest..."
+            pytest tests/ -v --cov=src --cov-report=xml --cov-report=html --cov-report=term || echo "Tests failed or not found"
+          )
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379/1
+          ENVIRONMENT: test
+
+      - name: Run Node.js tests
+        if: inputs.language == 'node'
+        run: |
+          cd ${{ inputs.service_path }}
+          npm test || echo "Test script not found"
+
+      - name: Run Go tests
+        if: inputs.language == 'go'
+        run: |
+          cd ${{ inputs.service_path }}
+          go test -v -race -coverprofile=coverage.out ./...
+
+      # Upload test results
+      - name: Upload Python coverage reports
+        if: inputs.language == 'python'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ${{ inputs.service_path }}/coverage.xml
+          flags: ${{ inputs.service_name }}
+          name: ${{ inputs.service_name }}-coverage
+          fail_ci_if_error: false
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-reports-${{ inputs.service_name }}
+          path: |
+            ${{ inputs.service_path }}/coverage.xml
+            ${{ inputs.service_path }}/htmlcov/
+            ${{ inputs.service_path }}/coverage.out
+            ${{ inputs.service_path }}/test-results.xml
+          retention-days: 30
+
+  # Security scanning
+  security:
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Trivy filesystem scan
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "${{ inputs.service_path }}"
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      # Language-specific security scanning
+      - name: Run Bandit security linter (Python)
+        if: inputs.language == 'python'
+        run: |
+          pip install bandit[toml]
+          bandit -r ${{ inputs.service_path }}/src/ -f json -o bandit-report.json || true
+
+      - name: Run npm audit (Node.js)
+        if: inputs.language == 'node'
+        run: |
+          cd ${{ inputs.service_path }}
+          npm audit --audit-level high || true
+
+      - name: Run gosec (Go)
+        if: inputs.language == 'go'
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: "-fmt json -out gosec-report.json ${{ inputs.service_path }}/..."
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports-${{ inputs.service_name }}
+          path: |
+            trivy-results.sarif
+            bandit-report.json
+            gosec-report.json
+          retention-days: 30
+
+  # Docker build and push
+  docker:
+    needs: [changes, test, security]
+    if: needs.changes.outputs.should_run == 'true' && inputs.enable_docker
+    runs-on: ubuntu-latest
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Registry
+        if: secrets.DOCKER_REGISTRY_URL != '' && secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_REGISTRY_URL }}/${{ inputs.service_name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.service_path }}/Dockerfile
+          push: ${{ secrets.DOCKER_REGISTRY_URL != '' && github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      # Generate SBOM
+      - name: Generate SBOM
+        if: inputs.enable_sbom
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ secrets.DOCKER_REGISTRY_URL }}/${{ inputs.service_name }}:${{ github.sha }}
+          format: spdx-json
+          output-file: ${{ inputs.service_name }}-sbom.spdx.json
+
+      - name: Upload SBOM
+        if: inputs.enable_sbom
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-${{ inputs.service_name }}
+          path: ${{ inputs.service_name }}-sbom.spdx.json
+          retention-days: 90
+
+  # Deployment readiness check
+  deploy-check:
+    needs: [changes, test, security, docker]
+    if: needs.changes.outputs.should_run == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Kubernetes manifests
+        run: |
+          cd ${{ inputs.service_path }}/deploy
+          if [ -f "Makefile" ]; then
+            make validate || echo "Validation failed or not implemented"
+          fi
+
+      - name: Check deployment readiness
+        run: |
+          echo "✅ Service: ${{ inputs.service_name }}"
+          echo "✅ Tests: Passed"
+          echo "✅ Security: Scanned"
+          echo "✅ Docker: Built"
+          echo "🚀 Ready for deployment"

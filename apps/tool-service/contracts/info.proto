@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package tool_service.info.v1;
+option go_package = "github.com/company/multi-ai-agent/tool-service/gen/info/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Service information
+service InfoService {
+  // Get service information
+  rpc GetInfo(InfoRequest) returns (InfoResponse);
+}
+
+message InfoRequest {
+  // Empty request
+}
+
+message InfoResponse {
+  string service_name = 1;
+  string version = 2;
+  string description = 3;
+  google.protobuf.Timestamp build_time = 4;
+  string commit_sha = 5;
+  map<string, string> metadata = 6;
+}

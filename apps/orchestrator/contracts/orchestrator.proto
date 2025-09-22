@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package orchestrator.v1;
+option go_package = "github.com/company/multi-ai-agent/orchestrator/gen/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// LangGraph workflow execution with resilient tool adapters
+service WorkflowService {
+  rpc ExecuteWorkflow(ExecuteWorkflowRequest) returns (ExecuteWorkflowResponse);\n  rpc GetWorkflowStatus(GetWorkflowStatusRequest) returns (GetWorkflowStatusResponse);\n  rpc CancelWorkflow(CancelWorkflowRequest) returns (CancelWorkflowResponse);\n}\n\nmessage ExecuteWorkflowRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message ExecuteWorkflowResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GetWorkflowStatusRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message GetWorkflowStatusResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message CancelWorkflowRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message CancelWorkflowResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+// LangGraph workflow execution with resilient tool adapters
+service ToolService {
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);\n  rpc ExecuteTool(ExecuteToolRequest) returns (ExecuteToolResponse);\n  rpc GetToolStatus(GetToolStatusRequest) returns (GetToolStatusResponse);\n}\n\nmessage ListToolsRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message ListToolsResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message ExecuteToolRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message ExecuteToolResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GetToolStatusRequest {
+  // TODO: Define request fields
+  string request_id = 1;
+}
+
+message GetToolStatusResponse {
+  // TODO: Define response fields
+  string response_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+

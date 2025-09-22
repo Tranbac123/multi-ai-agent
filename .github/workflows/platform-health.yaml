@@ -1,0 +1,149 @@
+name: "Platform Health Check"
+
+on:
+  schedule:
+    # Run every hour
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: "Platform Health Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check service dependencies
+        run: |
+          echo "## Platform Health Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Service Dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check if all services have required files
+          SERVICES="api-gateway analytics-service orchestrator router-service realtime ingestion billing-service tenant-service chat-adapters tool-service eval-service capacity-monitor admin-portal web-frontend"
+
+          HEALTHY_SERVICES=0
+          TOTAL_SERVICES=0
+
+          for service in $SERVICES; do
+            TOTAL_SERVICES=$((TOTAL_SERVICES + 1))
+            echo "Checking $service..."
+            
+            ISSUES=0
+            ISSUE_LIST=""
+            
+            # Check required files
+            if [ ! -f "apps/$service/Dockerfile" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing Dockerfile;"
+            fi
+            
+            if [ ! -f "apps/$service/Makefile" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing Makefile;"
+            fi
+            
+            if [ ! -f "apps/$service/README.md" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing README;"
+            fi
+            
+            if [ ! -d "apps/$service/tests" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing tests directory;"
+            fi
+            
+            if [ ! -d "apps/$service/deploy" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing deploy directory;"
+            fi
+            
+            if [ ! -d "apps/$service/observability" ]; then
+              ISSUES=$((ISSUES + 1))
+              ISSUE_LIST="$ISSUE_LIST Missing observability directory;"
+            fi
+            
+            if [ $ISSUES -eq 0 ]; then
+              echo "- ✅ **$service** - All required files present" >> $GITHUB_STEP_SUMMARY
+              HEALTHY_SERVICES=$((HEALTHY_SERVICES + 1))
+            else
+              echo "- ❌ **$service** - Issues: $ISSUE_LIST" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Health Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Healthy Services**: $HEALTHY_SERVICES/$TOTAL_SERVICES" >> $GITHUB_STEP_SUMMARY
+
+          HEALTH_PERCENTAGE=$((HEALTHY_SERVICES * 100 / TOTAL_SERVICES))
+          echo "- **Health Percentage**: $HEALTH_PERCENTAGE%" >> $GITHUB_STEP_SUMMARY
+
+          if [ $HEALTH_PERCENTAGE -eq 100 ]; then
+            echo "- **Status**: 🟢 All services healthy" >> $GITHUB_STEP_SUMMARY
+          elif [ $HEALTH_PERCENTAGE -ge 80 ]; then
+            echo "- **Status**: 🟡 Most services healthy" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: 🔴 Multiple services need attention" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  validate-workflows:
+    name: "Validate Workflows"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate workflow syntax
+        run: |
+          echo "## Workflow Validation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          WORKFLOW_COUNT=0
+          VALID_WORKFLOWS=0
+
+          # Check platform workflows
+          for workflow in .github/workflows/*.yaml .github/workflows/*.yml; do
+            if [ -f "$workflow" ]; then
+              WORKFLOW_COUNT=$((WORKFLOW_COUNT + 1))
+              echo "Validating $workflow..."
+              
+              # Basic YAML syntax check
+              if python3 -c "import yaml; yaml.safe_load(open('$workflow'))" 2>/dev/null; then
+                echo "- ✅ $workflow" >> $GITHUB_STEP_SUMMARY
+                VALID_WORKFLOWS=$((VALID_WORKFLOWS + 1))
+              else
+                echo "- ❌ $workflow - Invalid YAML syntax" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+          # Check service workflows
+          for service_workflow in apps/*/.github/workflows/*.yaml apps/*/.github/workflows/*.yml; do
+            if [ -f "$service_workflow" ]; then
+              WORKFLOW_COUNT=$((WORKFLOW_COUNT + 1))
+              echo "Validating $service_workflow..."
+              
+              if python3 -c "import yaml; yaml.safe_load(open('$service_workflow'))" 2>/dev/null; then
+                echo "- ✅ $service_workflow" >> $GITHUB_STEP_SUMMARY
+                VALID_WORKFLOWS=$((VALID_WORKFLOWS + 1))
+              else
+                echo "- ❌ $service_workflow - Invalid YAML syntax" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Workflows**: $WORKFLOW_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Valid Workflows**: $VALID_WORKFLOWS" >> $GITHUB_STEP_SUMMARY
+
+          if [ $VALID_WORKFLOWS -eq $WORKFLOW_COUNT ]; then
+            echo "- **Status**: ✅ All workflows valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ❌ Some workflows have syntax errors" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

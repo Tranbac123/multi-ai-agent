@@ -1,0 +1,148 @@
+name: "Changed Services Detection"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: "Detect Changed Services"
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.changes.outputs.services }}
+      matrix: ${{ steps.changes.outputs.matrix }}
+      has_changes: ${{ steps.changes.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" == "push" ]; then
+            if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }}..${{ github.event.after }})
+            else
+              # First push to branch
+              CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD)
+            fi
+          else
+            # Pull request
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Define all services
+          ALL_SERVICES="api-gateway analytics-service orchestrator router-service realtime ingestion billing-service tenant-service chat-adapters tool-service eval-service capacity-monitor admin-portal web-frontend"
+
+          # Detect changed services
+          CHANGED_SERVICES=""
+          MATRIX_SERVICES="[]"
+
+          for service in $ALL_SERVICES; do
+            if echo "$CHANGED_FILES" | grep -q "^apps/$service/"; then
+              if [ -z "$CHANGED_SERVICES" ]; then
+                CHANGED_SERVICES="$service"
+                MATRIX_SERVICES="[\"$service\"]"
+              else
+                CHANGED_SERVICES="$CHANGED_SERVICES,$service"
+                MATRIX_SERVICES=$(echo "$MATRIX_SERVICES" | sed "s/]$/,\"$service\"]/")
+              fi
+              echo "Detected changes in service: $service"
+            fi
+          done
+
+          # Check for global changes that affect all services
+          GLOBAL_CHANGES=$(echo "$CHANGED_FILES" | grep -E "^(libs/|contracts/|platform/|\.github/workflows/)" || true)
+          if [ -n "$GLOBAL_CHANGES" ]; then
+            echo "Detected global changes affecting all services:"
+            echo "$GLOBAL_CHANGES"
+            CHANGED_SERVICES="$ALL_SERVICES"
+            MATRIX_SERVICES="[$(echo "$ALL_SERVICES" | sed 's/ /","/g' | sed 's/^/"/; s/$/"/')]"
+          fi
+
+          # Set outputs
+          if [ -n "$CHANGED_SERVICES" ]; then
+            echo "services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+            echo "matrix=$MATRIX_SERVICES" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changed services: $CHANGED_SERVICES"
+          else
+            echo "services=" >> $GITHUB_OUTPUT
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No service changes detected"
+          fi
+
+  # Trigger service-specific workflows
+  trigger-service-ci:
+    name: "Trigger Service CI"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger ${{ matrix.service }} CI
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const service = '${{ matrix.service }}';
+            console.log(`Triggering CI for service: ${service}`);
+
+            // The individual service CI workflows will run automatically
+            // due to their path filters, so we just log the trigger
+            console.log(`✅ Service ${service} CI will be triggered by path filters`);
+
+  # Summary of triggered services
+  summary:
+    name: "CI Summary"
+    needs: [detect-changes, trigger-service-ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display summary
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.detect-changes.outputs.has_changes }}" == "true" ]; then
+            echo "### 🚀 Services with Changes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            SERVICES="${{ needs.detect-changes.outputs.services }}"
+            IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+            for service in "${SERVICE_ARRAY[@]}"; do
+              echo "- **$service** - CI pipeline triggered" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📊 Pipeline Status" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ needs.trigger-service-ci.result }}" == "success" ]; then
+              echo "✅ All service CI pipelines triggered successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Some service CI pipelines failed to trigger" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### ℹ️ No Changes Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No service changes detected in this commit. No CI pipelines triggered." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- [Service Catalog](docs/SERVICES_CATALOG.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Microservices Architecture](docs/MICROSERVICES_ARCHITECTURE.md)" >> $GITHUB_STEP_SUMMARY
