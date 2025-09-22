@@ -1,38 +1,38 @@
-name: 'Frontend CI Template'
+name: "Frontend CI Template"
 
 on:
   workflow_call:
     inputs:
       frontend_type:
-        description: 'Frontend type: spa, bff'
+        description: "Frontend type: spa, bff"
         required: true
         type: string
       service_path:
-        description: 'Path to the frontend service'
+        description: "Path to the frontend service"
         required: true
         type: string
       node_version:
-        description: 'Node.js version to use'
+        description: "Node.js version to use"
         required: false
         type: string
-        default: '18'
+        default: "18"
       deploy_target:
-        description: 'Deployment target: cdn, vercel, s3-cloudfront'
+        description: "Deployment target: cdn, vercel, s3-cloudfront"
         required: false
         type: string
-        default: 'cdn'
+        default: "cdn"
     secrets:
       VERCEL_TOKEN:
-        description: 'Vercel deployment token'
+        description: "Vercel deployment token"
         required: false
       AWS_ACCESS_KEY_ID:
-        description: 'AWS access key for S3/CloudFront deployment'
+        description: "AWS access key for S3/CloudFront deployment"
         required: false
       AWS_SECRET_ACCESS_KEY:
-        description: 'AWS secret key for S3/CloudFront deployment'
+        description: "AWS secret key for S3/CloudFront deployment"
         required: false
       CDN_DEPLOY_URL:
-        description: 'CDN deployment webhook URL'
+        description: "CDN deployment webhook URL"
         required: false
 
 env:
@@ -42,11 +42,11 @@ env:
 jobs:
   frontend-pipeline:
     runs-on: ubuntu-latest
-    
+
     outputs:
       build-artifact: ${{ steps.upload.outputs.artifact-url }}
       deployment-url: ${{ steps.deploy.outputs.url }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
 
       - name: Cache dependencies

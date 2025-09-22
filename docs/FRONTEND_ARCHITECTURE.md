@@ -6,10 +6,10 @@ The Multi-AI-Agent platform employs a modern frontend architecture with two dist
 
 ### **📱 Frontend Applications**
 
-| Application | Type | Technology Stack | Purpose | Users |
-|-------------|------|------------------|---------|--------|
-| **Web Frontend** | SPA | React 18 + TypeScript + Vite | Main user interface | End users, customers |
-| **Admin Portal** | BFF | FastAPI + Jinja2 + HTML | Administrative interface | System admins, tenant managers |
+| Application      | Type | Technology Stack             | Purpose                  | Users                          |
+| ---------------- | ---- | ---------------------------- | ------------------------ | ------------------------------ |
+| **Web Frontend** | SPA  | React 18 + TypeScript + Vite | Main user interface      | End users, customers           |
+| **Admin Portal** | BFF  | FastAPI + Jinja2 + HTML      | Administrative interface | System admins, tenant managers |
 
 ## 🔄 **BFF (Backend for Frontend) Pattern**
 
@@ -27,6 +27,7 @@ The Admin Portal follows the BFF pattern, combining backend logic with frontend 
 ```
 
 **Why BFF for Admin Portal:**
+
 - **Server-Side Rendering**: Better SEO for admin documentation
 - **Security**: Sensitive operations stay on the server
 - **Performance**: Direct service-to-service communication
@@ -47,6 +48,7 @@ The Web Frontend is a pure Single Page Application:
 ```
 
 **Why SPA for Web Frontend:**
+
 - **User Experience**: Rich, interactive UI
 - **Performance**: Client-side routing and caching
 - **Real-time**: WebSocket integration for live updates
@@ -56,6 +58,7 @@ The Web Frontend is a pure Single Page Application:
 ## 🚀 **Deployment Architecture**
 
 ### **Web Frontend Deployment**
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │      Vercel     │    │   S3 + CF       │    │   Custom CDN    │
@@ -69,11 +72,13 @@ The Web Frontend is a pure Single Page Application:
 ```
 
 **Deployment Options:**
+
 1. **Vercel** (Default): Zero-config deployment with edge functions
 2. **S3 + CloudFront**: AWS-native with full control
 3. **Custom CDN**: Enterprise CDN with custom configurations
 
 ### **Admin Portal Deployment**
+
 ```
 ┌─────────────────┐    ┌─────────────────┐
 │   Kubernetes    │    │   Load Balancer │
@@ -84,6 +89,7 @@ The Web Frontend is a pure Single Page Application:
 ```
 
 **Deployment Details:**
+
 - **Kubernetes**: Same as backend services
 - **Internal Access**: Admin portal not exposed publicly
 - **TLS Termination**: Internal load balancer
@@ -92,6 +98,7 @@ The Web Frontend is a pure Single Page Application:
 ## 📊 **CI/CD Pipelines**
 
 ### **Web Frontend Pipeline**
+
 ```yaml
 # apps/web-frontend/.github/workflows/ci.yaml
 Trigger: Changes to apps/web-frontend/**
@@ -105,6 +112,7 @@ Trigger: Changes to apps/web-frontend/**
 ```
 
 ### **Admin Portal Pipeline**
+
 ```yaml
 # apps/admin-portal/.github/workflows/ci.yaml
 Trigger: Changes to apps/admin-portal/**
@@ -124,18 +132,20 @@ Trigger: Changes to apps/admin-portal/**
 ### **Frontend → Backend Communication**
 
 **Web Frontend:**
+
 ```typescript
 // Direct API calls through API Gateway
 const apiClient = axios.create({
-  baseURL: 'https://api.company.com',
-  headers: { 'Authorization': `Bearer ${token}` }
+  baseURL: "https://api.company.com",
+  headers: { Authorization: `Bearer ${token}` },
 });
 
 // WebSocket for real-time updates
-const ws = new WebSocket('wss://realtime.company.com');
+const ws = new WebSocket("wss://realtime.company.com");
 ```
 
 **Admin Portal:**
+
 ```python
 # Server-to-server communication
 async def get_tenant_analytics(tenant_id: str):
@@ -149,13 +159,14 @@ async def get_tenant_analytics(tenant_id: str):
 
 ### **BFF Consumption Matrix**
 
-| BFF Service | Consumed Backend Services | Purpose |
-|-------------|---------------------------|---------|
+| BFF Service      | Consumed Backend Services                                                    | Purpose                                                 |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
 | **Admin Portal** | `tenant-service`, `billing-service`, `analytics-service`, `capacity-monitor` | Tenant management, billing oversight, system monitoring |
 
 ## 📱 **Migration Strategy**
 
 ### **Phase 1: Current State**
+
 - Web Frontend: Monorepo (`apps/web-frontend/`)
 - Admin Portal: Monorepo (`apps/admin-portal/`)
 
@@ -164,6 +175,7 @@ async def get_tenant_analytics(tenant_id: str):
 **Recommended Timeline:** Q2 2024
 
 **Web Frontend Extraction:**
+
 ```bash
 # New repository: company/web-frontend
 ├── src/                 # From apps/web-frontend/src/
@@ -175,6 +187,7 @@ async def get_tenant_analytics(tenant_id: str):
 ```
 
 **Admin Portal Extraction:**
+
 ```bash
 # New repository: company/admin-portal
 ├── src/                 # From apps/admin-portal/src/
@@ -186,6 +199,7 @@ async def get_tenant_analytics(tenant_id: str):
 ```
 
 **Migration Benefits:**
+
 - **Independent Development**: Frontend teams can work autonomously
 - **Separate Release Cycles**: Frontend releases independent of backend
 - **Technology Evolution**: Easier to upgrade frontend frameworks
@@ -193,6 +207,7 @@ async def get_tenant_analytics(tenant_id: str):
 - **Reduced Repository Size**: Faster clones and builds
 
 **Migration Considerations:**
+
 - **Shared Dependencies**: Move shared types to npm packages
 - **API Contracts**: Ensure stable API versioning
 - **CI/CD Coordination**: Coordinate deployments with backend changes
@@ -203,6 +218,7 @@ async def get_tenant_analytics(tenant_id: str):
 ### **Local Development**
 
 **Web Frontend:**
+
 ```bash
 # In apps/web-frontend/
 npm install
@@ -213,6 +229,7 @@ npm run lint         # ESLint + TypeScript
 ```
 
 **Admin Portal:**
+
 ```bash
 # In apps/admin-portal/
 make dev            # Start development server (port 8012)
@@ -222,6 +239,7 @@ make docker-build   # Build Docker image
 ```
 
 ### **Full-Stack Development**
+
 ```bash
 # Root level - start all services
 make dev            # All backend services + frontend
@@ -235,6 +253,7 @@ make build          # All Docker images
 ## 📈 **Performance & Monitoring**
 
 ### **Web Frontend Metrics**
+
 - **Core Web Vitals**: LCP, FID, CLS
 - **Bundle Size**: Track JS/CSS bundle sizes
 - **Load Performance**: First Paint, TTI
@@ -242,13 +261,16 @@ make build          # All Docker images
 - **User Analytics**: Page views, user flows
 
 ### **Admin Portal Metrics**
+
 - **Server Response**: API response times
 - **Template Rendering**: Server-side rendering performance
 - **Resource Usage**: CPU, memory for admin operations
 - **Admin Operations**: CRUD operation success rates
 
 ### **Monitoring Integration**
+
 Both frontends integrate with the platform observability:
+
 - **Grafana Dashboards**: Frontend-specific panels
 - **Alert Rules**: Error rate, performance degradation
 - **SLO Tracking**: Availability and performance targets
@@ -257,17 +279,20 @@ Both frontends integrate with the platform observability:
 ## 🎯 **Next Steps**
 
 ### **Immediate (Current Sprint)**
+
 1. ✅ **Frontend CI Pipelines**: Dedicated CI for both apps
 2. ✅ **BFF Documentation**: Clear BFF pattern documentation
 3. ✅ **Deployment Placeholders**: Vercel, S3+CF, CDN templates
 
 ### **Short-term (Next 2 Sprints)**
+
 1. **Frontend Testing**: Add comprehensive test suites
 2. **Performance Monitoring**: Implement frontend observability
 3. **PWA Capabilities**: Add service worker for Web Frontend
 4. **Admin UX**: Improve admin portal user experience
 
 ### **Long-term (6+ Months)**
+
 1. **Repository Extraction**: Move to separate repositories
 2. **Micro-frontends**: Consider micro-frontend architecture
 3. **Edge Computing**: Leverage edge functions for performance

@@ -1,16 +1,16 @@
-name: 'Admin Portal CI'
+name: "Admin Portal CI"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'apps/admin-portal/**'
-      - 'platform/ci-templates/service-ci.yaml'
+      - "apps/admin-portal/**"
+      - "platform/ci-templates/service-ci.yaml"
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'apps/admin-portal/**'
-      - 'platform/ci-templates/service-ci.yaml'
+      - "apps/admin-portal/**"
+      - "platform/ci-templates/service-ci.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,16 +19,16 @@ concurrency:
 jobs:
   # Admin Portal is a BFF (Backend for Frontend) - Python FastAPI with templates
   backend-ci:
-    name: 'Admin Portal BFF CI/CD'
+    name: "Admin Portal BFF CI/CD"
     uses: ./.github/workflows/../../../platform/ci-templates/service-ci.yaml
     with:
-      language: 'python'
-      service_path: 'apps/admin-portal'
+      language: "python"
+      service_path: "apps/admin-portal"
     secrets: inherit
 
   # Also treat it as a frontend for template/static assets
   frontend-assets:
-    name: 'Admin Portal Frontend Assets'
+    name: "Admin Portal Frontend Assets"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -37,7 +37,7 @@ jobs:
       - name: Setup Node.js (for asset processing)
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Process static assets
         working-directory: apps/admin-portal
