@@ -1,6 +1,6 @@
 """Performance management and testing components."""
 
-from .baseline_manager import (
+from src.baseline_manager import (
     PerformanceBaselineManager,
     PerformanceBaseline,
     BaselineType,
@@ -10,7 +10,7 @@ from .baseline_manager import (
     PerformanceAlert
 )
 
-from .cost_ceiling_manager import (
+from src.cost_ceiling_manager import (
     CostCeilingManager,
     CostCeiling,
     CeilingType,
@@ -21,7 +21,7 @@ from .cost_ceiling_manager import (
     CostOptimizationRecommendation
 )
 
-from .locust_profiles import (
+from src.locust_profiles import (
     TestScenario,
     PerformanceGate,
     GateThreshold,

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 import re
 
-from .golden_tasks import GoldenTask, TaskExecution, EvaluationResult
+from src.golden_tasks import GoldenTask, TaskExecution, EvaluationResult
 
 logger = structlog.get_logger(__name__)
 

@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 
-from .adapters.facebook_adapter import FacebookMessengerAdapter
-from .adapters.zalo_adapter import ZaloChatAdapter
-from .adapters.tiktok_adapter import TikTokChatAdapter
-from .core.unified_message import UnifiedMessage, UnifiedResponse
+from src.adapters.facebook_adapter import FacebookMessengerAdapter
+from src.adapters.zalo_adapter import ZaloChatAdapter
+from src.adapters.tiktok_adapter import TikTokChatAdapter
+from src.core.unified_message import UnifiedMessage, UnifiedResponse
 
 # Configure structured logging
 structlog.configure(

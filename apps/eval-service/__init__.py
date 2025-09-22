@@ -1,6 +1,6 @@
 """Evaluation and replay service."""
 
-from .core.golden_tasks import (
+from src.core.golden_tasks import (
     GoldenTaskManager,
     GoldenTask,
     TaskCategory,
@@ -10,7 +10,7 @@ from .core.golden_tasks import (
     EvaluationResult
 )
 
-from .core.llm_judge import (
+from src.core.llm_judge import (
     LLMJudge,
     LLMJudgeConfig,
     EvaluationCriteria,
@@ -20,7 +20,7 @@ from .core.llm_judge import (
     EvaluationEngine
 )
 
-from .core.episode_replay import (
+from src.core.episode_replay import (
     EpisodeReplayManager,
     Episode,
     EpisodeState,

@@ -1,0 +1,52 @@
+name: "Tool Service CI/CD"
+
+on:
+  push:
+    paths:
+      - "apps/tool-service/**"
+      - "libs/**"
+      - "contracts/**"
+      - "platform/ci-templates/**"
+      - ".github/workflows/tool-service-*.yaml"
+  pull_request:
+    paths:
+      - "apps/tool-service/**"
+      - "libs/**"
+      - "contracts/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: "Build and Test Tool Service"
+    uses: ./platform/ci-templates/service-ci.yaml
+    with:
+      language: "python"
+      service_path: "apps/tool-service"
+      service_name: "tool-service"
+      enable_docker: true
+      enable_sbom: true
+    secrets:
+      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # Optional: Service-specific deployment to dev environment
+  deploy-dev:
+    name: "Deploy to Development"
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to development
+        run: |
+          echo "Deploying tool-service to development environment"
+          # Add your deployment logic here
+          # cd apps/tool-service/deploy
+          # make deploy ENV=dev IMAGE_TAG=${{ github.sha }}

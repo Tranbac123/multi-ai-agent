@@ -7,10 +7,10 @@ from typing import Dict, Any, List, Optional, Callable
 from uuid import UUID
 import structlog
 
-from .event_bus import event_bus, publish_event
-from .event_types import EventType, EVENT_MODELS
-from .event_handlers import create_event_handler
-from .dlq_processor import process_dlq_message
+from src.event_bus import event_bus, publish_event
+from src.event_types import EventType, EVENT_MODELS
+from src.event_handlers import create_event_handler
+from src.dlq_processor import process_dlq_message
 
 logger = structlog.get_logger(__name__)
 
@@ -137,7 +137,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish agent run event."""
-        from .event_types import create_agent_run_event
+        from src.event_types import create_agent_run_event
 
         event = create_agent_run_event(
             run_id=run_id,
@@ -186,7 +186,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish tool call event."""
-        from .event_types import create_tool_call_event
+        from src.event_types import create_tool_call_event
 
         event = create_tool_call_event(
             call_id=call_id,
@@ -232,7 +232,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish document ingestion event."""
-        from .event_types import create_ingest_doc_event
+        from src.event_types import create_ingest_doc_event
 
         event = create_ingest_doc_event(
             doc_id=doc_id,
@@ -277,7 +277,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish usage metering event."""
-        from .event_types import create_usage_metered_event
+        from src.event_types import create_usage_metered_event
 
         event = create_usage_metered_event(
             usage_id=usage_id,
@@ -311,7 +311,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish router decision event."""
-        from .event_types import create_router_decision_event
+        from src.event_types import create_router_decision_event
 
         event = create_router_decision_event(
             decision_id=decision_id,
@@ -343,7 +343,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish WebSocket message event."""
-        from .event_types import create_websocket_message_event
+        from src.event_types import create_websocket_message_event
 
         event = create_websocket_message_event(
             message_id=message_id,
@@ -373,7 +373,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish billing event."""
-        from .event_types import create_billing_event
+        from src.event_types import create_billing_event
 
         event = create_billing_event(
             billing_id=billing_id,
@@ -407,7 +407,7 @@ class EventService:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Publish audit log event."""
-        from .event_types import create_audit_log_event
+        from src.event_types import create_audit_log_event
 
         event = create_audit_log_event(
             log_id=log_id,

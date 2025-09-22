@@ -1,0 +1,52 @@
+name: "Analytics Service CI/CD"
+
+on:
+  push:
+    paths:
+      - "apps/analytics-service/**"
+      - "libs/**"
+      - "contracts/**"
+      - "platform/ci-templates/**"
+      - ".github/workflows/analytics-service-*.yaml"
+  pull_request:
+    paths:
+      - "apps/analytics-service/**"
+      - "libs/**"
+      - "contracts/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: "Build and Test Analytics Service"
+    uses: ./platform/ci-templates/service-ci.yaml
+    with:
+      language: "python"
+      service_path: "apps/analytics-service"
+      service_name: "analytics-service"
+      enable_docker: true
+      enable_sbom: true
+    secrets:
+      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # Optional: Service-specific deployment to dev environment
+  deploy-dev:
+    name: "Deploy to Development"
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to development
+        run: |
+          echo "Deploying analytics-service to development environment"
+          # Add your deployment logic here
+          # cd apps/analytics-service/deploy
+          # make deploy ENV=dev IMAGE_TAG=${{ github.sha }}

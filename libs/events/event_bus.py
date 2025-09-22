@@ -8,7 +8,7 @@ from uuid import UUID
 import structlog
 from pydantic import BaseModel
 
-from .nats_client import NATSClient
+from src.nats_client import NATSClient
 
 logger = structlog.get_logger(__name__)
 

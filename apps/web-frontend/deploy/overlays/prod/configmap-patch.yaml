@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-frontend-config
+data:
+  ENVIRONMENT: "prod"
+  DEBUG: "false"

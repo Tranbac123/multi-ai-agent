@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import structlog
 
-from .event_types import Event, EventType, EventMetadata
+from src.event_types import Event, EventType, EventMetadata
 
 logger = structlog.get_logger(__name__)
 

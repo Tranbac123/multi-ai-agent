@@ -11,12 +11,12 @@ from typing import Dict, List, Optional, Any, Callable, Awaitable
 import structlog
 from opentelemetry import trace
 
-from .loop_safety import (
+from src.loop_safety import (
     LoopSafetyManager, LoopBudget, LoopStatus, 
     ProgressMetrics, get_safety_manager, get_degradation_manager
 )
-from .workflow_engine import WorkflowEngine
-from .tool_registry import ToolRegistry
+from src.workflow_engine import WorkflowEngine
+from src.tool_registry import ToolRegistry
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

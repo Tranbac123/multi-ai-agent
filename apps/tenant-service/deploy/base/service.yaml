@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenant-service
+  labels:
+    app: tenant-service
+spec:
+  selector:
+    app: tenant-service
+  ports:
+  - name: http
+    port: 8008
+    targetPort: 8008
+    protocol: TCP
+  type: ClusterIP

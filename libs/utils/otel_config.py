@@ -7,7 +7,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
-from .logging_config import get_logger
+from src.logging_config import get_logger
 
 logger = get_logger(__name__)
 

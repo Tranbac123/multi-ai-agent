@@ -1,0 +1,32 @@
+groups:
+  - name: web-frontend_alerts
+    rules:
+      - alert: Web_FrontendHighErrorRate
+        expr: rate(http_requests_total{service="web-frontend",status=~"5.."}[5m]) / rate(http_requests_total{service="web-frontend"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: web-frontend
+        annotations:
+          summary: "High error rate on web-frontend"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Web_FrontendHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="web-frontend"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: web-frontend
+        annotations:
+          summary: "High latency on web-frontend"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Web_FrontendServiceDown
+        expr: up{service="web-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: web-frontend
+        annotations:
+          summary: "web-frontend service is down"
+          description: "Service has been down for more than 2 minutes"

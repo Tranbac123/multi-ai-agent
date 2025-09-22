@@ -21,10 +21,10 @@ from libs.contracts.billing import (
     BillingEvent,
     MeteredUsage,
 )
-from .core.billing_engine import BillingEngine
-from .core.usage_tracker import UsageTracker
-from .core.payment_processor import PaymentProcessor
-from .core.webhook_aggregator import WebhookAggregator
+from src.core.billing_engine import BillingEngine
+from src.core.usage_tracker import UsageTracker
+from src.core.payment_processor import PaymentProcessor
+from src.core.webhook_aggregator import WebhookAggregator
 
 # Configure structured logging
 structlog.configure(
@@ -154,7 +154,7 @@ async def get_usage(
 async def meter_usage(usage: MeteredUsage):
     """Record metered usage."""
     try:
-        from .core.usage_tracker import UsageType
+        from src.core.usage_tracker import UsageType
 
         # Convert usage type
         usage_type_map = {
@@ -254,7 +254,7 @@ async def preview_invoice(tenant_id: UUID, start_date: datetime, end_date: datet
 async def create_payment_method(payment_method: PaymentMethod, tenant_id: UUID):
     """Create payment method for tenant."""
     try:
-        from .core.payment_processor import PaymentMethodType
+        from src.core.payment_processor import PaymentMethodType
 
         method_type_map = {
             "credit_card": PaymentMethodType.CREDIT_CARD,

@@ -7,8 +7,8 @@ from typing import Dict, Any, List, Optional
 from uuid import UUID
 import structlog
 
-from .event_types import EventType
-from .event_handlers import create_event_handler
+from src.event_types import EventType
+from src.event_handlers import create_event_handler
 
 logger = structlog.get_logger(__name__)
 
@@ -203,7 +203,7 @@ class DLQProcessor:
             }
 
             # Publish alert event
-            from .event_bus import publish_event
+            from src.event_bus import publish_event
 
             await publish_event(
                 event_type="alert",

@@ -6,12 +6,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import structlog
 
-from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-from .retry_policy import RetryPolicy, RetryConfig
-from .timeout_handler import TimeoutHandler, TimeoutConfig
-from .bulkhead import Bulkhead, BulkheadConfig
-from .rate_limiter import RateLimiter, RateLimitConfig
-from .health_checker import HealthChecker, HealthCheckConfig
+from src.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from src.retry_policy import RetryPolicy, RetryConfig
+from src.timeout_handler import TimeoutHandler, TimeoutConfig
+from src.bulkhead import Bulkhead, BulkheadConfig
+from src.rate_limiter import RateLimiter, RateLimitConfig
+from src.health_checker import HealthChecker, HealthCheckConfig
 
 logger = structlog.get_logger(__name__)
 

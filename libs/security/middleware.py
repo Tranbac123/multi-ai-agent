@@ -7,9 +7,9 @@ from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 
-from .auth import get_current_user
-from .validation import validate_tenant_id
-from .threat_detection import ThreatDetector
+from src.auth import get_current_user
+from src.validation import validate_tenant_id
+from src.threat_detection import ThreatDetector
 
 logger = structlog.get_logger(__name__)
 

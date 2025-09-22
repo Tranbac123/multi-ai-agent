@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import text
 
-from apps.billing-service.core.budget_manager import BudgetManager, BudgetPeriod
+from apps.billing-service.src.core.budget_manager import BudgetManager, BudgetPeriod
 from apps.router-service.core.cost_drift_detector import CostDriftDetector
 from apps.router-service.core.safe_mode_router import SafeModeRouter, SafeModeLevel
 from libs.clients.notification import NotificationClient

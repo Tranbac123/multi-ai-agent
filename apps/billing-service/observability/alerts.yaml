@@ -1,0 +1,32 @@
+groups:
+  - name: billing-service_alerts
+    rules:
+      - alert: Billing_ServiceHighErrorRate
+        expr: rate(http_requests_total{service="billing-service",status=~"5.."}[5m]) / rate(http_requests_total{service="billing-service"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: billing-service
+        annotations:
+          summary: "High error rate on billing-service"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Billing_ServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="billing-service"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: billing-service
+        annotations:
+          summary: "High latency on billing-service"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Billing_ServiceServiceDown
+        expr: up{service="billing-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: billing-service
+        annotations:
+          summary: "billing-service service is down"
+          description: "Service has been down for more than 2 minutes"

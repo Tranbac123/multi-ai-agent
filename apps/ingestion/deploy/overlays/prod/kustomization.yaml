@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ingestion-prod
+
+namespace: multi-ai-agent-prod
+
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - configmap-patch.yaml
+
+configMapGenerator:
+  - name: ingestion-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=prod
+      - LOG_LEVEL=INFO

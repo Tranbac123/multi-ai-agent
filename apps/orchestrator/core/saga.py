@@ -9,7 +9,7 @@ from opentelemetry import trace
 from libs.contracts.agent import AgentRun
 from libs.contracts.tool import ToolCall, ToolResult
 from libs.contracts.error import ErrorSpec, ErrorCode
-from .event_store import EventStore
+from src.event_store import EventStore
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

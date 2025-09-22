@@ -10,10 +10,10 @@ import structlog
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 
-from .core.backpressure_handler import BackpressureHandler, BackpressureMetrics
-from .core.connection_manager import ConnectionManager
-from .core.backpressure_manager import BackpressureManager, MessageType
-from .core.websocket_manager import WebSocketManager
+from src.core.backpressure_handler import BackpressureHandler, BackpressureMetrics
+from src.core.connection_manager import ConnectionManager
+from src.core.backpressure_manager import BackpressureManager, MessageType
+from src.core.websocket_manager import WebSocketManager
 
 logger = structlog.get_logger(__name__)
 

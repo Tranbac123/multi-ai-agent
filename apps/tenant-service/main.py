@@ -24,8 +24,8 @@ from libs.clients.billing import BillingClient
 from libs.clients.quota import QuotaClient
 # from libs.middleware.tenant_middleware import TenantMiddleware
 # from libs.middleware.rate_limiter import RateLimiterMiddleware
-# from apps.tenant-service.core.tenant_onboarding import TenantOnboardingManager
-# from apps.tenant-service.core.plan_upgrade_manager import PlanUpgradeManager
+# from apps.tenant-service.src.core.tenant_onboarding import TenantOnboardingManager
+# from apps.tenant-service.src.core.plan_upgrade_manager import PlanUpgradeManager
 from apps.tenant_service.core.webhook_manager import WebhookManager, WebhookEvent
 
 

@@ -1,0 +1,32 @@
+groups:
+  - name: eval-service_alerts
+    rules:
+      - alert: Eval_ServiceHighErrorRate
+        expr: rate(http_requests_total{service="eval-service",status=~"5.."}[5m]) / rate(http_requests_total{service="eval-service"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: eval-service
+        annotations:
+          summary: "High error rate on eval-service"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Eval_ServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="eval-service"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: eval-service
+        annotations:
+          summary: "High latency on eval-service"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Eval_ServiceServiceDown
+        expr: up{service="eval-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: eval-service
+        annotations:
+          summary: "eval-service service is down"
+          description: "Service has been down for more than 2 minutes"

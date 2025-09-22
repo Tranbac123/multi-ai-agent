@@ -15,9 +15,9 @@ from libs.contracts.agent import AgentRun
 from libs.contracts.tool import ToolCall, ToolResult
 from libs.contracts.message import MessageSpec, MessageRole
 from libs.contracts.error import ErrorSpec, ErrorCode
-from .workflow import WorkflowEngine, WorkflowResult, WorkflowContext
-from .langgraph_workflow import LangGraphWorkflow
-from .workflow_registry import WorkflowRegistry
+from src.workflow import WorkflowEngine, WorkflowResult, WorkflowContext
+from src.langgraph_workflow import LangGraphWorkflow
+from src.workflow_registry import WorkflowRegistry
 
 # Import the YAML workflow loader
 import sys

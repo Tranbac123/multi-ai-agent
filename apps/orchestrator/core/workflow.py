@@ -10,8 +10,8 @@ from libs.contracts.agent import AgentRun
 from libs.contracts.tool import ToolCall, ToolResult
 from libs.contracts.message import MessageSpec, MessageRole
 from libs.contracts.error import ErrorSpec, ErrorCode
-from .langgraph_workflow import LangGraphWorkflow
-from .workflow_registry import WorkflowRegistry
+from src.langgraph_workflow import LangGraphWorkflow
+from src.workflow_registry import WorkflowRegistry
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

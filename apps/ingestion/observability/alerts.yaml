@@ -1,0 +1,32 @@
+groups:
+  - name: ingestion_alerts
+    rules:
+      - alert: IngestionHighErrorRate
+        expr: rate(http_requests_total{service="ingestion",status=~"5.."}[5m]) / rate(http_requests_total{service="ingestion"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: ingestion
+        annotations:
+          summary: "High error rate on ingestion"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: IngestionHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="ingestion"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: ingestion
+        annotations:
+          summary: "High latency on ingestion"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: IngestionServiceDown
+        expr: up{service="ingestion"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: ingestion
+        annotations:
+          summary: "ingestion service is down"
+          description: "Service has been down for more than 2 minutes"

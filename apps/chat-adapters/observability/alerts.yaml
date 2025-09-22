@@ -1,0 +1,32 @@
+groups:
+  - name: chat-adapters_alerts
+    rules:
+      - alert: Chat_AdaptersHighErrorRate
+        expr: rate(http_requests_total{service="chat-adapters",status=~"5.."}[5m]) / rate(http_requests_total{service="chat-adapters"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: chat-adapters
+        annotations:
+          summary: "High error rate on chat-adapters"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Chat_AdaptersHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="chat-adapters"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: chat-adapters
+        annotations:
+          summary: "High latency on chat-adapters"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Chat_AdaptersServiceDown
+        expr: up{service="chat-adapters"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: chat-adapters
+        annotations:
+          summary: "chat-adapters service is down"
+          description: "Service has been down for more than 2 minutes"

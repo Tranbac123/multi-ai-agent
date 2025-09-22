@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry import trace
 
-from .logging_config import configure_structured_logging, get_logger
+from src.logging_config import configure_structured_logging, get_logger
 
 logger = get_logger(__name__)
 

@@ -384,8 +384,8 @@ class SBOMGenerator:
             if dockerfile.exists():
                 await self._parse_dockerfile(dockerfile)
             
-            # Check for docker-compose.yml
-            docker_compose = project_path / "docker-compose.yml"
+            # Check for platform/compose/docker-compose.yml
+            docker_compose = project_path / "platform/compose/docker-compose.yml"
             if docker_compose.exists():
                 await self._parse_docker_compose(docker_compose)
             
@@ -425,15 +425,15 @@ class SBOMGenerator:
             logger.error("Failed to parse Dockerfile", error=str(e))
     
     async def _parse_docker_compose(self, docker_compose: Path):
-        """Parse docker-compose.yml for images."""
+        """Parse platform/compose/docker-compose.yml for images."""
         try:
             # In production, this would parse YAML
             # For this implementation, we'll simulate parsing
             
-            logger.info("Parsing docker-compose.yml", file_path=str(docker_compose))
+            logger.info("Parsing platform/compose/docker-compose.yml", file_path=str(docker_compose))
             
         except Exception as e:
-            logger.error("Failed to parse docker-compose.yml", error=str(e))
+            logger.error("Failed to parse platform/compose/docker-compose.yml", error=str(e))
     
     async def _scan_system_dependencies(self, project_path: Path):
         """Scan system dependencies."""

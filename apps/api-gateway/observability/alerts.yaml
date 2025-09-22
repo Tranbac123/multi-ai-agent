@@ -1,0 +1,32 @@
+groups:
+  - name: api-gateway_alerts
+    rules:
+      - alert: Api_GatewayHighErrorRate
+        expr: rate(http_requests_total{service="api-gateway",status=~"5.."}[5m]) / rate(http_requests_total{service="api-gateway"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "High error rate on api-gateway"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Api_GatewayHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "High latency on api-gateway"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Api_GatewayServiceDown
+        expr: up{service="api-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "api-gateway service is down"
+          description: "Service has been down for more than 2 minutes"

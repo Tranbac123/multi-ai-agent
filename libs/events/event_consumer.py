@@ -5,9 +5,9 @@ from typing import Dict, Any, Optional, Callable, List
 from dataclasses import dataclass
 import structlog
 
-from .event_bus import EventBus
-from .event_types import Event, EventType
-from .dlq_handler import DLQHandler, DLQConfig
+from src.event_bus import EventBus
+from src.event_types import Event, EventType
+from src.dlq_handler import DLQHandler, DLQConfig
 
 logger = structlog.get_logger(__name__)
 

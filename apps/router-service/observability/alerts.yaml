@@ -1,0 +1,32 @@
+groups:
+  - name: router-service_alerts
+    rules:
+      - alert: Router_ServiceHighErrorRate
+        expr: rate(http_requests_total{service="router-service",status=~"5.."}[5m]) / rate(http_requests_total{service="router-service"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: router-service
+        annotations:
+          summary: "High error rate on router-service"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Router_ServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="router-service"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: router-service
+        annotations:
+          summary: "High latency on router-service"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Router_ServiceServiceDown
+        expr: up{service="router-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: router-service
+        annotations:
+          summary: "router-service service is down"
+          description: "Service has been down for more than 2 minutes"

@@ -13,7 +13,7 @@ import structlog
 from datetime import datetime, timedelta
 import hashlib
 
-from .rag_metadata import (
+from src.rag_metadata import (
     RAGMetadataManager, DocumentMetadata, RetrievalContext, 
     SensitivityLevel, DocumentStatus
 )

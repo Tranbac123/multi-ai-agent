@@ -1,0 +1,32 @@
+groups:
+  - name: admin-portal_alerts
+    rules:
+      - alert: Admin_PortalHighErrorRate
+        expr: rate(http_requests_total{service="admin-portal",status=~"5.."}[5m]) / rate(http_requests_total{service="admin-portal"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: admin-portal
+        annotations:
+          summary: "High error rate on admin-portal"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: Admin_PortalHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="admin-portal"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: admin-portal
+        annotations:
+          summary: "High latency on admin-portal"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: Admin_PortalServiceDown
+        expr: up{service="admin-portal"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: admin-portal
+        annotations:
+          summary: "admin-portal service is down"
+          description: "Service has been down for more than 2 minutes"

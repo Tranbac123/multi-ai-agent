@@ -573,7 +573,7 @@ class GrafanaDashboardGenerator:
             json.dump(dashboard, f, indent=2)
 
     def generate_all_dashboards(
-        self, output_dir: str = "observability/dashboards"
+        self, output_dir: str = "platform/shared-observability/dashboards"
     ) -> None:
         """Generate all dashboards and save to files."""
         import os

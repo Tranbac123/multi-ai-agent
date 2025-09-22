@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass
 import structlog
 
-from .base_adapter import BaseToolAdapter, AdapterConfig
+from src.base_adapter import BaseToolAdapter, AdapterConfig
 
 logger = structlog.get_logger(__name__)
 

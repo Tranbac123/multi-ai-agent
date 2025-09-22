@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from uuid import UUID
 import structlog
 
-from .event_types import (
+from src.event_types import (
     EventType,
     AgentRunEvent,
     ToolCallEvent,

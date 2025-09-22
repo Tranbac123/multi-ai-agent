@@ -12,15 +12,15 @@ from contextlib import asynccontextmanager
 import structlog
 from typing import List, Optional, Dict, Any
 
-from .core.golden_tasks import (
+from src.core.golden_tasks import (
     GoldenTaskManager, GoldenTask, TaskCategory, TaskDifficulty, TaskStatus,
     TaskExecution, EvaluationResult
 )
-from .core.llm_judge import (
+from src.core.llm_judge import (
     LLMJudge, LLMJudgeConfig, EvaluationCriteria, ScoringScale,
     EvaluationMethod, EvaluationEngine
 )
-from .core.episode_replay import (
+from src.core.episode_replay import (
     EpisodeReplayManager, Episode, EpisodeState, StateType,
     ReplayRequest, ReplayExecution, ReplayStatus
 )
@@ -424,7 +424,7 @@ async def execute_replay(
     try:
         # Get replay request (this would be implemented in the real service)
         # For now, we'll create a mock replay request
-        from .core.episode_replay import ReplayRequest
+        from src.core.episode_replay import ReplayRequest
         replay_request = ReplayRequest(
             replay_id=replay_id,
             episode_id="mock-episode-id",
@@ -468,7 +468,7 @@ async def evaluate_execution(
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Mock execution (in real implementation, this would be retrieved from database)
-    from .core.golden_tasks import TaskExecution
+    from src.core.golden_tasks import TaskExecution
     execution = TaskExecution(
         execution_id=execution_id,
         task_id=task_id,

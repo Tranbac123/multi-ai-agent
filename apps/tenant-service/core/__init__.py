@@ -1,8 +1,8 @@
 """Tenant Service Core Module."""
 
-from .tenant_onboarding import TenantOnboardingManager
-from .plan_upgrade_manager import PlanUpgradeManager
-from .webhook_manager import WebhookManager, WebhookEvent
+from src.tenant_onboarding import TenantOnboardingManager
+from src.plan_upgrade_manager import PlanUpgradeManager
+from src.webhook_manager import WebhookManager, WebhookEvent
 
 __all__ = [
     "TenantOnboardingManager",

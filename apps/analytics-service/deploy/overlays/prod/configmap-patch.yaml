@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-service-config
+data:
+  ENVIRONMENT: "prod"
+  DEBUG: "false"

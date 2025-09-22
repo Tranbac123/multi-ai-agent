@@ -9,8 +9,8 @@ import structlog
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 
-from .core.analytics_engine import AnalyticsEngine, DataSource, TenantAnalytics
-from .core.dashboard_generator import GrafanaDashboardGenerator
+from src.core.analytics_engine import AnalyticsEngine, DataSource, TenantAnalytics
+from src.core.dashboard_generator import GrafanaDashboardGenerator
 
 logger = structlog.get_logger(__name__)
 
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     dashboard_generator = GrafanaDashboardGenerator()
 
     # Generate dashboards
-    dashboard_generator.generate_all_dashboards("observability/dashboards")
+    dashboard_generator.generate_all_dashboards("platform/shared-observability/dashboards")
 
     logger.info("Analytics service started with warehouse support")
 
@@ -243,7 +243,7 @@ async def list_dashboards():
                         "file": "comprehensive_analytics.json",
                     },
                 ],
-                "location": "observability/dashboards/",
+                "location": "platform/shared-observability/dashboards/",
             }
         )
 

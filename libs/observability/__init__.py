@@ -1,6 +1,6 @@
 """Observability and monitoring components."""
 
-from .otel_instrumentation import (
+from src.otel_instrumentation import (
     OTELInstrumentor,
     SpanManager,
     MetricsCollector,
@@ -12,7 +12,7 @@ from .otel_instrumentation import (
     record_metric
 )
 
-from .slo_manager import (
+from src.slo_manager import (
     SLOManager,
     SLODefinition,
     SLOTarget,

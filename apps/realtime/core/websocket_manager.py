@@ -15,7 +15,7 @@ from datetime import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 from opentelemetry import trace
 
-from .backpressure_manager import BackpressureManager, OutboundMessage, MessageType
+from src.backpressure_manager import BackpressureManager, OutboundMessage, MessageType
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

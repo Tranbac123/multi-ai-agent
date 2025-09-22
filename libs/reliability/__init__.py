@@ -1,6 +1,6 @@
 """Reliability patterns for tool adapters."""
 
-from .base_adapter import (
+from src.base_adapter import (
     BaseToolAdapter,
     CircuitBreaker,
     Bulkhead,
@@ -15,7 +15,7 @@ from .base_adapter import (
     CircuitState
 )
 
-from .saga_manager import (
+from src.saga_manager import (
     SagaManager,
     SagaExecution,
     SagaStep,

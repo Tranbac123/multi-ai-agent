@@ -6,7 +6,7 @@ from typing import Callable, Any, Optional, Type, Union
 from functools import wraps
 import structlog
 
-from .logging_config import get_logger
+from src.logging_config import get_logger
 
 logger = get_logger(__name__)
 

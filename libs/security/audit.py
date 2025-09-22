@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List
 from uuid import UUID
 import structlog
 
-from .auth import get_current_user
+from src.auth import get_current_user
 
 logger = structlog.get_logger(__name__)
 

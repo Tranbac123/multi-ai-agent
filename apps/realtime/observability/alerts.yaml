@@ -1,0 +1,32 @@
+groups:
+  - name: realtime_alerts
+    rules:
+      - alert: RealtimeHighErrorRate
+        expr: rate(http_requests_total{service="realtime",status=~"5.."}[5m]) / rate(http_requests_total{service="realtime"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "High error rate on realtime"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: RealtimeHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="realtime"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High latency on realtime"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: RealtimeServiceDown
+        expr: up{service="realtime"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "realtime service is down"
+          description: "Service has been down for more than 2 minutes"

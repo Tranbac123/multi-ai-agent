@@ -1,0 +1,32 @@
+groups:
+  - name: orchestrator_alerts
+    rules:
+      - alert: OrchestratorHighErrorRate
+        expr: rate(http_requests_total{service="orchestrator",status=~"5.."}[5m]) / rate(http_requests_total{service="orchestrator"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: orchestrator
+        annotations:
+          summary: "High error rate on orchestrator"
+          description: "Error rate is above 1% for 5 minutes"
+
+      - alert: OrchestratorHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="orchestrator"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: orchestrator
+        annotations:
+          summary: "High latency on orchestrator"
+          description: "P95 latency is above 1 second for 5 minutes"
+
+      - alert: OrchestratorServiceDown
+        expr: up{service="orchestrator"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: orchestrator
+        annotations:
+          summary: "orchestrator service is down"
+          description: "Service has been down for more than 2 minutes"

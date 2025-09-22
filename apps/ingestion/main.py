@@ -17,9 +17,9 @@ from libs.clients.database import get_db_session
 from libs.clients.auth import get_current_tenant
 from libs.clients.event_bus import EventBus, EventProducer
 from libs.utils.responses import success_response, error_response
-from .core.document_processor import DocumentProcessor
-from .core.embedding_service import EmbeddingService
-from .core.vector_indexer import VectorIndexer
+from src.core.document_processor import DocumentProcessor
+from src.core.embedding_service import EmbeddingService
+from src.core.vector_indexer import VectorIndexer
 
 # Configure structured logging
 structlog.configure(

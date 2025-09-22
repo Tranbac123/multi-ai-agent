@@ -6,7 +6,7 @@ import httpx
 import structlog
 from fastapi import APIRouter, Request, HTTPException, status
 
-from ..core.unified_message import UnifiedMessage, UnifiedResponse, UserProfile, MessageContent, Channel, MessageType
+from src..core.unified_message import UnifiedMessage, UnifiedResponse, UserProfile, MessageContent, Channel, MessageType
 from libs.resilience.tool_adapter_base import ResilientToolAdapter
 
 logger = structlog.get_logger(__name__)
