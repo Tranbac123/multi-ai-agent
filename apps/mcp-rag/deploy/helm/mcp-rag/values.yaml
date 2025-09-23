@@ -1,0 +1,26 @@
+image:
+  repository: ghcr.io/OWNER/mcp-rag
+  tag: "latest"
+  pullPolicy: IfNotPresent
+service:
+  port: 8765
+env:
+  - name: MCP_RAG_RETRIEVAL_BASE_URL
+    value: "http://retrieval-service"
+  - name: MCP_RAG_INGESTION_BASE_URL
+    value: "http://ingestion-service"
+resources:
+  limits:
+    cpu: 300m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+pdb:
+  minAvailable: 1
+

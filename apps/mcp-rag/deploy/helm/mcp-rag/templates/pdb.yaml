@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mcp-rag
+spec:
+  minAvailable: { { .Values.pdb.minAvailable } }
+  selector:
+    matchLabels:
+      app: mcp-rag
+
