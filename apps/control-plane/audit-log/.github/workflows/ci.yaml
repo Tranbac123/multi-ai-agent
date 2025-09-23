@@ -1,0 +1,11 @@
+name: audit-log-ci
+on:
+  push: { branches: [main], paths: ["apps/control-plane/audit-log/**"] }
+  pull_request: { paths: ["apps/control-plane/audit-log/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/audit-log
+      image_name: audit-log
+

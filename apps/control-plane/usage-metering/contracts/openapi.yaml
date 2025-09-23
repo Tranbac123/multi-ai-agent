@@ -1,0 +1,30 @@
+openapi: 3.0.3
+info: { title: usage-metering, version: "0.1.0" }
+paths:
+  /healthz: { get: { responses: { "200": { description: ok } } } }
+  /v1/usage:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UsageEvent" } } }
+      responses: { "200": { description: ok } }
+  /v1/summary:
+    get:
+      parameters:
+        - in: query; name: tenant_id; schema: { type: string }
+      responses: { "200": { description: ok } }
+components:
+  schemas:
+    UsageEvent:
+      type: object
+      required: [tenant_id, service, route]
+      properties:
+        tenant_id: { type: string }
+        service: { type: string }
+        route: { type: string }
+        tokens_in: { type: integer, default: 0 }
+        tokens_out: { type: integer, default: 0 }
+        latency_ms: { type: number, default: 0 }
+        cost_usd: { type: number, default: 0 }
+        ts: { type: string, format: date-time }
+

@@ -1,0 +1,11 @@
+name: usage-metering-ci
+on:
+  push: { branches: [main], paths: ["apps/control-plane/usage-metering/**"] }
+  pull_request: { paths: ["apps/control-plane/usage-metering/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/usage-metering
+      image_name: usage-metering
+

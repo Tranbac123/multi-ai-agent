@@ -1,0 +1,11 @@
+name: policy-adapter-ci
+on:
+  push: { branches: [main], paths: ["apps/control-plane/policy-adapter/**"] }
+  pull_request: { paths: ["apps/control-plane/policy-adapter/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/policy-adapter
+      image_name: policy-adapter
+

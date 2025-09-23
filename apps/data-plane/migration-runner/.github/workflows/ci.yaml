@@ -1,0 +1,11 @@
+name: migration-runner-ci
+on:
+  push: { branches: [main], paths: ["apps/data-plane/migration-runner/**"] }
+  pull_request: { paths: ["apps/data-plane/migration-runner/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/data-plane/migration-runner
+      image_name: migration-runner
+

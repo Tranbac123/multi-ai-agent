@@ -1,0 +1,12 @@
+name: feature-flags-service-ci
+on:
+  push:
+    { branches: [main], paths: ["apps/control-plane/feature-flags-service/**"] }
+  pull_request: { paths: ["apps/control-plane/feature-flags-service/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/feature-flags-service
+      image_name: feature-flags-service
+

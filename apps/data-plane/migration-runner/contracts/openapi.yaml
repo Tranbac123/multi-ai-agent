@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info: { title: migration-runner, version: "0.1.0" }
+paths:
+  /healthz: { get: { responses: { "200": { description: ok } } } }
+  /v1/migrate:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id]
+              properties:
+                tenant_id: { type: string }
+                target_version: { type: string }
+      responses: { "200": { description: ok } }
+

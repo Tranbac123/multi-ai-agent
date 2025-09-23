@@ -1,0 +1,29 @@
+name: python-service-ci
+on:
+  workflow_call:
+    inputs:
+      service_path: { required: true, type: string }
+      image_name:   { required: true, type: string }
+      python:       { required: false, type: string, default: "3.11" }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ${{ inputs.service_path }} } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: ${{ inputs.python }} }
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ${{ inputs.service_path }} } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: ${{ github.repository_owner }}, password: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: docker/build-push-action@v6
+        with: { context: ${{ inputs.service_path }}, push: true, tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }} }
+      - uses: aquasecurity/trivy-action@0.20.0
+        with: { image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }} }

@@ -1,0 +1,10 @@
+name: config-service-ci
+on:
+  push: { branches: [main], paths: ["apps/control-plane/config-service/**"] }
+  pull_request: { paths: ["apps/control-plane/config-service/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/config-service
+      image_name: config-service

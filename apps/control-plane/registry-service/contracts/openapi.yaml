@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info: { title: registry-service, version: "0.1.0" }
+paths:
+  /healthz: { get: { responses: { "200": { description: ok } } } }
+  /v1/agents:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AgentManifest" } } }
+      responses: { "200": { description: ok } }
+    get:
+      parameters:
+        - in: query; name: name; schema: { type: string }
+        - in: query; name: version; schema: { type: string }
+      responses: { "200": { description: ok } }
+  /v1/tools:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ToolManifest" } } }
+      responses: { "200": { description: ok } }
+    get:
+      parameters:
+        - in: query; name: name; schema: { type: string }
+        - in: query; name: version; schema: { type: string }
+      responses: { "200": { description: ok } }
+components:
+  schemas:
+    AgentManifest:
+      type: object
+      required: [name, version, checksum_sha256, owner]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        checksum_sha256: { type: string }
+        owner: { type: string }
+        deprecated: { type: boolean, default: false }
+        metadata: { type: object, additionalProperties: true }
+        signature: { type: string }
+    ToolManifest:
+      type: object
+      required: [name, version, checksum_sha256, owner]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        checksum_sha256: { type: string }
+        owner: { type: string }
+        deprecated: { type: boolean, default: false }
+        metadata: { type: object, additionalProperties: true }
+        signature: { type: string }
+

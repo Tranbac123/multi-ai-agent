@@ -1,0 +1,24 @@
+openapi: 3.0.3
+info: { title: policy-adapter, version: "0.1.0" }
+paths:
+  /healthz: { get: { responses: { "200": { description: ok } } } }
+  /v1/authorize:
+    post:
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/AuthorizeRequest" } },
+          }
+      responses: { "200": { description: ok } }
+components:
+  schemas:
+    AuthorizeRequest:
+      type: object
+      required: [resource, action]
+      properties:
+        resource: { type: string }
+        action: { type: string }
+        context: { type: object, additionalProperties: true }
+

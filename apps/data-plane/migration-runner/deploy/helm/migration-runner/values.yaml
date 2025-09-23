@@ -1,0 +1,22 @@
+image:
+  {
+    repository: ghcr.io/OWNER/migration-runner,
+    tag: "latest",
+    pullPolicy: IfNotPresent,
+  }
+service: { port: 8071 }
+resources:
+  {
+    limits: { cpu: 500m, memory: 512Mi },
+    requests: { cpu: 100m, memory: 256Mi },
+  }
+env: []
+hpa:
+  {
+    enabled: true,
+    minReplicas: 1,
+    maxReplicas: 5,
+    targetCPUUtilizationPercentage: 70,
+  }
+pdb: { minAvailable: 1 }
+

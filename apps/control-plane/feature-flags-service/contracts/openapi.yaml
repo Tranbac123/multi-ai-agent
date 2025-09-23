@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info: { title: feature-flags-service, version: "0.1.0" }
+paths:
+  /healthz: { get: { responses: { "200": { description: ok } } } }
+  /v1/flags:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FlagSet" } } }
+      responses: { "200": { description: ok } }
+  /v1/flags/eval:
+    get:
+      parameters:
+        - in: query; name: name; schema: { type: string }
+        - in: query; name: user_id; schema: { type: string }
+      responses: { "200": { description: ok } }
+components:
+  schemas:
+    FlagSet:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        on: { type: boolean, default: false }
+        rollout: { type: integer, minimum: 0, maximum: 100, default: 0 }
+        tenant_overrides: { type: object, additionalProperties: { type: boolean } }
+

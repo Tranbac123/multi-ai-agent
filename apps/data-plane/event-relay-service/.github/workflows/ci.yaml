@@ -1,0 +1,11 @@
+name: event-relay-service-ci
+on:
+  push: { branches: [main], paths: ["apps/data-plane/event-relay-service/**"] }
+  pull_request: { paths: ["apps/data-plane/event-relay-service/**"] }
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/data-plane/event-relay-service
+      image_name: event-relay-service
+
