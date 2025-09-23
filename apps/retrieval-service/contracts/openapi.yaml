@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: retrieval-service
+  version: "0.1.0"
+paths:
+  /healthz:
+    get:
+      responses:
+        "200":
+          description: ok
+  /v1/query:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryRequest"
+      responses:
+        "200":
+          description: results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+  /v1/index:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IndexRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexResponse"
+  /v1/delete:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+components:
+  schemas:
+    ReturnFields:
+      type: object
+      properties:
+        chunks: { type: boolean, default: true }
+        citations: { type: boolean, default: true }
+    QueryRequest:
+      type: object
+      required: [tenant_id, query]
+      properties:
+        tenant_id: { type: string }
+        query: { type: string }
+        top_k: { type: integer, default: 8 }
+        filters: { type: object, additionalProperties: true }
+        hybrid_alpha: { type: number }
+        reranker: { type: string }
+        return_fields: { $ref: "#/components/schemas/ReturnFields" }
+    ResultItem:
+      type: object
+      required: [doc_id, score, chunk]
+      properties:
+        doc_id: { type: string }
+        score: { type: number }
+        chunk: { type: string }
+        meta: { type: object, additionalProperties: true }
+    QueryUsage:
+      type: object
+      properties:
+        retrieval_ms: { type: integer, default: 0 }
+        rerank_ms: { type: integer, default: 0 }
+    QueryResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/ResultItem" }
+        usage: { $ref: "#/components/schemas/QueryUsage" }
+    IndexRequest:
+      type: object
+      required: [tenant_id, doc]
+      properties:
+        tenant_id: { type: string }
+        doc: { type: string }
+        meta: { type: object, additionalProperties: true }
+    IndexResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+    DeleteRequest:
+      type: object
+      required: [tenant_id, doc_id]
+      properties:
+        tenant_id: { type: string }
+        doc_id: { type: string }
+    DeleteResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+
