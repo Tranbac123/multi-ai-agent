@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: config-service
 spec:
-  selector: { app: config-service }
+  selector:
+    app: config-service
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

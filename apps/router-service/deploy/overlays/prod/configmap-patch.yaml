@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: router-service-config
-data:
-  ENVIRONMENT: "prod"
-  DEBUG: "false"

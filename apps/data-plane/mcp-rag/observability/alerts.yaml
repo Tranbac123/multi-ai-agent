@@ -1,0 +1,8 @@
+groups:
+  - name: placeholder
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "High 5xx rate" }

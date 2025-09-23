@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+spec:
+  selector:
+    app: billing-service
+  ports:
+    - port: 80
+      targetPort: {{ .Values.service.port }}
+      name: http

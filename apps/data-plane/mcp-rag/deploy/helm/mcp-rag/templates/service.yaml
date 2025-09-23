@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-rag
+spec:
+  selector:
+    app: mcp-rag
+  ports:
+    - port: 80
+      targetPort: {{ .Values.service.port }}
+      name: http

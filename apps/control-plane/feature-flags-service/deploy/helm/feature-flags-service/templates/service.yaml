@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: feature-flags-service
 spec:
-  selector: { app: feature-flags-service }
+  selector:
+    app: feature-flags-service
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

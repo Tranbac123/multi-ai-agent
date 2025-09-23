@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: tool-service-config
-data:
-  ENVIRONMENT: "staging"
-  DEBUG: "false"

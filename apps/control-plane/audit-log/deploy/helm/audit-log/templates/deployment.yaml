@@ -5,30 +5,35 @@ metadata:
 spec:
   replicas: 2
   selector:
-    matchLabels: { app: audit-log }
+    matchLabels:
+      app: audit-log
   template:
     metadata:
-      labels: { app: audit-log }
+      labels:
+        app: audit-log
     spec:
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-          ports: [{ containerPort: {{ .Values.service.port }} }]
+          ports:
+            - containerPort: {{ .Values.service.port }}
           env:
             {{- range .Values.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
           readinessProbe:
-            httpGet: { path: /healthz, port: {{ .Values.service.port }} }
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.port }}
             initialDelaySeconds: 3
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /healthz, port: {{ .Values.service.port }} }
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.port }}
             initialDelaySeconds: 3
             periodSeconds: 5
           resources:
-            limits: {{- toYaml .Values.resources.limits | nindent 12 }}
-            requests: {{- toYaml .Values.resources.requests | nindent 12 }}
-
+            {{- toYaml .Values.resources | nindent 12 }}

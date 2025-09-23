@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: usage-metering
 spec:
-  selector: { app: usage-metering }
+  selector:
+    app: usage-metering
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

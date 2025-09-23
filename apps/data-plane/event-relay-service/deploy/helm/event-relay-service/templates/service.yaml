@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: event-relay-service
 spec:
-  selector: { app: event-relay-service }
+  selector:
+    app: event-relay-service
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

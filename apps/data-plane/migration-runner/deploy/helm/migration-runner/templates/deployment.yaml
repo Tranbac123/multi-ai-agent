@@ -3,32 +3,37 @@ kind: Deployment
 metadata:
   name: migration-runner
 spec:
-  replicas: 1
+  replicas: 2
   selector:
-    matchLabels: { app: migration-runner }
+    matchLabels:
+      app: migration-runner
   template:
     metadata:
-      labels: { app: migration-runner }
+      labels:
+        app: migration-runner
     spec:
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-          ports: [{ containerPort: {{ .Values.service.port }} }]
+          ports:
+            - containerPort: {{ .Values.service.port }}
           env:
             {{- range .Values.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
           readinessProbe:
-            httpGet: { path: /healthz, port: {{ .Values.service.port }} }
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 3
+            periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /healthz, port: {{ .Values.service.port }} }
-            initialDelaySeconds: 10
-            periodSeconds: 30
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 3
+            periodSeconds: 5
           resources:
-            limits: {{- toYaml .Values.resources.limits | nindent 12 }}
-            requests: {{- toYaml .Values.resources.requests | nindent 12 }}
-
+            {{- toYaml .Values.resources | nindent 12 }}

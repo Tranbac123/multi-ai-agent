@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: policy-adapter
 spec:
-  selector: { app: policy-adapter }
+  selector:
+    app: policy-adapter
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

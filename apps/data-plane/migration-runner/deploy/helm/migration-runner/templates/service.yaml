@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: migration-runner
 spec:
-  selector: { app: migration-runner }
+  selector:
+    app: migration-runner
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

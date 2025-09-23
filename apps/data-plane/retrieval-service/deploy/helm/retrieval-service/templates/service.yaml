@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: retrieval-service
+spec:
+  selector:
+    app: retrieval-service
+  ports:
+    - port: 80
+      targetPort: {{ .Values.service.port }}
+      name: http

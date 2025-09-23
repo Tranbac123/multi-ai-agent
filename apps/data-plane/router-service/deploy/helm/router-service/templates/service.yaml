@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-service
+spec:
+  selector:
+    app: router-service
+  ports:
+    - port: 80
+      targetPort: {{ .Values.service.port }}
+      name: http

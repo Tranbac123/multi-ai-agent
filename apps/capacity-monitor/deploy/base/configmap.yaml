@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: capacity-monitor-config
-data:
-  LOG_LEVEL: "INFO"
-  METRICS_ENABLED: "true"
-  TRACING_ENABLED: "true"
-  SERVICE_NAME: "capacity-monitor"

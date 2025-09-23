@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: registry-service
 spec:
-  selector: { app: registry-service }
+  selector:
+    app: registry-service
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

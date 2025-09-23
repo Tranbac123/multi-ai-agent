@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: audit-log
 spec:
-  selector: { app: audit-log }
+  selector:
+    app: audit-log
   ports:
     - port: 80
-      targetPort: { { .Values.service.port } }
+      targetPort: {{ .Values.service.port }}
       name: http
-

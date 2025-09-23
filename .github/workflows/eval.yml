@@ -26,11 +26,62 @@ on:
         required: false
         default: 'SLM_A,SLM_B,LLM_C'
   pull_request:
-    paths:
+    \1      - apps/data-plane/tools/deploy/helm/deploy/helm/deploy/helm/**
       - 'eval/**'
       - 'apps/**'
-      - 'services/**'
+      - 'apps/**'
       - '.github/workflows/eval.yml'
+      - apps/retrieval-service/deploy/helm/**
+
+      - apps/retrieval-service/deploy/helm/deploy/helm/**
+
+      - apps/mcp-rag/deploy/helm/**
+
+      - apps/mcp-rag/deploy/helm/deploy/helm/**
+
+      - apps/data-plane/tools/deploy/helm/**
+
+      - apps/data-plane/tools/deploy/helm/deploy/helm/**
+
+      - apps/data-plane/memory/deploy/helm/**
+
+      - apps/data-plane/memory/deploy/helm/deploy/helm/**
+
+      - apps/data-plane/agents/deploy/helm/**
+
+      - apps/data-plane/agents/deploy/helm/deploy/helm/**
+
+      - apps/data-plane/migration-runner/deploy/helm/**
+
+      - apps/data-plane/migration-runner/deploy/helm/deploy/helm/**
+
+      - apps/data-plane/event-relay-service/deploy/helm/**
+
+      - apps/data-plane/event-relay-service/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/feature-flags-service/deploy/helm/**
+
+      - apps/control-plane/feature-flags-service/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/config-service/deploy/helm/**
+
+      - apps/control-plane/config-service/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/registry-service/deploy/helm/**
+
+      - apps/control-plane/registry-service/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/audit-log/deploy/helm/**
+
+      - apps/control-plane/audit-log/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/policy-adapter/deploy/helm/**
+
+      - apps/control-plane/policy-adapter/deploy/helm/deploy/helm/**
+
+      - apps/control-plane/usage-metering/deploy/helm/**
+
+      - apps/control-plane/usage-metering/deploy/helm/deploy/helm/**
 
 env:
   PYTHON_VERSION: '3.11'
