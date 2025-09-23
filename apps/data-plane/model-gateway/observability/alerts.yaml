@@ -1,0 +1,53 @@
+groups:
+  - name: model-gateway
+    rules:
+      - alert: ModelGatewayHighErrorRate
+        expr: rate(http_requests_total{service="model-gateway",status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: model-gateway
+        annotations:
+          summary: "Model Gateway high error rate"
+          description: "Error rate is {{ $value }} for model-gateway"
+
+      - alert: ModelGatewayHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="model-gateway"}[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: model-gateway
+        annotations:
+          summary: "Model Gateway high latency"
+          description: "P95 latency is {{ $value }}s for model-gateway"
+
+      - alert: ModelGatewayCircuitBreakerOpen
+        expr: circuit_breaker_state{service="model-gateway"} == 2
+        for: 1m
+        labels:
+          severity: critical
+          service: model-gateway
+        annotations:
+          summary: "Model Gateway circuit breaker open"
+          description: "Circuit breaker {{ $labels.provider }} is open"
+
+      - alert: ModelGatewayProviderDown
+        expr: provider_health{service="model-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: model-gateway
+        annotations:
+          summary: "Model Gateway provider down"
+          description: "Provider {{ $labels.provider }} is down"
+
+      - alert: ModelGatewayHighTokenUsage
+        expr: rate(llm_tokens_total{service="model-gateway"}[5m]) > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: model-gateway
+        annotations:
+          summary: "Model Gateway high token usage"
+          description: "Token usage rate is {{ $value }} tokens/sec"
+

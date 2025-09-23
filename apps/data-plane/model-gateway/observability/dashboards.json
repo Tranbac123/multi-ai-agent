@@ -1,0 +1,49 @@
+[
+  {
+    "title": "Model Gateway Dashboard",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          "rate(http_requests_total{service=\"model-gateway\"}[5m])"
+        ]
+      },
+      {
+        "title": "Response Latency P95",
+        "type": "graph", 
+        "targets": [
+          "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"model-gateway\"}[5m]))"
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          "rate(http_requests_total{service=\"model-gateway\",status=~\"5..\"}[5m])"
+        ]
+      },
+      {
+        "title": "Token Usage",
+        "type": "graph",
+        "targets": [
+          "rate(llm_tokens_total{service=\"model-gateway\"}[5m])"
+        ]
+      },
+      {
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "targets": [
+          "circuit_breaker_state{service=\"model-gateway\"}"
+        ]
+      },
+      {
+        "title": "Provider Health",
+        "type": "stat",
+        "targets": [
+          "provider_health{service=\"model-gateway\"}"
+        ]
+      }
+    ]
+  }
+]

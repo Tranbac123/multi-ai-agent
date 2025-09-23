@@ -1,0 +1,9 @@
+groups:
+  - name: notification-service
+    rules:
+      - alert: NotificationServiceHighErrorRate
+        expr: rate(http_requests_total{service="notification-service",status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "High 5xx rate for notification-service" }
+

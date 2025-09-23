@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: semantic-cache-service
+  version: "0.1.0"
+  description: Semantic Cache Service for LLM responses and RAG results
+paths:
+  /healthz:
+    get:
+      summary: Health Check
+      responses:
+        "200":
+          description: Service is healthy
+
+  /v1/cache:
+    post:
+      summary: Store Content in Cache
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CacheRequest"
+      responses:
+        "200":
+          description: Content stored successfully
+        "500":
+          description: Cache storage error
+
+  /v1/cache/{tenant_id}:
+    get:
+      summary: Retrieve from Cache
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: similarity_threshold
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Cache response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheResponse"
+
+  /v1/search:
+    post:
+      summary: Semantic Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SemanticSearchRequest"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemanticSearchResponse"
+
+  /v1/cache/{tenant_id}/{cache_key}:
+    delete:
+      summary: Delete Cache Entry
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cache_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entry deleted
+        "404":
+          description: Entry not found
+
+  /v1/stats/{tenant_id}:
+    get:
+      summary: Get Cache Stats
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheStats"
+
+components:
+  schemas:
+    CacheRequest:
+      type: object
+      required: [tenant_id, cache_key, content]
+      properties:
+        tenant_id:
+          type: string
+        cache_key:
+          type: string
+        content:
+          type: string
+        ttl_seconds:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CacheResponse:
+      type: object
+      properties:
+        found:
+          type: boolean
+        content:
+          type: string
+        similarity_score:
+          type: number
+        cache_key:
+          type: string
+        cached_at:
+          type: string
+        expires_at:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    SemanticSearchRequest:
+      type: object
+      required: [tenant_id, query]
+      properties:
+        tenant_id:
+          type: string
+        query:
+          type: string
+        similarity_threshold:
+          type: number
+        max_results:
+          type: integer
+          default: 10
+
+    SemanticSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CacheResponse"
+        query_embedding:
+          type: array
+          items:
+            type: number
+        search_time_ms:
+          type: integer
+
+    CacheStats:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        total_entries:
+          type: integer
+        hit_rate:
+          type: number
+        avg_similarity:
+          type: number
+        cache_size_mb:
+          type: number
+        oldest_entry:
+          type: string
+        newest_entry:
+          type: string
+

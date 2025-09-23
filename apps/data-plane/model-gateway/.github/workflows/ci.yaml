@@ -1,0 +1,16 @@
+name: model-gateway-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/data-plane/model-gateway/**"]
+  pull_request:
+    paths: ["apps/data-plane/model-gateway/**"]
+
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/data-plane/model-gateway
+      image_name: model-gateway
+

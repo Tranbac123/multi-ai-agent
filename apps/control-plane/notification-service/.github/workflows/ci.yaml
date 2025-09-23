@@ -1,0 +1,16 @@
+name: notification-service-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/control-plane/notification-service/**"]
+  pull_request:
+    paths: ["apps/control-plane/notification-service/**"]
+
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/control-plane/notification-service
+      image_name: notification-service
+

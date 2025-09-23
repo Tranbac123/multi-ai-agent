@@ -1,0 +1,16 @@
+name: chat-adapters-service-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/data-plane/chat-adapters-service/**"]
+  pull_request:
+    paths: ["apps/data-plane/chat-adapters-service/**"]
+
+jobs:
+  call:
+    uses: ./platform/ci-templates/python-service-ci.yaml
+    with:
+      service_path: apps/data-plane/chat-adapters-service
+      image_name: chat-adapters-service
+

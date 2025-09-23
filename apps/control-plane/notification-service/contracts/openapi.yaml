@@ -1,0 +1,171 @@
+openapi: 3.0.3
+info:
+  title: notification-service
+  version: "0.1.0"
+  description: Notification Service for Email, Slack, Teams, and Webhook notifications
+paths:
+  /healthz:
+    get:
+      summary: Health Check
+      responses:
+        "200":
+          description: Service is healthy
+
+  /v1/health:
+    get:
+      summary: Detailed Health Check
+      responses:
+        "200":
+          description: Detailed health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheck"
+
+  /v1/send:
+    post:
+      summary: Send Notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequest"
+      responses:
+        "200":
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+
+  /v1/status/{notification_id}:
+    get:
+      summary: Get Notification Status
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationStatus"
+
+  /v1/channels:
+    get:
+      summary: List Channels
+      responses:
+        "200":
+          description: Available channels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelConfig"
+
+components:
+  schemas:
+    NotificationType:
+      type: string
+      enum: [email, slack, teams, webhook]
+
+    NotificationPriority:
+      type: string
+      enum: [low, medium, high, critical]
+
+    NotificationRequest:
+      type: object
+      required: [tenant_id, notification_type, recipients, message]
+      properties:
+        tenant_id:
+          type: string
+        notification_type:
+          $ref: "#/components/schemas/NotificationType"
+        recipients:
+          type: array
+          items:
+            type: string
+        subject:
+          type: string
+        message:
+          type: string
+        priority:
+          $ref: "#/components/schemas/NotificationPriority"
+          default: medium
+        template:
+          type: string
+        template_vars:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    NotificationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        notification_id:
+          type: string
+        sent_to:
+          type: array
+          items:
+            type: string
+        failed_recipients:
+          type: array
+          items:
+            type: string
+        processing_time_ms:
+          type: integer
+        error:
+          type: string
+
+    NotificationStatus:
+      type: object
+      properties:
+        notification_id:
+          type: string
+        tenant_id:
+          type: string
+        notification_type:
+          $ref: "#/components/schemas/NotificationType"
+        status:
+          type: string
+        recipients:
+          type: array
+          items:
+            type: string
+        sent_at:
+          type: string
+        error:
+          type: string
+
+    ChannelConfig:
+      type: object
+      properties:
+        channel_type:
+          $ref: "#/components/schemas/NotificationType"
+        enabled:
+          type: boolean
+        config:
+          type: object
+          additionalProperties: true
+
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+        channels:
+          type: object
+          additionalProperties: true
+        last_check:
+          type: string
+
