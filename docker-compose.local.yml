@@ -1,0 +1,201 @@
+version: "3.8"
+
+services:
+  # Database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ai_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NATS for event streaming
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8222/healthz",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Services
+  api-gateway:
+    build:
+      context: ./apps/data-plane/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  model-gateway:
+    build:
+      context: ./apps/data-plane/model-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+    depends_on:
+      - api-gateway
+
+  retrieval-service:
+    build:
+      context: ./apps/data-plane/retrieval-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tools-service:
+    build:
+      context: ./apps/data-plane/tools-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    depends_on:
+      - api-gateway
+
+  router-service:
+    build:
+      context: ./apps/data-plane/router-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    depends_on:
+      - api-gateway
+
+  # Control Plane Services
+  config-service:
+    build:
+      context: ./apps/control-plane/config-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  policy-adapter:
+    build:
+      context: ./apps/control-plane/policy-adapter
+      dockerfile: Dockerfile
+    ports:
+      - "8091:8091"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  # Admin Portal (Backend for Frontend)
+  admin-portal:
+    build:
+      context: ./frontend/admin-portal
+      dockerfile: Dockerfile
+    ports:
+      - "8099:8099"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Web Frontend
+  web-frontend:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_ADMIN_API_URL=http://localhost:8099
+      - VITE_MODEL_GATEWAY_URL=http://localhost:8080
+    depends_on:
+      - api-gateway
+      - admin-portal
+
+  # AI Chatbot Frontend
+  ai-chatbot:
+    build:
+      context: ./frontend/chatbot-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_ENVIRONMENT=development
+      - REACT_APP_NAME=AI Search Agent
+      - REACT_APP_DEBUG=true
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:

@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - ai-search-network
+
+  backend:
+    build: ..
+    ports:
+      - "8000:8000"
+    environment:
+      - AGENT_FUNC=agent_adapter:run_query
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+    networks:
+      - ai-search-network
+
+networks:
+  ai-search-network:
+    driver: bridge
+
+
+
+

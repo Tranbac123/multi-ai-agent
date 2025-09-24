@@ -1,3 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔧 Setting up environment variables..."
+
+# Check if .env already exists
+if [[ -f .env ]]; then
+    echo "📝 .env file already exists. Backing up to .env.backup"
+    cp .env .env.backup
+fi
+
+# Create .env file with your actual API keys
+cat > .env << 'EOF'
 # Multi-Tenant AIaaS Platform - Environment Configuration
 
 # Environment
@@ -8,7 +21,7 @@ APP_VERSION=2.0.0
 
 # API KEYS - REQUIRED
 # OpenAI API Key (Required)
-OPENAI_API_KEY=your_openai_api_key_here-vCy89WzK94qDiaX13FODxDAfSlWS0K_Snqa1izBs8ivFk2XKuWkAyib9kT3BlbkFJpU7hX_2atulBZtFhaNAeTbK60O5zCWGP4Qs_p7pZxc8_ISIHB2ReR2yk0acJNRV8DmcEWPoZwA
+OPENAI_API_KEY=your_openai_api_key_here
 
 # Firecrawl API Key (Optional - for web scraping)
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
@@ -17,7 +30,7 @@ FIRECRAWL_API_KEY=your_firecrawl_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/ai_agent
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_agent
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 DATABASE_POOL_TIMEOUT=30
@@ -125,3 +138,16 @@ TENANT_ISOLATION_ENABLED=true
 MAX_CONCURRENT_REQUESTS=100
 REQUEST_TIMEOUT=30
 WORKER_PROCESSES=1
+EOF
+
+echo "✅ Environment variables set up successfully!"
+echo ""
+echo "🔑 Your API keys are now configured:"
+echo "   • OpenAI API Key: ${OPENAI_API_KEY:0:20}..."
+echo "   • Firecrawl API Key: ${FIRECRAWL_API_KEY:0:15}..."
+echo ""
+echo "💡 To use these in your shell, run:"
+echo "   source .env"
+echo ""
+echo "🚀 Or start the development environment:"
+echo "   ./scripts/start-local.sh"

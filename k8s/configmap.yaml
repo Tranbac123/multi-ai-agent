@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ai-chatbot
+data:
+  # Environment variables
+  DATABASE_URL: "postgresql://postgres:password@postgres-service:5432/ai_agent"
+  REDIS_URL: "redis://redis-service:6379"
+  NATS_URL: "nats://nats-service:4222"
+
+  # API Configuration
+  REACT_APP_API_URL: "http://api-gateway-service:8000"
+  REACT_APP_ENVIRONMENT: "production"
+  REACT_APP_NAME: "AI Chatbot"
+  REACT_APP_DEBUG: "false"
+
+  # Service URLs
+  MODEL_GATEWAY_URL: "http://model-gateway-service:8080"
+  RETRIEVAL_SERVICE_URL: "http://retrieval-service:8081"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+
+  # Performance
+  MAX_CONNECTIONS: "100"
+  TIMEOUT_SECONDS: "30"

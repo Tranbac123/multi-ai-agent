@@ -23,6 +23,7 @@ fi
 # Create .env file if it doesn't exist
 if [[ ! -f .env ]]; then
     echo "📝 Creating .env file..."
+    echo "   Run ./scripts/setup-env.sh to configure your API keys"
     cat > .env << EOF
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_agent
@@ -36,11 +37,15 @@ NATS_URL=nats://localhost:4222
 # API Keys (set these with your actual keys)
 OPENAI_API_KEY=${OPENAI_API_KEY:-}
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
 
 # Frontend URLs
 VITE_API_URL=http://localhost:8000
 VITE_ADMIN_API_URL=http://localhost:8099
+VITE_MODEL_GATEWAY_URL=http://localhost:8080
 EOF
+else
+    echo "✅ .env file already exists"
 fi
 
 echo "✅ Environment setup complete!"

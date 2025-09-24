@@ -1,0 +1,109 @@
+name: Deploy to Google Cloud Platform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PROJECT_ID: your-ai-chatbot-project
+  GKE_CLUSTER: ai-chatbot-cluster
+  GKE_ZONE: us-central1-a
+  DEPLOYMENT_NAME: ai-chatbot
+  REGISTRY: gcr.io
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services for testing
+        run: |
+          docker-compose -f docker-compose.local.yml up -d
+
+      - name: Wait for services to be ready
+        run: |
+          sleep 30
+          curl -f http://localhost:8000/healthz || exit 1
+
+      - name: Run tests
+        run: |
+          ./scripts/run_p0_subset.sh
+
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "multi-ai-agent-ai-chatbot:latest"
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push images
+        run: |
+          ./scripts/build-images.sh $PROJECT_ID $GITHUB_SHA
+
+      - name: Deploy to GKE
+        run: |
+          gcloud container clusters get-credentials $GKE_CLUSTER --zone=$GKE_ZONE
+
+          # Update image tags in deployments
+          kubectl set image deployment/ai-chatbot \
+            chatbot=$REGISTRY/$PROJECT_ID/ai-chatbot:$GITHUB_SHA \
+            -n ai-chatbot
+
+          kubectl set image deployment/api-gateway \
+            api-gateway=$REGISTRY/$PROJECT_ID/api-gateway:$GITHUB_SHA \
+            -n ai-chatbot
+
+          kubectl set image deployment/model-gateway \
+            model-gateway=$REGISTRY/$PROJECT_ID/model-gateway:$GITHUB_SHA \
+            -n ai-chatbot
+
+          # Wait for rollout
+          kubectl rollout status deployment/ai-chatbot -n ai-chatbot --timeout=600s
+          kubectl rollout status deployment/api-gateway -n ai-chatbot --timeout=600s
+
+      - name: Run health checks
+        run: |
+          ./scripts/health-check.sh ai-chatbot
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi
