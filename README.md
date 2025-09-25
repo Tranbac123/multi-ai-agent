@@ -82,24 +82,28 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 ## 🌟 Key Features
 
 ### **🔍 Real-Time Web Search**
+
 - **FIRECRAWL Integration**: Live internet search capabilities
 - **Intelligent Detection**: Automatic web search trigger detection
 - **Multi-Source Results**: Combines top search results with AI enhancement
 - **Citation Support**: Proper attribution and source tracking
 
 ### **🏠 Local Development**
+
 - **No Docker Option**: Run all services natively for faster development
 - **Auto-Setup Scripts**: One-command local environment setup
 - **Service Management**: Start/stop individual or all services
 - **Live Reloading**: Instant code changes without container rebuilds
 
 ### **🔒 Security & Privacy**
+
 - **API Key Protection**: Secure environment variable management
 - **Multi-tenant Isolation**: Row-level security and tenant separation
 - **PII Detection**: Automatic sensitive data identification and redaction
 - **Audit Logging**: Comprehensive activity tracking and compliance
 
 ### **⚡ Performance & Reliability**
+
 - **Circuit Breakers**: Automatic failure detection and recovery
 - **Load Balancing**: Intelligent request routing and distribution
 - **Caching**: Semantic response caching for improved performance
@@ -141,6 +145,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 The platform is production-ready with enterprise-grade features for stability, accuracy, safety, and reliability:
 
 ### **Core Capabilities**
+
 - **Loop Safety**: MAX_STEPS enforcement, progress tracking, and oscillation detection
 - **Strict Contracts**: Pydantic validation with boundary enforcement and PII redaction
 - **Router Intelligence**: Feature extraction, classification, and cost optimization
@@ -218,11 +223,13 @@ cd multi-ai-agent
 ### **🌐 Service URLs**
 
 **Frontend Services:**
+
 - AI Chatbot: http://localhost:3001
 - Web Frontend: http://localhost:3000
 - Admin Portal: http://localhost:8099
 
 **Backend Services:**
+
 - API Gateway: http://localhost:8000
 - Model Gateway: http://localhost:8080
 - Retrieval Service: http://localhost:8081
@@ -231,6 +238,7 @@ cd multi-ai-agent
 - Realtime Gateway: http://localhost:8084
 
 **Control Plane:**
+
 - Config Service: http://localhost:8090
 - Policy Adapter: http://localhost:8091
 - Feature Flags: http://localhost:8092
@@ -240,6 +248,7 @@ cd multi-ai-agent
 - Notifications: http://localhost:8097
 
 **Documentation:**
+
 - API Docs: http://localhost:8000/docs
 - Local Development Guide: [LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md)
 
@@ -323,6 +332,7 @@ make update-docker # Update Docker images
 ## API Endpoints
 
 ### **Main API Gateway (Port 8000)**
+
 - **Chat**: `/ask` - Main chatbot endpoint with web search
 - **Chat API**: `/v1/chat` - Standard chat completion API
 - **Web Scraping**: `/web-scrape` - FIRECRAWL web scraping
@@ -330,6 +340,7 @@ make update-docker # Update Docker images
 - **Docs**: `/docs` - Interactive API documentation
 
 ### **Service-Specific Endpoints**
+
 - **Model Gateway**: `/v1/chat` - AI model routing and provider management
 - **Retrieval Service**: `/search` - Document retrieval and RAG
 - **Tools Service**: `/v1/tools/exec` - External tools execution
