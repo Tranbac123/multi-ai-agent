@@ -1,0 +1,164 @@
+graph TB
+    %% User Input Types
+    subgraph "👤 User Input Types"
+        ChatQuery["💬 Chat Query<br/>\"What's the weather?\"<br/>\"Explain AI\"<br/>\"Latest news\""]
+        DocumentUpload["📄 Document Upload<br/>PDF • DOCX • TXT<br/>Company Handbook<br/>Technical Docs"]
+        SocialMessage["📱 Social Message<br/>Facebook Messenger<br/>Zalo Chat • TikTok<br/>Multi-platform"]
+        AdminAction["⚙️ Admin Action<br/>User Management<br/>System Configuration<br/>Analytics Viewing"]
+    end
+
+    %% Processing Paths
+    subgraph "🔄 Processing Paths"
+        subgraph "💬 Chat Processing Path"
+            ChatGateway["🚪 API Gateway<br/>:8000<br/>Authentication<br/>Rate Limiting"]
+            ChatRouter["🎯 Router Service<br/>:8083<br/>Query Classification<br/>Tier Selection"]
+            ChatOrchestrator["🎼 Orchestrator<br/>:8081<br/>Workflow Execution<br/>Tool Coordination"]
+            
+            subgraph "🔍 Web Search Branch"
+                WebTools["🛠️ Tools Service<br/>:8082<br/>FIRECRAWL Integration"]
+                WebSearch["🕷️ FIRECRAWL API<br/>Live Web Search<br/>Real-time Data"]
+            end
+            
+            subgraph "🧠 AI Processing Branch"
+                AIModel["🤖 Model Gateway<br/>:8080<br/>AI Model Routing"]
+                OpenAI["🧠 OpenAI API<br/>GPT-4 • GPT-3.5<br/>Text Generation"]
+                Anthropic["🤖 Anthropic API<br/>Claude Models<br/>Advanced Reasoning"]
+            end
+            
+            subgraph "📚 Knowledge Branch"
+                Retrieval["📚 Retrieval Service<br/>:8081<br/>Document Search"]
+                VectorDB["🧮 Vector Database<br/>Embeddings<br/>Semantic Search"]
+            end
+        end
+        
+        subgraph "📄 Document Processing Path"
+            DocGateway["🚪 API Gateway<br/>:8000<br/>File Upload<br/>Validation"]
+            Ingestion["📥 Ingestion Service<br/>:8004<br/>Text Extraction<br/>PII Detection"]
+            DocProcessing["⚙️ Document Processing<br/>Chunking • Embedding<br/>Indexing • Storage"]
+        end
+        
+        subgraph "📱 Social Processing Path"
+            SocialAdapter["💬 Chat Adapters<br/>:8006<br/>Platform Integration<br/>Message Normalization"]
+            SocialGateway["🚪 API Gateway<br/>:8000<br/>Unified Processing"]
+            SocialResponse["📤 Response Routing<br/>Platform-specific<br/>Formatting"]
+        end
+        
+        subgraph "⚙️ Admin Processing Path"
+            AdminGateway["🚪 API Gateway<br/>:8000<br/>Admin Authentication<br/>Permission Checks"]
+            AdminServices["🎛️ Control Plane<br/>Config • Policy<br/>Usage • Audit"]
+            AdminData["📊 Admin Dashboard<br/>Analytics • Reports<br/>System Management"]
+        end
+    end
+
+    %% Real-time Layer
+    subgraph "⚡ Real-time Communication"
+        RealtimeGateway["⚡ Realtime Gateway<br/>:8084<br/>WebSocket Management<br/>Message Streaming"]
+        SemanticCache["🧠 Semantic Cache<br/>:8085<br/>Response Caching<br/>Performance Optimization"]
+    end
+
+    %% Data Storage Layer
+    subgraph "💾 Data Storage Layer"
+        Postgres["🐘 PostgreSQL<br/>:5432<br/>Primary Database<br/>Multi-tenant RLS<br/>ACID Compliance"]
+        Redis["🔴 Redis<br/>:6379<br/>Session Storage<br/>Caching Layer<br/>Pub/Sub Messaging"]
+        NATS["📡 NATS JetStream<br/>:4222<br/>Event Streaming<br/>Message Queuing<br/>Guaranteed Delivery"]
+        VectorStorage["🧮 Vector Storage<br/>Embeddings Database<br/>Similarity Search<br/>Index Management"]
+    end
+
+    %% Control & Monitoring
+    subgraph "🎛️ Control & Monitoring"
+        ConfigService["⚙️ Config Service<br/>:8090<br/>Configuration<br/>Environment Settings"]
+        PolicyAdapter["📋 Policy Adapter<br/>:8091<br/>Policy Enforcement<br/>Access Control"]
+        FeatureFlags["🚩 Feature Flags<br/>:8092<br/>Runtime Toggles<br/>A/B Testing"]
+        UsageMetering["📊 Usage Metering<br/>:8095<br/>Cost Tracking<br/>Budget Monitoring"]
+        AuditLog["📝 Audit Log<br/>:8096<br/>Activity Tracking<br/>Compliance Logging"]
+    end
+
+    %% Output Types
+    subgraph "📤 Output Types"
+        ChatResponse["💬 Chat Response<br/>AI-generated Answer<br/>Live Web Data<br/>Source Citations"]
+        DocumentStatus["📄 Document Status<br/>Processing Complete<br/>Indexed & Searchable<br/>Metadata Available"]
+        SocialResponse["📱 Social Response<br/>Platform-formatted<br/>Message Delivery<br/>Status Tracking"]
+        AdminDashboard["⚙️ Admin Dashboard<br/>System Analytics<br/>User Management<br/>Configuration UI"]
+    end
+
+    %% Chat Query Flow
+    ChatQuery --> ChatGateway
+    ChatGateway --> ChatRouter
+    ChatRouter --> ChatOrchestrator
+    ChatOrchestrator --> WebTools
+    ChatOrchestrator --> AIModel
+    ChatOrchestrator --> Retrieval
+    
+    WebTools --> WebSearch
+    AIModel --> OpenAI
+    AIModel --> Anthropic
+    Retrieval --> VectorDB
+    
+    ChatOrchestrator --> RealtimeGateway
+    ChatOrchestrator --> SemanticCache
+    
+    %% Document Upload Flow
+    DocumentUpload --> DocGateway
+    DocGateway --> Ingestion
+    Ingestion --> DocProcessing
+    DocProcessing --> VectorStorage
+    DocProcessing --> Postgres
+    
+    %% Social Message Flow
+    SocialMessage --> SocialAdapter
+    SocialAdapter --> SocialGateway
+    SocialGateway --> ChatRouter
+    ChatRouter --> SocialResponse
+    
+    %% Admin Action Flow
+    AdminAction --> AdminGateway
+    AdminGateway --> AdminServices
+    AdminServices --> AdminData
+    
+    %% Control Plane Interactions
+    ChatGateway --> ConfigService
+    ChatGateway --> PolicyAdapter
+    ChatGateway --> FeatureFlags
+    ChatGateway --> UsageMetering
+    ChatGateway --> AuditLog
+    
+    %% Data Storage Interactions
+    ChatGateway --> Postgres
+    ChatGateway --> Redis
+    ChatGateway --> NATS
+    Retrieval --> Postgres
+    Retrieval --> VectorStorage
+    RealtimeGateway --> Redis
+    RealtimeGateway --> NATS
+    Ingestion --> Postgres
+    Ingestion --> VectorStorage
+    
+    %% Final Outputs
+    ChatOrchestrator --> ChatResponse
+    DocProcessing --> DocumentStatus
+    SocialResponse --> SocialResponse
+    AdminData --> AdminDashboard
+    
+    %% Event Publishing
+    ChatGateway -.->|"Usage Events"| NATS
+    ChatGateway -.->|"Audit Events"| NATS
+    AIModel -.->|"Model Events"| NATS
+    WebTools -.->|"Tool Events"| NATS
+    UsageMetering -.->|"Billing Events"| NATS
+    
+    %% Styling
+    classDef inputType fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef processingPath fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef realtimeLayer fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef dataStorage fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    classDef controlMonitoring fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+    classDef outputType fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef externalAPI fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+
+    class ChatQuery,DocumentUpload,SocialMessage,AdminAction inputType
+    class ChatGateway,ChatRouter,ChatOrchestrator,WebTools,AIModel,Retrieval,DocGateway,Ingestion,DocProcessing,SocialAdapter,SocialGateway,SocialResponse,AdminGateway,AdminServices,AdminData processingPath
+    class RealtimeGateway,SemanticCache realtimeLayer
+    class Postgres,Redis,NATS,VectorStorage,VectorDB dataStorage
+    class ConfigService,PolicyAdapter,FeatureFlags,UsageMetering,AuditLog controlMonitoring
+    class ChatResponse,DocumentStatus,SocialResponse,AdminDashboard outputType
+    class WebSearch,OpenAI,Anthropic externalAPI

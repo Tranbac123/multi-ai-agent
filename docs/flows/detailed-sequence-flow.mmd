@@ -1,0 +1,128 @@
+sequenceDiagram
+    participant 👤 as 👤 User
+    participant 🤖 as 🤖 AI Chatbot UI<br/>:3001
+    participant 🚪 as 🚪 API Gateway<br/>:8000
+    participant 🎯 as 🎯 Router Service<br/>:8083
+    participant 🎼 as 🎼 Orchestrator<br/>:8081
+    participant 🛠️ as 🛠️ Tools Service<br/>:8082
+    participant 🕷️ as 🕷️ FIRECRAWL API
+    participant 🤖 as 🤖 Model Gateway<br/>:8080
+    participant 🧠 as 🧠 OpenAI API
+    participant 📚 as 📚 Retrieval Service<br/>:8081
+    participant 🧮 as 🧮 Vector Database
+    participant ⚡ as ⚡ Realtime Gateway<br/>:8084
+    participant 📊 as 📊 Usage Metering<br/>:8095
+    participant 📝 as 📝 Audit Log<br/>:8096
+    participant 🔴 as 🔴 Redis<br/>:6379
+    participant 🐘 as 🐘 PostgreSQL<br/>:5432
+    participant 📡 as 📡 NATS<br/>:4222
+
+    Note over 👤,📡: 🌟 Complete User Journey: From Question to AI Response with Web Search
+
+    %% Step 1: User Interaction
+    👤->>🤖: 1. 💬 "What's the latest AI news?"
+    Note over 🤖: 🎨 Frontend Processing<br/>User Input Validation<br/>UI State Management
+
+    %% Step 2: API Gateway Entry
+    🤖->>🚪: 2. 📤 POST /ask<br/>Headers: Content-Type: application/json<br/>X-Tenant-Id: tenant_123<br/>X-Session-Id: sess_456<br/>Body: {query: "What's the latest AI news?", session_id: "sess_456"}
+
+    %% Step 3: Authentication & Validation
+    Note over 🚪: 🔐 Authentication Layer<br/>JWT Validation • Rate Limiting<br/>Tenant Context Injection
+    🚪->>🔴: 3. 🔍 GET session:sess_456<br/>Retrieve user session context
+    🔴-->>🚪: ✅ Session data: {user_id: "user_123", tenant: "tenant_123", preferences: {...}}
+
+    %% Step 4: Audit Logging
+    🚪->>📝: 4. 📝 POST /audit<br/>Log incoming request
+    📝->>🐘: 5. 💾 INSERT INTO audit_events<br/>{action: "chat_query", user_id: "user_123", query: "What's the latest AI news?", timestamp: NOW()}
+    📝-->>🚪: ✅ Audit logged
+
+    %% Step 5: Intelligent Routing
+    🚪->>🎯: 6. 🎯 POST /route<br/>Intelligent request routing
+    Note over 🎯: 🧠 Feature Extraction<br/>- Token count: 5<br/>- Domain: technology<br/>- Complexity: medium<br/>- Historical success: 0.92
+    🎯->>🔴: 7. 📊 GET router:features:tenant_123<br/>Retrieve feature store data
+    🔴-->>🎯: 📈 Feature cache: {avg_response_time: 2.3s, success_rate: 0.95}
+    🎯->>🎯: 8. 🎯 Classification Decision<br/>Tier: standard<br/>Confidence: 0.89<br/>Route: orchestrator + tools
+    🎯-->>🚪: ✅ {tier: "standard", route_to: ["orchestrator", "tools"], confidence: 0.89}
+
+    %% Step 6: Orchestrator Processing
+    🚪->>🎼: 9. 🎼 POST /workflows/execute<br/>Workflow orchestration
+    Note over 🎼: 🎼 LangGraph Workflow<br/>Multi-step Processing<br/>Tool Coordination<br/>Loop Safety (MAX_STEPS: 10)
+
+    %% Step 7: Web Search Detection & Execution
+    🎼->>🛠️: 10. 🛠️ POST /v1/tools/exec<br/>Web search execution
+    Note over 🛠️: 🔍 Web Search Detection<br/>Keywords: "latest", "news"<br/>Trigger: FIRECRAWL search
+    🛠️->>🕷️: 11. 🕷️ POST /v1/search<br/>Headers: Authorization: Bearer fc-xxx<br/>Body: {query: "latest AI news 2024", limit: 5}
+    🕷️-->>🛠️: ✅ {data: [{title: "GPT-4 Updates", content: "...", url: "..."}, ...]}
+    🛠️->>🛠️: 12. 🔄 Result Processing<br/>Combine top 3 results<br/>Extract key information<br/>Format for AI context
+    🛠️-->>🎼: ✅ {success: true, output: "Latest AI news: GPT-4 improvements, new language models...", execution_time_ms: 1250}
+
+    %% Step 8: Document Retrieval (if needed)
+    🎼->>📚: 13. 📚 POST /search<br/>Document retrieval (optional)
+    📚->>🧮: 14. 🧮 POST /search<br/>Vector similarity search
+    🧮-->>📚: ✅ {results: [{chunk_id: "chunk_001", similarity: 0.87, content: "..."}, ...]}
+    📚-->>🎼: ✅ {results: [{content: "AI developments in 2024...", source: "tech_report.pdf", relevance: 0.87}, ...]}
+
+    %% Step 9: AI Model Processing
+    🎼->>🤖: 15. 🤖 POST /v1/chat<br/>AI model request
+    Note over 🤖: 🧠 Model Gateway Processing<br/>Provider Selection • Cost Optimization<br/>Token Counting • Rate Limiting
+    🤖->>🧠: 16. 🧠 POST /v1/chat/completions<br/>Headers: Authorization: Bearer sk-xxx<br/>Body: {model: "gpt-4o-mini", messages: [{role: "system", content: "You have access to latest AI news: GPT-4 improvements..."}, {role: "user", content: "What's the latest AI news?"}], temperature: 0.7}
+    🧠-->>🤖: ✅ {choices: [{message: {content: "Based on the latest information, here are the key AI developments..."}}], usage: {input_tokens: 850, output_tokens: 320, total_cost: 0.018}}
+    🤖-->>🎼: ✅ {content: "Based on the latest information, here are the key AI developments: GPT-4 improvements, new language models...", usage: {tokens: 1170, cost: 0.018}}
+
+    %% Step 10: Real-time Streaming
+    🚪->>⚡: 17. ⚡ WebSocket /ws/tenant_123<br/>Real-time response streaming
+    ⚡->>📡: 18. 📡 SUBSCRIBE tenant.tenant_123.realtime<br/>Listen for streaming events
+    🚪->>📡: 19. 📡 PUBLISH tenant.tenant_123.realtime<br/>{type: "response_chunk", content: "Based on the latest information...", session_id: "sess_456"}
+
+    %% Step 11: Usage Tracking
+    🚪->>📊: 20. 📊 POST /usage<br/>Usage tracking
+    Note over 📊: 📊 Usage Metering<br/>Cost Calculation • Budget Monitoring<br/>Performance Metrics
+    📊->>🐘: 21. 💾 INSERT INTO usage_log<br/>{tenant_id: "tenant_123", service: "api-gateway", tokens_used: 1170, cost: 0.018, timestamp: NOW()}
+    📊->>🔴: 22. 📈 INCRBY tenant:tenant_123:cost:current_month<br/>Add to monthly cost: +0.018
+    📊->>🔴: 23. 📊 SET tenant:tenant_123:usage:api_gateway<br/>Update usage counter
+    📊-->>🚪: ✅ Usage tracked
+
+    %% Step 12: Final Audit
+    🚪->>📝: 24. 📝 POST /audit<br/>Final audit logging
+    📝->>🐘: 25. 💾 UPDATE audit_events<br/>SET success = true, response_time_ms = 2500<br/>WHERE request_id = 'req_789'
+    📝-->>🚪: ✅ Audit updated
+
+    %% Step 13: Event Publishing
+    🚪->>📡: 26. 📡 PUBLISH tenant.usage.api_gateway<br/>{tenant_id: "tenant_123", endpoint: "/ask", tokens: 1170, cost: 0.018, timestamp: "..."}
+    🚪->>📡: 27. 📡 PUBLISH tenant.analytics.query_complexity<br/>{tenant_id: "tenant_123", complexity: "medium", success_rate: 1.0, response_time_ms: 2500}
+
+    %% Step 14: Final Response
+    🚪-->>🤖: 28. ✅ 200 OK<br/>{answer: "Based on the latest information, here are the key AI developments: GPT-4 improvements, new language models, enhanced reasoning capabilities...", citations: ["[1] Live web data via FIRECRAWL", "[2] Internal knowledge base"], trace: ["Web search successful", "Router: standard tier selected", "AI: comprehensive response generated"]}
+
+    %% Step 15: Real-time Update
+    ⚡-->>🤖: 29. 📡 WebSocket message<br/>{type: "response_complete", session_id: "sess_456", total_chunks: 2, final_tokens: 320}
+
+    %% Step 16: User Experience
+    🤖-->>👤: 30. 💬 Display AI Response<br/>🎨 Rich UI with citations<br/>📊 Live web data integration<br/>🔗 Source links and references
+
+    %% Error Handling Branch
+    Note over 👤,📡: 🚨 Error Handling Scenarios
+
+    alt 🚨 Web Search Fails
+        🕷️-->>🛠️: ❌ 500 Error: API timeout
+        🛠️-->>🎼: ⚠️ {success: false, output: "Web search temporarily unavailable"}
+        🎼->>🤖: 🔄 Continue with AI-only response
+        Note over 🎼: 🛡️ Graceful Degradation<br/>AI responds without live data<br/>User informed of limitation
+    end
+
+    alt 🚨 AI Model Fails
+        🧠-->>🤖: ❌ 500 Error: Rate limit exceeded
+        🤖-->>🎼: ⚠️ {error: "OpenAI API rate limit exceeded"}
+        🎼-->>🚪: 🔄 Fallback response
+        🚪-->>🤖: ⚠️ {answer: "I apologize, but I'm having trouble connecting to the AI service right now. Please try again later.", citations: [], trace: ["AI service temporarily unavailable"]}
+        🤖-->>👤: 💬 Display error message with retry option
+    end
+
+    alt 🚨 Router Service Unavailable
+        🎯-->>🚪: ❌ 503 Service Unavailable
+        🚪->>🎼: 🔄 Direct routing (fallback)
+        Note over 🚪: 🛡️ Default Strategy<br/>Skip intelligent routing<br/>Log service degradation
+    end
+
+    %% Background Processing
+    Note over 🚪,🐘: 🔄 Background Processing<br/>📊 Analytics aggregation<br/>🧹 Session cleanup<br/>📈 Performance optimization<br/>🔒 Security monitoring

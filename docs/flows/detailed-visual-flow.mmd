@@ -1,0 +1,185 @@
+graph TB
+    %% User Interface Layer
+    subgraph "👤 User Interface Layer"
+        User["👤 User"]
+        Browser["🌐 Web Browser"]
+        Mobile["📱 Mobile App"]
+    end
+
+    %% Frontend Services
+    subgraph "🎨 Frontend Services"
+        ChatbotUI["🤖 AI Chatbot UI<br/>:3001<br/>React + Real-time Search"]
+        WebFrontend["🌐 Web Frontend<br/>:3000<br/>React/Vite Dashboard"]
+        AdminPortal["⚙️ Admin Portal<br/>:8099<br/>FastAPI Backend"]
+    end
+
+    %% API Gateway Layer
+    subgraph "🚪 API Gateway Layer"
+        APIGateway["🚪 API Gateway<br/>:8000<br/>Authentication • Rate Limiting<br/>Request Routing • CORS"]
+    end
+
+    %% Core Processing Layer
+    subgraph "🧠 Core Processing Layer"
+        RouterService["🎯 Router Service<br/>:8083<br/>Intelligent Routing<br/>Feature Extraction<br/>Tier Classification"]
+        
+        Orchestrator["🎼 Orchestrator<br/>:8081<br/>Workflow Execution<br/>LangGraph • Saga Patterns<br/>Loop Safety • Tool Coordination"]
+        
+        ModelGateway["🤖 Model Gateway<br/>:8080<br/>AI Model Routing<br/>Provider Management<br/>Cost Optimization"]
+    end
+
+    %% Data & Tools Layer
+    subgraph "🔧 Data & Tools Layer"
+        RetrievalService["📚 Retrieval Service<br/>:8081<br/>Document Retrieval<br/>RAG • Vector Search<br/>Semantic Analysis"]
+        
+        ToolsService["🛠️ Tools Service<br/>:8082<br/>External Tools<br/>FIRECRAWL Web Search<br/>API Integrations"]
+        
+        ChatAdapters["💬 Chat Adapters<br/>:8006<br/>Multi-channel Integration<br/>Facebook • Zalo • TikTok<br/>Webhook Processing"]
+    end
+
+    %% Real-time Layer
+    subgraph "⚡ Real-time Layer"
+        RealtimeGateway["⚡ Realtime Gateway<br/>:8084<br/>WebSocket Connections<br/>Message Streaming<br/>Backpressure Management"]
+        
+        SemanticCache["🧠 Semantic Cache<br/>:8085<br/>Intelligent Caching<br/>Response Optimization<br/>Similarity Matching"]
+    end
+
+    %% Control Plane
+    subgraph "🎛️ Control Plane"
+        ConfigService["⚙️ Config Service<br/>:8090<br/>Configuration Management<br/>Environment Settings<br/>Feature Toggles"]
+        
+        PolicyAdapter["📋 Policy Adapter<br/>:8091<br/>Policy Enforcement<br/>Compliance Management<br/>Access Control"]
+        
+        FeatureFlags["🚩 Feature Flags<br/>:8092<br/>Runtime Toggles<br/>A/B Testing<br/>Canary Deployments"]
+        
+        UsageMetering["📊 Usage Metering<br/>:8095<br/>Usage Tracking<br/>Cost Monitoring<br/>Budget Enforcement"]
+        
+        AuditLog["📝 Audit Log<br/>:8096<br/>Activity Tracking<br/>Compliance Logging<br/>Security Events"]
+    end
+
+    %% Infrastructure Layer
+    subgraph "🏗️ Infrastructure Layer"
+        Postgres["🐘 PostgreSQL<br/>:5432<br/>Primary Database<br/>Multi-tenant RLS<br/>ACID Compliance"]
+        
+        Redis["🔴 Redis<br/>:6379<br/>Session Storage<br/>Caching Layer<br/>Pub/Sub Messaging"]
+        
+        NATS["📡 NATS JetStream<br/>:4222<br/>Event Streaming<br/>Message Queuing<br/>Guaranteed Delivery"]
+        
+        VectorDB["🧮 Vector Database<br/>Embeddings Storage<br/>Semantic Search<br/>Similarity Matching"]
+    end
+
+    %% External Services
+    subgraph "🌍 External Services"
+        OpenAI["🧠 OpenAI API<br/>GPT Models<br/>Text Generation"]
+        
+        Anthropic["🤖 Anthropic API<br/>Claude Models<br/>Advanced Reasoning"]
+        
+        FIRECRAWL["🕷️ FIRECRAWL API<br/>Web Scraping<br/>Live Data Search"]
+        
+        Stripe["💳 Stripe API<br/>Payment Processing<br/>Billing Management"]
+        
+        SocialPlatforms["📱 Social Platforms<br/>Facebook Messenger<br/>Zalo Chat • TikTok<br/>Webhook Endpoints"]
+    end
+
+    %% User Journey - Main Flow
+    User --> Browser
+    User --> Mobile
+    Browser --> ChatbotUI
+    Browser --> WebFrontend
+    Mobile --> ChatbotUI
+
+    %% Frontend to API Gateway
+    ChatbotUI -->|"POST /ask<br/>JSON Request<br/>Session Management"| APIGateway
+    WebFrontend -->|"REST API Calls<br/>Authentication<br/>CORS Headers"| APIGateway
+    AdminPortal -->|"Admin APIs<br/>Management Operations<br/>User Administration"| APIGateway
+
+    %% API Gateway Processing
+    APIGateway -->|"JWT Validation<br/>Rate Limiting<br/>Tenant Context"| ConfigService
+    APIGateway -->|"Policy Checks<br/>Access Control<br/>Compliance"| PolicyAdapter
+    APIGateway -->|"Feature Flags<br/>A/B Testing<br/>Runtime Toggles"| FeatureFlags
+
+    %% Core Processing Flow
+    APIGateway -->|"Intelligent Routing<br/>Feature Extraction<br/>Tier Selection"| RouterService
+    RouterService -->|"Workflow Execution<br/>Multi-step Processing<br/>Tool Coordination"| Orchestrator
+    Orchestrator -->|"AI Model Requests<br/>Provider Selection<br/>Cost Optimization"| ModelGateway
+
+    %% Data & Tools Processing
+    Orchestrator -->|"Document Retrieval<br/>Vector Search<br/>RAG Processing"| RetrievalService
+    Orchestrator -->|"External Tools<br/>Web Search<br/>API Integrations"| ToolsService
+    
+    %% Real-time Communication
+    APIGateway -->|"WebSocket Upgrade<br/>Real-time Streaming<br/>Message Queues"| RealtimeGateway
+    APIGateway -->|"Response Caching<br/>Similarity Matching<br/>Performance Optimization"| SemanticCache
+
+    %% External API Calls
+    ModelGateway -->|"GPT Completions<br/>Text Generation<br/>Token Usage"| OpenAI
+    ModelGateway -->|"Claude Completions<br/>Advanced Reasoning<br/>Multi-modal"| Anthropic
+    ToolsService -->|"Web Scraping<br/>Live Data Search<br/>Content Extraction"| FIRECRAWL
+
+    %% Social Platform Integration
+    SocialPlatforms -->|"Webhook Messages<br/>Platform Events<br/>User Interactions"| ChatAdapters
+    ChatAdapters -->|"Normalized Messages<br/>Platform Abstraction<br/>Response Routing"| APIGateway
+
+    %% Infrastructure Dependencies
+    APIGateway -->|"Data Persistence<br/>Multi-tenant Storage<br/>ACID Transactions"| Postgres
+    APIGateway -->|"Session Management<br/>Caching Layer<br/>Pub/Sub Events"| Redis
+    APIGateway -->|"Event Streaming<br/>Message Queuing<br/>Reliable Delivery"| NATS
+    
+    RetrievalService -->|"Vector Storage<br/>Embedding Indexing<br/>Similarity Search"| VectorDB
+    RetrievalService -->|"Document Storage<br/>Metadata Management<br/>RLS Isolation"| Postgres
+    
+    RealtimeGateway -->|"Session Storage<br/>Message Buffering<br/>Connection Management"| Redis
+    RealtimeGateway -->|"Event Broadcasting<br/>Real-time Updates<br/>Message Streaming"| NATS
+
+    %% Control Plane Dependencies
+    ConfigService -->|"Configuration Storage<br/>Environment Variables<br/>Settings Cache"| Redis
+    PolicyAdapter -->|"Policy Cache<br/>Decision Storage<br/>Access Rules"| Redis
+    FeatureFlags -->|"Flag State<br/>A/B Test Data<br/>Toggle History"| Redis
+    UsageMetering -->|"Usage Data<br/>Billing Events<br/>Cost Tracking"| Postgres
+    AuditLog -->|"Audit Events<br/>Compliance Logs<br/>Security Trails"| Postgres
+
+    %% Billing Integration
+    UsageMetering -->|"Payment Processing<br/>Invoice Generation<br/>Subscription Management"| Stripe
+
+    %% Monitoring & Analytics
+    APIGateway -->|"Usage Tracking<br/>Cost Monitoring<br/>Performance Metrics"| UsageMetering
+    APIGateway -->|"Activity Logging<br/>Security Events<br/>Compliance Tracking"| AuditLog
+
+    %% Event Publishing
+    APIGateway -.->|"Usage Events<br/>tenant.usage.*"| NATS
+    APIGateway -.->|"Audit Events<br/>tenant.audit.*"| NATS
+    ModelGateway -.->|"Model Events<br/>model.usage.*"| NATS
+    ToolsService -.->|"Tool Events<br/>tool.execution.*"| NATS
+    UsageMetering -.->|"Billing Events<br/>tenant.billing.*"| NATS
+
+    %% Response Flow
+    ModelGateway -->|"AI Response<br/>Generated Content<br/>Usage Metrics"| APIGateway
+    RetrievalService -->|"Document Results<br/>Relevance Scores<br/>Source Citations"| APIGateway
+    ToolsService -->|"Tool Output<br/>External Data<br/>Execution Metrics"| APIGateway
+    
+    APIGateway -->|"Final Response<br/>Citations • Trace<br/>Usage Data"| ChatbotUI
+    APIGateway -->|"API Response<br/>JSON Data<br/>Status Codes"| WebFrontend
+    APIGateway -->|"Admin Response<br/>Management Data<br/>System Status"| AdminPortal
+
+    %% Real-time Updates
+    RealtimeGateway -->|"WebSocket Messages<br/>Real-time Updates<br/>Streaming Response"| ChatbotUI
+
+    %% Styling
+    classDef userLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    classDef frontendLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef gatewayLayer fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    classDef coreLayer fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef dataLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef realtimeLayer fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef controlLayer fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+    classDef infraLayer fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    classDef externalLayer fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+
+    class User,Browser,Mobile userLayer
+    class ChatbotUI,WebFrontend,AdminPortal frontendLayer
+    class APIGateway gatewayLayer
+    class RouterService,Orchestrator,ModelGateway coreLayer
+    class RetrievalService,ToolsService,ChatAdapters dataLayer
+    class RealtimeGateway,SemanticCache realtimeLayer
+    class ConfigService,PolicyAdapter,FeatureFlags,UsageMetering,AuditLog controlLayer
+    class Postgres,Redis,NATS,VectorDB infraLayer
+    class OpenAI,Anthropic,FIRECRAWL,Stripe,SocialPlatforms externalLayer

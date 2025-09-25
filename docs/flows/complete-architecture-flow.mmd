@@ -1,0 +1,180 @@
+graph TB
+    %% User Layer
+    subgraph "👥 User Layer"
+        WebUser["👤 Web User"]
+        MobileUser["📱 Mobile User"]
+        AdminUser["⚙️ Admin User"]
+        SocialUser["📱 Social Platform User"]
+    end
+
+    %% Frontend Layer
+    subgraph "🎨 Frontend Layer"
+        ChatbotUI["🤖 AI Chatbot UI<br/>:3001<br/>React + Real-time Search<br/>Live Web Integration"]
+        WebDashboard["🌐 Web Dashboard<br/>:3000<br/>React/Vite<br/>User Management"]
+        AdminPanel["⚙️ Admin Panel<br/>:8099<br/>FastAPI Backend<br/>System Administration"]
+    end
+
+    %% API Gateway Layer
+    subgraph "🚪 API Gateway Layer"
+        MainGateway["🚪 Main API Gateway<br/>:8000<br/>🔐 Authentication<br/>⚡ Rate Limiting<br/>🎯 Request Routing<br/>🌐 CORS Handling<br/>📊 Request Validation"]
+    end
+
+    %% Core Processing Layer
+    subgraph "🧠 Core Processing Layer"
+        IntelligentRouter["🎯 Intelligent Router<br/>:8083<br/>🧠 Feature Extraction<br/>📊 Tier Classification<br/>🎲 Bandit Policy<br/>🔄 Load Balancing"]
+        
+        WorkflowOrchestrator["🎼 Workflow Orchestrator<br/>:8081<br/>📋 LangGraph Workflows<br/>🔄 Saga Patterns<br/>🛡️ Loop Safety<br/>🔧 Tool Coordination"]
+        
+        AIModelGateway["🤖 AI Model Gateway<br/>:8080<br/>🎯 Provider Selection<br/>💰 Cost Optimization<br/>📊 Token Management<br/>🔄 Failover Handling"]
+    end
+
+    %% Data & Intelligence Layer
+    subgraph "📚 Data & Intelligence Layer"
+        DocumentRetrieval["📚 Document Retrieval<br/>:8081<br/>🔍 RAG Processing<br/>🧮 Vector Search<br/>📊 Semantic Analysis<br/>🎯 Relevance Scoring"]
+        
+        ExternalTools["🛠️ External Tools<br/>:8082<br/>🕷️ FIRECRAWL Web Search<br/>🔌 API Integrations<br/>⚡ Tool Execution<br/>📊 Performance Metrics"]
+        
+        MultiChannelChat["💬 Multi-Channel Chat<br/>:8006<br/>📱 Facebook Integration<br/>💬 Zalo Integration<br/>🎵 TikTok Integration<br/>🔄 Message Normalization"]
+    end
+
+    %% Real-time & Performance Layer
+    subgraph "⚡ Real-time & Performance Layer"
+        RealtimeGateway["⚡ Realtime Gateway<br/>:8084<br/>🔌 WebSocket Management<br/>📡 Message Streaming<br/>🛡️ Backpressure Control<br/>🔄 Connection Pooling"]
+        
+        IntelligentCache["🧠 Semantic Cache<br/>:8085<br/>🎯 Similarity Matching<br/>⚡ Response Optimization<br/>📊 Cache Analytics<br/>🔄 TTL Management"]
+        
+        EventRelay["📡 Event Relay<br/>:8087<br/>🔄 Webhook Delivery<br/>📊 Message Queuing<br/>🛡️ Circuit Breaker<br/>📈 Retry Logic"]
+    end
+
+    %% Control Plane Layer
+    subgraph "🎛️ Control Plane Layer"
+        ConfigManagement["⚙️ Config Management<br/>:8090<br/>🔧 Environment Settings<br/>🎛️ Runtime Configuration<br/>📊 Feature Toggles<br/>🔄 Dynamic Updates"]
+        
+        PolicyEngine["📋 Policy Engine<br/>:8091<br/>🛡️ Access Control<br/>📊 Compliance Rules<br/>🎯 Decision Engine<br/>📝 Policy Auditing"]
+        
+        FeatureManagement["🚩 Feature Management<br/>:8092<br/>🎛️ Runtime Toggles<br/>🧪 A/B Testing<br/>🎯 Canary Deployments<br/>📊 Experiment Analytics"]
+        
+        ServiceRegistry["📋 Service Registry<br/>:8094<br/>🔍 Service Discovery<br/>❤️ Health Monitoring<br/>📊 Load Balancing<br/>🔄 Failover Management"]
+        
+        UsageTracking["📊 Usage Tracking<br/>:8095<br/>💰 Cost Monitoring<br/>📈 Usage Analytics<br/>🚨 Budget Alerts<br/>📊 Performance Metrics"]
+        
+        AuditSystem["📝 Audit System<br/>:8096<br/>📊 Activity Logging<br/>🛡️ Security Events<br/>📋 Compliance Tracking<br/>🔍 Forensic Analysis"]
+        
+        NotificationHub["📢 Notification Hub<br/>:8097<br/>📧 Multi-channel Alerts<br/>🎯 Smart Routing<br/>📊 Delivery Tracking<br/>🔄 Retry Logic"]
+    end
+
+    %% Infrastructure Layer
+    subgraph "🏗️ Infrastructure Layer"
+        PrimaryDatabase["🐘 Primary Database<br/>:5432<br/>💾 ACID Compliance<br/>🏢 Multi-tenant RLS<br/>📊 JSON Support<br/>🔄 Connection Pooling"]
+        
+        CacheLayer["🔴 Cache Layer<br/>:6379<br/>⚡ Session Storage<br/>📊 Pub/Sub Messaging<br/>🔄 Clustering<br/>📈 Performance Monitoring"]
+        
+        EventStreaming["📡 Event Streaming<br/>:4222<br/>🔄 Guaranteed Delivery<br/>📊 Message Queuing<br/>🛡️ Dead Letter Queues<br/>📈 Scalability"]
+        
+        VectorStorage["🧮 Vector Storage<br/>Embeddings Database<br/>🎯 Similarity Search<br/>📊 Index Management<br/>🔄 Backup & Recovery"]
+    end
+
+    %% External Services Layer
+    subgraph "🌍 External Services Layer"
+        OpenAIServices["🧠 OpenAI Services<br/>GPT-4 • GPT-3.5<br/>📊 Text Generation<br/>💰 Token-based Pricing<br/>🔄 Rate Limiting"]
+        
+        AnthropicServices["🤖 Anthropic Services<br/>Claude Models<br/>🧠 Advanced Reasoning<br/>💰 Cost Optimization<br/>🔄 Multi-modal Support"]
+        
+        WebScrapingServices["🕷️ Web Scraping Services<br/>FIRECRAWL API<br/>🌐 Live Web Search<br/>📊 Content Extraction<br/>🔄 Real-time Data"]
+        
+        PaymentServices["💳 Payment Services<br/>Stripe API<br/>💰 Billing Management<br/>📊 Invoice Generation<br/>🔄 Payment Processing"]
+        
+        SocialPlatforms["📱 Social Platforms<br/>Facebook Messenger<br/>💬 Zalo Chat<br/>🎵 TikTok<br/>🔄 Webhook Endpoints"]
+    end
+
+    %% User Connections
+    WebUser --> ChatbotUI
+    WebUser --> WebDashboard
+    MobileUser --> ChatbotUI
+    AdminUser --> AdminPanel
+    SocialUser --> SocialPlatforms
+
+    %% Frontend to Gateway
+    ChatbotUI -->|"📤 POST /ask<br/>🔐 JWT Auth<br/>📊 Session Management"| MainGateway
+    WebDashboard -->|"🌐 REST API<br/>📊 Data Fetching<br/>🎛️ User Management"| MainGateway
+    AdminPanel -->|"⚙️ Admin APIs<br/>🛡️ Privileged Access<br/>📊 System Control"| MainGateway
+
+    %% Gateway to Core Processing
+    MainGateway -->|"🎯 Intelligent Routing<br/>📊 Feature Analysis<br/>🔄 Load Balancing"| IntelligentRouter
+    IntelligentRouter -->|"🎼 Workflow Execution<br/>🔄 Multi-step Processing<br/>🛡️ Safety Controls"| WorkflowOrchestrator
+    WorkflowOrchestrator -->|"🤖 AI Model Requests<br/>💰 Cost Optimization<br/>🔄 Provider Selection"| AIModelGateway
+
+    %% Core to Data & Intelligence
+    WorkflowOrchestrator -->|"📚 Document Retrieval<br/>🧮 Vector Search<br/>🎯 RAG Processing"| DocumentRetrieval
+    WorkflowOrchestrator -->|"🛠️ External Tools<br/>🕷️ Web Search<br/>🔌 API Calls"| ExternalTools
+    SocialPlatforms -->|"💬 Message Processing<br/>🔄 Platform Integration<br/>📊 Normalization"| MultiChannelChat
+
+    %% Real-time & Performance
+    MainGateway -->|"⚡ WebSocket Upgrade<br/>📡 Real-time Streaming<br/>🛡️ Connection Management"| RealtimeGateway
+    MainGateway -->|"🧠 Response Caching<br/>🎯 Similarity Matching<br/>⚡ Performance Optimization"| IntelligentCache
+    WorkflowOrchestrator -->|"📡 Event Publishing<br/>🔄 Webhook Delivery<br/>🛡️ Circuit Breaker"| EventRelay
+
+    %% Control Plane Interactions
+    MainGateway -->|"⚙️ Configuration<br/>🎛️ Runtime Settings<br/>🔄 Dynamic Updates"| ConfigManagement
+    MainGateway -->|"📋 Policy Checks<br/>🛡️ Access Control<br/>📊 Compliance"| PolicyEngine
+    MainGateway -->|"🚩 Feature Flags<br/>🧪 A/B Testing<br/>🎯 Canary Deployments"| FeatureManagement
+    MainGateway -->|"📋 Service Discovery<br/>❤️ Health Checks<br/>🔄 Load Balancing"| ServiceRegistry
+    MainGateway -->|"📊 Usage Tracking<br/>💰 Cost Monitoring<br/>🚨 Budget Alerts"| UsageTracking
+    MainGateway -->|"📝 Audit Logging<br/>🛡️ Security Events<br/>📋 Compliance"| AuditSystem
+
+    %% Infrastructure Dependencies
+    MainGateway -->|"💾 Data Persistence<br/>🏢 Multi-tenant Storage<br/>🔄 ACID Transactions"| PrimaryDatabase
+    MainGateway -->|"⚡ Session Storage<br/>📊 Caching Layer<br/>🔄 Pub/Sub Events"| CacheLayer
+    MainGateway -->|"📡 Event Streaming<br/>🔄 Message Queuing<br/>🛡️ Guaranteed Delivery"| EventStreaming
+    
+    DocumentRetrieval -->|"🧮 Vector Storage<br/>🎯 Embedding Indexing<br/>📊 Similarity Search"| VectorStorage
+    DocumentRetrieval -->|"💾 Document Storage<br/>📊 Metadata Management<br/>🏢 RLS Isolation"| PrimaryDatabase
+    
+    RealtimeGateway -->|"⚡ Session Storage<br/>📊 Message Buffering<br/>🔄 Connection Management"| CacheLayer
+    RealtimeGateway -->|"📡 Event Broadcasting<br/>🔄 Real-time Updates<br/>📊 Message Streaming"| EventStreaming
+
+    %% External API Calls
+    AIModelGateway -->|"🧠 GPT Completions<br/>📊 Text Generation<br/>💰 Token Usage"| OpenAIServices
+    AIModelGateway -->|"🤖 Claude Completions<br/>🧠 Advanced Reasoning<br/>🔄 Multi-modal"| AnthropicServices
+    ExternalTools -->|"🕷️ Web Scraping<br/>🌐 Live Data Search<br/>📊 Content Extraction"| WebScrapingServices
+    UsageTracking -->|"💳 Payment Processing<br/>📊 Invoice Generation<br/>🔄 Subscription Management"| PaymentServices
+
+    %% Event Publishing
+    MainGateway -.->|"📊 Usage Events<br/>tenant.usage.*"| EventStreaming
+    MainGateway -.->|"📝 Audit Events<br/>tenant.audit.*"| EventStreaming
+    AIModelGateway -.->|"🤖 Model Events<br/>model.usage.*"| EventStreaming
+    ExternalTools -.->|"🛠️ Tool Events<br/>tool.execution.*"| EventStreaming
+    UsageTracking -.->|"💰 Billing Events<br/>tenant.billing.*"| EventStreaming
+
+    %% Response Flow
+    AIModelGateway -->|"🤖 AI Response<br/>📊 Generated Content<br/>💰 Usage Metrics"| MainGateway
+    DocumentRetrieval -->|"📚 Document Results<br/>🎯 Relevance Scores<br/>📊 Source Citations"| MainGateway
+    ExternalTools -->|"🛠️ Tool Output<br/>🌐 External Data<br/>📊 Execution Metrics"| MainGateway
+    
+    MainGateway -->|"💬 Final Response<br/>📊 Citations • Trace<br/>💰 Usage Data"| ChatbotUI
+    MainGateway -->|"🌐 API Response<br/>📊 JSON Data<br/>📈 Status Codes"| WebDashboard
+    MainGateway -->|"⚙️ Admin Response<br/>📊 Management Data<br/>📈 System Status"| AdminPanel
+
+    %% Real-time Updates
+    RealtimeGateway -->|"📡 WebSocket Messages<br/>🔄 Real-time Updates<br/>📊 Streaming Response"| ChatbotUI
+
+    %% Styling
+    classDef userLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    classDef frontendLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef gatewayLayer fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    classDef coreLayer fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef dataLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef realtimeLayer fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef controlLayer fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+    classDef infraLayer fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    classDef externalLayer fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+
+    class WebUser,MobileUser,AdminUser,SocialUser userLayer
+    class ChatbotUI,WebDashboard,AdminPanel frontendLayer
+    class MainGateway gatewayLayer
+    class IntelligentRouter,WorkflowOrchestrator,AIModelGateway coreLayer
+    class DocumentRetrieval,ExternalTools,MultiChannelChat dataLayer
+    class RealtimeGateway,IntelligentCache,EventRelay realtimeLayer
+    class ConfigManagement,PolicyEngine,FeatureManagement,ServiceRegistry,UsageTracking,AuditSystem,NotificationHub controlLayer
+    class PrimaryDatabase,CacheLayer,EventStreaming,VectorStorage infraLayer
+    class OpenAIServices,AnthropicServices,WebScrapingServices,PaymentServices,SocialPlatforms externalLayer

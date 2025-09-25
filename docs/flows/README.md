@@ -11,11 +11,31 @@ The platform consists of **20+ services** organized into three main layers:
 - **Control Plane**: 7 services (Config, Policy, Feature Flags, Usage Metering, etc.)
 - **Infrastructure**: 4 services (PostgreSQL, Redis, NATS, Vector DB)
 
+## 🎨 **NEW: Detailed Visual Flows**
+
+For a comprehensive visual understanding of the system, check out these enhanced diagrams:
+
+### **🌟 Recommended Visual Flows**
+1. **[detailed-visual-flow.mmd](detailed-visual-flow.mmd)** - Enhanced system map with emojis and detailed service descriptions
+2. **[detailed-sequence-flow.mmd](detailed-sequence-flow.mmd)** - Step-by-step user journey with visual elements and detailed interactions
+3. **[comprehensive-data-flow.mmd](comprehensive-data-flow.mmd)** - Complete data flow showing all input types and processing paths
+4. **[complete-architecture-flow.mmd](complete-architecture-flow.mmd)** - Full architecture with all layers, services, and connections
+
+These diagrams provide:
+- 🎨 **Visual Enhancement**: Emojis and color coding for better readability
+- 📊 **Detailed Descriptions**: Comprehensive service features and capabilities
+- 🔄 **Complete Flows**: End-to-end request processing with all interactions
+- 🎯 **Multiple Perspectives**: System map, sequence, data flow, and architecture views
+
 ## 🗺️ Diagrams Overview
 
 | Diagram | Format | Description | Key Flows |
 |---------|--------|-------------|-----------|
 | [system-map.mmd](system-map.mmd) | Mermaid | Complete system architecture with all services and connections | All services, external APIs, infrastructure |
+| [detailed-visual-flow.mmd](detailed-visual-flow.mmd) | Mermaid | **Enhanced visual system map with detailed service descriptions** | **Complete architecture with emojis and detailed features** |
+| [detailed-sequence-flow.mmd](detailed-sequence-flow.mmd) | Mermaid | **Detailed step-by-step sequence with visual elements** | **Complete user journey with emojis and detailed interactions** |
+| [comprehensive-data-flow.mmd](comprehensive-data-flow.mmd) | Mermaid | **Comprehensive data flow showing all input types and processing paths** | **Chat, Documents, Social, Admin processing paths** |
+| [complete-architecture-flow.mmd](complete-architecture-flow.mmd) | Mermaid | **Complete architecture with all layers and detailed connections** | **Full system with all services, features, and connections** |
 | [flow-web-chat.mmd](flow-web-chat.mmd) | Mermaid | End-to-end web chat flow with real-time search | User → Chatbot → API Gateway → AI + Web Search |
 | [flow-chat-adapters.mmd](flow-chat-adapters.mmd) | Mermaid | Multi-channel chat integration (Facebook, Zalo, TikTok) | Social platforms → Chat Adapters → Core services |
 | [flow-ingestion.mmd](flow-ingestion.mmd) | Mermaid | Document upload, processing, and semantic search | Document upload → Vector indexing → Search |
