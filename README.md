@@ -50,31 +50,60 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
 ## Core Services
 
-### **Runtime Services**
+### **Data Plane Services**
 
-- **API Gateway**: Main entry point with authentication, rate limiting, and WebSocket support
-- **Orchestrator**: LangGraph-based workflow execution with resilient tool adapters
-- **Router Service**: Intelligent request routing with feature store and bandit policy
-- **Realtime Service**: WebSocket service with backpressure handling
-- **Ingestion Service**: Document processing and knowledge management
-- **Analytics Service**: CQRS read-only analytics and reporting
-- **Billing Service**: Usage tracking and billing engine
-- **Chat Adapters**: Multi-channel chat integration (Facebook, Zalo, TikTok, WhatsApp, Telegram)
-- **Tenant Service**: Self-serve tenant onboarding, plan management, and lifecycle hooks
-- **Admin Portal**: Tenant administration, plan configuration, and system management
+- **API Gateway** (Port 8000): Main entry point with authentication, rate limiting, and chat endpoints
+- **Model Gateway** (Port 8080): AI model routing and provider management
+- **Retrieval Service** (Port 8081): Document retrieval and RAG capabilities
+- **Tools Service** (Port 8082): External tools integration with FIRECRAWL web search
+- **Router Service** (Port 8083): Intelligent request routing and load balancing
+- **Realtime Gateway** (Port 8084): WebSocket connections and real-time communication
+- **Chat Adapters Service**: Multi-channel chat integration (Facebook, Zalo, TikTok, WhatsApp, Telegram)
+- **Semantic Cache Service**: Intelligent response caching and optimization
+- **Migration Runner**: Database schema management and migrations
+- **Event Relay Service**: Event processing and webhook delivery
 
-## 🌟 Enterprise-Grade Features
+### **Control Plane Services**
 
-The platform now includes **8 advanced enterprise capabilities**:
+- **Config Service** (Port 8090): Configuration management and environment settings
+- **Policy Adapter** (Port 8091): Policy enforcement and compliance management
+- **Feature Flags Service** (Port 8092): Runtime feature toggles and A/B testing
+- **Registry Service** (Port 8094): Service discovery and manifest management
+- **Usage Metering** (Port 8095): Usage tracking and billing calculations
+- **Audit Log** (Port 8096): Comprehensive audit logging and compliance
+- **Notification Service** (Port 8097): Multi-channel notifications and alerts
 
-1. **🌍 Data Residency & Regionalization** - Complete data sovereignty with regional provider selection
-2. **⚖️ Fairness & Isolation** - Per-tenant concurrency control with weighted fair queuing
-3. **💰 CostGuard** - Intelligent cost management with budget enforcement and drift detection
-4. **🔒 Privacy & DLP** - Advanced data protection with PII detection and field-level encryption
-5. **⚡ Tail-latency Control** - Request hedging and coordinated cancellation for optimal performance
-6. **🌐 Multi-region Active-Active** - Disaster recovery with NATS mirroring and automated failover
-7. **🔐 Supply-chain Security** - SBOM generation, image signing, and vulnerability scanning
-8. **🛠️ Self-serve Plans** - Complete tenant onboarding with webhooks and admin portal
+### **Frontend Services**
+
+- **AI Chatbot UI** (Port 3001): Main chatbot interface with real-time web search
+- **Web Frontend** (Port 3000): Web application and user dashboard
+- **Admin Portal** (Port 8099): Administrative interface and system management
+
+## 🌟 Key Features
+
+### **🔍 Real-Time Web Search**
+- **FIRECRAWL Integration**: Live internet search capabilities
+- **Intelligent Detection**: Automatic web search trigger detection
+- **Multi-Source Results**: Combines top search results with AI enhancement
+- **Citation Support**: Proper attribution and source tracking
+
+### **🏠 Local Development**
+- **No Docker Option**: Run all services natively for faster development
+- **Auto-Setup Scripts**: One-command local environment setup
+- **Service Management**: Start/stop individual or all services
+- **Live Reloading**: Instant code changes without container rebuilds
+
+### **🔒 Security & Privacy**
+- **API Key Protection**: Secure environment variable management
+- **Multi-tenant Isolation**: Row-level security and tenant separation
+- **PII Detection**: Automatic sensitive data identification and redaction
+- **Audit Logging**: Comprehensive activity tracking and compliance
+
+### **⚡ Performance & Reliability**
+- **Circuit Breakers**: Automatic failure detection and recovery
+- **Load Balancing**: Intelligent request routing and distribution
+- **Caching**: Semantic response caching for improved performance
+- **Health Monitoring**: Real-time service health checks and alerts
 
 ### **Control Plane**
 
@@ -107,119 +136,21 @@ The platform now includes **8 advanced enterprise capabilities**:
 - **Testing**: pytest + httpx + Hypothesis + LLM-judge + Episode replay
 - **Billing**: Usage tracking + Invoice generation + Payment processing
 
-## 🚀 Production Hardening Complete (11 Commits)
+## 🚀 Production-Ready Platform
 
-The platform has been comprehensively hardened with enterprise-grade features for production stability, accuracy, safety, and reliability:
+The platform is production-ready with enterprise-grade features for stability, accuracy, safety, and reliability:
 
-### **COMMIT 0 — Repo Audit Helpers**
-
-- **Audit readiness script** with comprehensive codebase scanning for production readiness criteria
-- **Loop safety detection** with MAX_STEPS, progress tracking, and oscillation detection validation
-- **Contract enforcement verification** with strict Pydantic validation and boundary checking
-- **Router guarantees validation** with feature extraction, classification, and canary deployment checks
-- **Tool adapter reliability** with timeout, retry, circuit-breaker, and bulkhead pattern verification
-- **Performance gates validation** with baseline establishment and cost ceiling enforcement
-- **Automated CI integration** with PASS/FAIL reporting and readiness assessment
-
-### **COMMIT 1 — Loop Safety in Orchestrator**
-
-- **MAX_STEPS enforcement** with configurable step limits and automatic loop termination
-- **Progress tracking** with state monitoring and no-progress event detection
-- **Oscillation detection** via state hashing with automatic loop cutting
-- **Budget-aware degradation** with intelligent resource management and fallback strategies
-- **Comprehensive metrics** with loop_cut_total, progress_events, and safety_violations
-- **Production-ready safety** with automatic escalation and manual intervention hooks
-- **12 passing tests** covering loop safety scenarios and edge cases
-
-### **COMMIT 2 — Strict Contracts at All Boundaries**
-
-- **Pydantic strict validation** with strict=True and forbid_extra=True enforcement
-- **Comprehensive contract specs** for AgentSpec, MessageSpec, ToolSpec, ErrorSpec, RouterSpec
-- **Boundary enforcement** at API Gateway, Orchestrator, Router, and Tool adapters
-- **PII redaction** in logs with automatic sensitive data protection
-- **Validation error handling** with structured error responses and debugging information
-- **Contract middleware** with automatic validation and error reporting
-- **15 passing tests** covering contract validation and boundary enforcement
-
-### **COMMIT 3 — Router v2 Guarantees**
-
-- **Feature extractor** with token_count, json_schema_strictness, domain_flags, novelty, historical_failure_rate
-- **Calibrated classifier** with temperature scaling and bandit policy optimization
-- **Early-exit logic** for strict JSON schema validation with SLM tier locking
-- **Per-tenant canary** with 5-10% traffic and automatic rollback on quality drift
-- **Comprehensive metrics** with router_decision_latency_ms, router_misroute_rate, tier_distribution
-- **Cost optimization** with expected_vs_actual_cost and expected_vs_actual_latency tracking
-- **18 passing tests** covering routing guarantees and performance validation
-
-### **COMMIT 4 — Tool Adapter Reliability**
-
-- **Base adapter patterns** with timeouts, retries (exponential backoff + jitter), circuit-breaker, bulkhead
-- **Idempotency management** with Redis-based caching and duplicate request handling
-- **Write-ahead logging** with comprehensive event tracking and audit trails
-- **Compensation logic** for side-effect reversal with automatic rollback capabilities
-- **Saga orchestration** for multi-step distributed transactions with compensation management
-- **Production reliability** with comprehensive error handling and recovery mechanisms
-- **22 passing tests** covering reliability patterns and distributed transaction scenarios
-
-### **COMMIT 5 — Realtime Backpressure**
-
-- **Per-connection queues** with configurable drop policies (oldest, newest, priority-based)
-- **WebSocket message buffering** with intelligent backpressure handling and graceful degradation
-- **Connection management** with sticky sessions and Redis-based session storage
-- **Comprehensive metrics** with ws_active_connections, ws_backpressure_drops, ws_send_errors
-- **Production-ready scaling** with automatic connection pooling and resource management
-- **Health monitoring** with detailed status reporting and performance analytics
-- **14 passing tests** covering backpressure scenarios and WebSocket management
-
-### **COMMIT 6 — Multi-tenant Safety & Fairness**
-
-- **Row-Level Security (RLS)** with strict tenant isolation and data access control
-- **Token bucket rate limiting** with per-tenant quotas and burst capacity management
-- **Concurrency token management** with Redis-based resource isolation and fair scheduling
-- **Weighted fair scheduling** with priority-based queuing and anti-starvation mechanisms
-- **Admission control middleware** with multi-layer validation and request queuing
-- **Degradation management** with automatic system load monitoring and performance optimization
-- **16 passing tests** covering multi-tenant isolation and fairness scenarios
-
-### **COMMIT 7 — RAG & Data Protection**
-
-- **RAG metadata management** with tenant isolation, role-based access, and TTL management
-- **Permissioned retrieval** with access validation and sensitivity filtering
-- **PII detection engine** with comprehensive pattern matching and redaction capabilities
-- **Field-level encryption** with KMS integration and envelope encryption for sensitive data
-- **Sensitivity tagging** with automatic document classification and access control
-- **Cross-tenant protection** with strict data isolation and leakage prevention
-- **20 passing tests** covering RAG security and data protection scenarios
-
-### **COMMIT 8 — Observability & SLOs**
-
-- **OpenTelemetry instrumentation** with comprehensive spans, metrics, and traces
-- **SLO management** with error budget tracking, burn rate analysis, and alerting
-- **Prometheus metrics** with detailed performance monitoring and cost tracking
-- **Grafana dashboards** with real-time visualization and SLO monitoring
-- **Service correlation** with distributed tracing and request flow analysis
-- **Production monitoring** with comprehensive alerting and performance optimization
-- **18 passing tests** covering observability and SLO validation scenarios
-
-### **COMMIT 9 — Eval & Replay**
-
-- **Golden task management** with comprehensive task definitions and lifecycle management
-- **LLM judge evaluation** with structured scoring, criteria-based assessment, and confidence metrics
-- **Episode replay system** with state tracking, debugging capabilities, and regression testing
-- **Evaluation engine** with multiple methods and composite scoring
-- **Performance validation** with automated testing and quality assurance
-- **Production evaluation** with comprehensive metrics and continuous improvement
-- **25 passing tests** covering evaluation functionality and replay scenarios
-
-### **COMMIT 10 — Performance Gates**
-
-- **Performance baseline management** with comprehensive metric tracking and regression detection
-- **Cost ceiling management** with spending limits, budget enforcement, and optimization recommendations
-- **Locust performance testing** with realistic user scenarios and performance gate validation
-- **Performance validation** with threshold enforcement and automatic alerting
-- **Cost optimization** with intelligent recommendations and spending analysis
-- **Production readiness** with comprehensive performance monitoring and cost management
-- **28 passing tests** covering performance gates and cost management scenarios
+### **Core Capabilities**
+- **Loop Safety**: MAX_STEPS enforcement, progress tracking, and oscillation detection
+- **Strict Contracts**: Pydantic validation with boundary enforcement and PII redaction
+- **Router Intelligence**: Feature extraction, classification, and cost optimization
+- **Tool Reliability**: Circuit breakers, retries, and saga orchestration
+- **Realtime Backpressure**: WebSocket management with graceful degradation
+- **Multi-tenant Isolation**: RLS, rate limiting, and fair scheduling
+- **Data Protection**: RAG security, PII detection, and field-level encryption
+- **Observability**: OpenTelemetry, SLOs, and comprehensive monitoring
+- **Evaluation**: LLM judge evaluation and episode replay system
+- **Performance Gates**: Cost ceilings and performance validation
 
 ## RACI (Responsibility Assignment)
 
@@ -264,46 +195,53 @@ The platform has been comprehensively hardened with enterprise-grade features fo
 
 ## Quick Start
 
-### **🚀 One-Command Setup**
+### **🐳 Docker Setup (Recommended)**
 
 ```bash
-# Clone and start the platform
+# Clone and start with Docker
 git clone <repo-url>
 cd multi-ai-agent
-./start.sh
+./scripts/setup-env.sh
+docker-compose -f docker-compose.local.yml up -d
 ```
 
-### **📖 Detailed Setup**
+### **🏠 Local Development (No Docker)**
 
-1. **Clone and setup**:
+```bash
+# Setup local development environment
+git clone <repo-url>
+cd multi-ai-agent
+./scripts/setup-local-dev.sh
+./scripts/start-local-dev.sh
+```
 
-   ```bash
-   git clone <repo-url>
-   cd multi-ai-agent
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+### **🌐 Service URLs**
 
-2. **Start development environment**:
+**Frontend Services:**
+- AI Chatbot: http://localhost:3001
+- Web Frontend: http://localhost:3000
+- Admin Portal: http://localhost:8099
 
-   ```bash
-   make dev
-   ```
+**Backend Services:**
+- API Gateway: http://localhost:8000
+- Model Gateway: http://localhost:8080
+- Retrieval Service: http://localhost:8081
+- Tools Service: http://localhost:8082
+- Router Service: http://localhost:8083
+- Realtime Gateway: http://localhost:8084
 
-3. **Access services**:
-   - API Gateway: http://localhost:8000
-   - Realtime Service: http://localhost:8001
-   - Router Service: http://localhost:8002
-   - Orchestrator: http://localhost:8003
-   - Analytics Service: http://localhost:8004
-   - Billing Service: http://localhost:8005
-   - Chat Adapters: http://localhost:8006
-   - Web Dashboard: http://localhost:5173
-   - API Docs: http://localhost:8000/docs
-   - WebSocket: ws://localhost:8000/ws/chat
-   - Grafana: http://localhost:3000
-   - Prometheus: http://localhost:9090
-   - Jaeger: http://localhost:16686
+**Control Plane:**
+- Config Service: http://localhost:8090
+- Policy Adapter: http://localhost:8091
+- Feature Flags: http://localhost:8092
+- Registry Service: http://localhost:8094
+- Usage Metering: http://localhost:8095
+- Audit Log: http://localhost:8096
+- Notifications: http://localhost:8097
+
+**Documentation:**
+- API Docs: http://localhost:8000/docs
+- Local Development Guide: [LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md)
 
 ### **📚 Documentation**
 
@@ -384,13 +322,21 @@ make update-docker # Update Docker images
 
 ## API Endpoints
 
-- **Chat**: `/api/v1/chat/*` - Customer chat interface
-- **Router**: `/api/v1/router/decide` - Intelligent routing
-- **Orchestrator**: `/api/v1/orchestrator/*` - Workflow execution
-- **Analytics**: `/api/v1/analytics/*` - Metrics and reporting
-- **Billing**: `/api/v1/billing/*` - Usage and billing
-- **Ingestion**: `/api/v1/ingestion/*` - Document processing
-- **Chat Adapters**: `/facebook/webhook`, `/zalo/webhook`, `/tiktok/webhook` - Multi-channel chat integration
+### **Main API Gateway (Port 8000)**
+- **Chat**: `/ask` - Main chatbot endpoint with web search
+- **Chat API**: `/v1/chat` - Standard chat completion API
+- **Web Scraping**: `/web-scrape` - FIRECRAWL web scraping
+- **Health**: `/healthz` - Service health check
+- **Docs**: `/docs` - Interactive API documentation
+
+### **Service-Specific Endpoints**
+- **Model Gateway**: `/v1/chat` - AI model routing and provider management
+- **Retrieval Service**: `/search` - Document retrieval and RAG
+- **Tools Service**: `/v1/tools/exec` - External tools execution
+- **Router Service**: `/route` - Intelligent request routing
+- **Config Service**: `/config` - Configuration management
+- **Usage Metering**: `/usage` - Usage tracking and billing
+- **Chat Adapters**: `/webhook/*` - Multi-channel chat integration
 
 ## CI/CD Pipeline
 
