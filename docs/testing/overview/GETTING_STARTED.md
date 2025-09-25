@@ -196,8 +196,8 @@ export REDIS_URL=redis://localhost:6379/15
 export NATS_URL=nats://localhost:4222
 
 # Set LLM API keys (for live_smoke mode)
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-...
+export OPENAI_API_KEY=your_openai_api_key_here
+export ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
 ### Pytest Configuration

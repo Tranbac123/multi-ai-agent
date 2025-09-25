@@ -1,24 +1,72 @@
-# Development dependencies for Multi-AI-Agent Platform
-# Core quality analysis tools for COMMIT 1 - Baseline & Detectors
+# Local Development Requirements
+# Install with: pip install -r requirements-dev.txt
+
+# Core dependencies for all services
+fastapi>=0.115.0
+uvicorn>=0.30.6
+pydantic>=2.8.2
+pydantic-settings>=2.3.4
+httpx>=0.27.0
+python-multipart>=0.0.6
+
+# Database
+psycopg2-binary>=2.9.7
+asyncpg>=0.29.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# Redis
+redis>=5.0.0
+
+# NATS
+nats-py>=2.3.0
+
+# Monitoring and logging
+structlog>=23.0.0
+prometheus-client>=0.19.0
+
+# Development tools
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-html>=4.1.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
 
 # Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-pytest-mock==3.12.0
+httpx>=0.27.0
+asyncio>=3.4.3
 
-# Code quality and formatting
-ruff==0.1.7
-black==23.11.0
-mypy==1.7.1
-isort==5.13.2
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+rich>=13.0.0
 
-# Dead code detection
-vulture==2.10
+# AI/ML
+openai>=1.0.0
+anthropic>=0.7.0
 
-# Code complexity analysis
-radon==6.0.1
+# Web scraping
+beautifulsoup4>=4.12.0
+requests>=2.31.0
 
-# Development utilities
-rich==13.7.0
-click==8.1.7
+# Security
+cryptography>=41.0.0
+passlib>=1.7.4
+python-jose>=3.3.0
+
+# Time and scheduling
+apscheduler>=3.10.0
+celery>=5.3.0
+
+# File handling
+aiofiles>=23.0.0
+
+# JSON handling
+orjson>=3.9.0
+
+# HTTP client
+aiohttp>=3.9.0
+
+# Environment management
+python-decouple>=3.8

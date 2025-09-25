@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Web Search Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #output { margin-top: 20px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; max-height: 400px; overflow-y: auto; }
+        .message { margin: 10px 0; padding: 10px; border-left: 3px solid #007bff; background-color: #f8f9fa; }
+        .citations { font-size: 0.9em; color: #6c757d; margin-top: 5px; }
+        .trace { font-size: 0.8em; color: #6c757d; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Chatbot Web Search Test</h1>
+    
+    <div class="info">
+        <strong>Testing chatbot web search functionality</strong>
+    </div>
+    
+    <button onclick="testWebSearch()">Test Hacker News Search</button>
+    <button onclick="testGenericSearch()">Test Generic News Search</button>
+    <button onclick="clearOutput()">Clear Output</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        async function testWebSearch() {
+            log('Testing Hacker News web search...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: 'What is the latest news from Hacker News?',
+                        session_id: 'test-web-search'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Display the response
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
+                    messageDiv.innerHTML = `
+                        <strong>Question:</strong> What is the latest news from Hacker News?<br>
+                        <strong>Answer:</strong> ${data.answer}<br>
+                        <div class="citations"><strong>Citations:</strong> ${data.citations ? data.citations.join(', ') : 'None'}</div>
+                        <div class="trace"><strong>Trace:</strong> ${data.trace ? data.trace.join(' → ') : 'None'}</div>
+                    `;
+                    output.appendChild(messageDiv);
+                    
+                    // Check if it contains live data
+                    if (data.citations && data.citations.some(c => c.includes('FIRECRAWL'))) {
+                        log('✅ SUCCESS: Web search is working! Live data detected.', 'success');
+                    } else {
+                        log('⚠️ WARNING: No live data detected in response.', 'error');
+                    }
+                } else {
+                    log(`❌ Error: ${response.status} - ${data.detail || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testGenericSearch() {
+            log('Testing generic news search...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: 'What are the latest technology trends today?',
+                        session_id: 'test-generic-search'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Display the response
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
+                    messageDiv.innerHTML = `
+                        <strong>Question:</strong> What are the latest technology trends today?<br>
+                        <strong>Answer:</strong> ${data.answer.substring(0, 200)}...<br>
+                        <div class="citations"><strong>Citations:</strong> ${data.citations ? data.citations.join(', ') : 'None'}</div>
+                        <div class="trace"><strong>Trace:</strong> ${data.trace ? data.trace.join(' → ') : 'None'}</div>
+                    `;
+                    output.appendChild(messageDiv);
+                    
+                    // Check if it contains live data
+                    if (data.citations && data.citations.some(c => c.includes('FIRECRAWL'))) {
+                        log('✅ SUCCESS: Generic web search is working! Live data detected.', 'success');
+                    } else {
+                        log('⚠️ INFO: Generic search response (may not need live data).', 'info');
+                    }
+                } else {
+                    log(`❌ Error: ${response.status} - ${data.detail || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+        }
+        
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+        
+        // Auto-run test on page load
+        window.onload = function() {
+            log('Page loaded, ready to test web search functionality.', 'info');
+        };
+    </script>
+</body>
+</html>

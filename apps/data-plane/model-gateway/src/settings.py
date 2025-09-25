@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # Provider configurations
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    firecrawl_api_key: Optional[str] = None
     azure_openai_endpoint: Optional[str] = None
     azure_openai_key: Optional[str] = None
     

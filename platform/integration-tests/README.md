@@ -267,8 +267,8 @@ REDIS_URL=redis://localhost:6379/15
 NATS_URL=nats://localhost:4222
 
 # LLM API Keys (for live_smoke mode)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-...
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
 ### Pytest Configuration

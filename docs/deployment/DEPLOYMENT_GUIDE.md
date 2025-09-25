@@ -86,8 +86,8 @@ REDIS_URL=redis://localhost:6379/0
 NATS_URL=nats://localhost:4222
 
 # API Keys
-OPENAI_API_KEY=sk-your-openai-key
-ANTHROPIC_API_KEY=sk-your-anthropic-key
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # Security
 JWT_SECRET=your-jwt-secret-key

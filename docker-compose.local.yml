@@ -108,6 +108,8 @@ services:
       - "8082:8082"
     env_file:
       - .env
+    environment:
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
     depends_on:
       - api-gateway
 

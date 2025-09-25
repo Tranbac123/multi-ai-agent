@@ -3,6 +3,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY src ./src
-EXPOSE 8092
-CMD ["uvicorn","src.main:app","--host","0.0.0.0","--port","8092"]
+EXPOSE 8090
+CMD ["uvicorn","src.main:app","--host","0.0.0.0","--port","8090"]
 

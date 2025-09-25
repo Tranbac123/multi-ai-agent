@@ -5,8 +5,8 @@ echo "🔧 Setting up environment variables..."
 
 # Check if .env already exists
 if [[ -f .env ]]; then
-    echo "📝 .env file already exists. Backing up to .env.backup"
-    cp .env .env.backup
+    echo "⚠️  .env file already exists. Please backup manually if needed."
+    echo "   Note: Backup files with API keys should not be committed to git."
 fi
 
 # Create .env file with your actual API keys
@@ -20,7 +20,7 @@ APP_NAME=Multi-AI-Agent
 APP_VERSION=2.0.0
 
 # API KEYS - REQUIRED
-# OpenAI API Key (Required)
+# OpenAI API Key (Required) - Replace with your actual key
 OPENAI_API_KEY=your_openai_api_key_here
 
 # Firecrawl API Key (Optional - for web scraping)
@@ -143,8 +143,8 @@ EOF
 echo "✅ Environment variables set up successfully!"
 echo ""
 echo "🔑 Your API keys are now configured:"
-echo "   • OpenAI API Key: ${OPENAI_API_KEY:0:20}..."
-echo "   • Firecrawl API Key: ${FIRECRAWL_API_KEY:0:15}..."
+echo "   • OpenAI API Key: [CONFIGURED]"
+echo "   • Firecrawl API Key: [CONFIGURED]"
 echo ""
 echo "💡 To use these in your shell, run:"
 echo "   source .env"
