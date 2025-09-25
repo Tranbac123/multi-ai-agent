@@ -47,7 +47,7 @@ opentelemetry-instrumentation-sqlalchemy==0.42b0
 opentelemetry-instrumentation-redis==0.42b0
 
 # Testing
-pytest==7.4.3
+pytest==8.4.2
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 pytest-mock==3.12.0
