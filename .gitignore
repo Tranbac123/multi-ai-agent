@@ -25,12 +25,23 @@ out/
 ehthumbs.db
 Thumbs.db
 
-# Environment variables
-.env
+# Environment variables - ALL VARIATIONS
+.env*
+!.env.example
+*.env
 .env.local
+.env.development
+.env.test
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
+.env.staging
+.env.staging.local
+.env.uat
+.env.uat.local
+.env.preview
+.env.preview.local
 
 # Logs
 logs
