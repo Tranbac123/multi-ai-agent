@@ -1,0 +1,105 @@
+sequenceDiagram
+    participant User as User
+    participant ChatbotUI as AI Chatbot UI<br/>:3001
+    participant APIGateway as API Gateway<br/>:8000
+    participant RouterService as Router Service<br/>:8083
+    participant RetrievalService as Retrieval Service<br/>:8081
+    participant ModelGateway as Model Gateway<br/>:8080
+    participant RealtimeGateway as Realtime Gateway<br/>:8084
+    participant VectorDB as Vector Database<br/>(Embeddings)
+    participant Postgres as PostgreSQL<br/>:5432
+    participant Redis as Redis<br/>:6379
+    participant NATS as NATS<br/>:4222
+    participant UsageMetering as Usage Metering<br/>:8095
+    participant AuditLog as Audit Log<br/>:8096
+
+    %% Complex Query Processing Flow
+    Note over User,AuditLog: === Multi-Step Retrieval with Router Intelligence ===
+    User->>ChatbotUI: 1. Complex query: "Find all documents about Q4 financial performance and summarize the key metrics"
+    ChatbotUI->>APIGateway: 2. POST /ask<br/>Headers: X-Tenant-Id: tenant_456<br/>Body: {query: "Find all documents about Q4 financial performance and summarize the key metrics", session_id: "sess_789"}
+
+    APIGateway->>Redis: 3. GET session:sess_789<br/>Retrieve conversation context
+    Redis-->>APIGateway: Previous messages and context
+
+    %% Router Service - Intelligent Tier Selection
+    APIGateway->>RouterService: 4. POST /route<br/>Headers: X-Request-Id: req_101, X-Tenant-Id: tenant_456<br/>Body: {query: "Find all documents about Q4 financial performance and summarize the key metrics", context: {...}}
+
+    RouterService->>RouterService: 5. Feature extraction:<br/>- Token count: 15<br/>- Domain: financial<br/>- Complexity: high<br/>- Historical success rate: 0.85
+    RouterService->>Redis: 6. GET router:features:tenant_456<br/>Retrieve feature store data
+    Redis-->>RouterService: Feature store cache
+
+    RouterService->>RouterService: 7. Classification decision:<br/>- Tier: advanced<br/>- Confidence: 0.92<br/>- Route to: orchestrator + retrieval
+    RouterService->>Postgres: 8. INSERT INTO router_decisions<br/>Log routing decision for analytics
+
+    RouterService-->>APIGateway: 9. 200 OK<br/>{tier: "advanced", route_to: ["orchestrator", "retrieval"], confidence: 0.92, estimated_tokens: 800}
+
+    %% Orchestrator - Multi-Step Workflow
+    APIGateway->>RetrievalService: 10. POST /search<br/>Headers: X-Tenant-Id: tenant_456, X-Step-Id: step_001<br/>Body: {query: "Q4 financial performance", filters: {document_types: ["reports", "presentations"]}, limit: 10}
+
+    RetrievalService->>VectorDB: 11. POST /search<br/>Body: {query: "Q4 financial performance", tenant_id: "tenant_456", filters: {document_types: ["reports", "presentations"]}, limit: 10, similarity_threshold: 0.75}
+    VectorDB-->>RetrievalService: 200 OK<br/>{results: [{chunk_id: "chunk_001", similarity: 0.89, content: "Q4 revenue increased 15% to $2.3M...", document: "Q4_Financial_Report.pdf", page: 3}, ...]}
+
+    RetrievalService->>Postgres: 12. SELECT * FROM document_chunks<br/>WHERE id IN ('chunk_001', 'chunk_002', ...)<br/>AND tenant_id = 'tenant_456'
+    Postgres-->>RetrievalService: Chunk data with metadata
+
+    RetrievalService->>Redis: 13. SET retrieval:cache:tenant_456:q4_financial<br/>Cache search results for 1 hour
+    RetrievalService-->>APIGateway: 14. 200 OK<br/>{results: [{content: "Q4 revenue increased 15% to $2.3M...", source: "Q4_Financial_Report.pdf", page: 3, relevance: 0.89}, ...], total_results: 8}
+
+    %% Model Gateway - AI Processing with Retrieved Context
+    APIGateway->>ModelGateway: 15. POST /v1/chat<br/>Headers: Authorization: Bearer sk-xxx<br/>Body: {messages: [{role: "system", content: "You are a financial analyst. Use the provided documents to answer questions about Q4 performance."}, {role: "user", content: "Find all documents about Q4 financial performance and summarize the key metrics. Context: [retrieved documents...]"}]}
+
+    ModelGateway->>ModelGateway: 16. Token counting and cost estimation<br/>Input: 1200 tokens, Output: ~400 tokens<br/>Total cost: $0.024
+
+    ModelGateway->>ModelGateway: 17. LLM processing with retrieved context<br/>Generate comprehensive summary with citations
+    ModelGateway-->>APIGateway: 18. 200 OK<br/>{content: "Based on the Q4 financial documents, here are the key metrics: Revenue increased 15% to $2.3M, Net profit margin improved to 12%, Operating expenses decreased 8%...", usage: {input_tokens: 1200, output_tokens: 380, total_cost: 0.024}}
+
+    %% Real-time Streaming Response
+    APIGateway->>RealtimeGateway: 19. WebSocket /ws/tenant_456<br/>Stream response to user
+    RealtimeGateway->>NATS: 20. SUBSCRIBE tenant.tenant_456.realtime<br/>Listen for streaming events
+
+    APIGateway->>NATS: 21. PUBLISH tenant.tenant_456.realtime<br/>{type: "response_chunk", content: "Based on the Q4 financial documents...", session_id: "sess_789"}
+
+    %% Usage Tracking and Analytics
+    APIGateway->>UsageMetering: 22. POST /usage<br/>Headers: X-Tenant-Id: tenant_456<br/>Body: {service: "retrieval", action: "semantic_search", queries_count: 1, documents_retrieved: 8, tokens_used: 1200, cost: 0.024}
+    UsageMetering->>Postgres: 23. INSERT INTO usage_log<br/>Track retrieval and AI usage costs
+
+    APIGateway->>AuditLog: 24. POST /audit<br/>Headers: X-Tenant-Id: tenant_456<br/>Body: {action: "complex_query", user_id: "user_123", query_type: "financial_analysis", documents_accessed: 8, success: true}
+    AuditLog->>Postgres: 25. INSERT INTO audit_events<br/>Log complex query execution
+
+    %% Event Publishing
+    APIGateway->>NATS: 26. PUBLISH tenant.usage.retrieval<br/>{tenant_id: "tenant_456", service: "retrieval", documents_retrieved: 8, tokens_used: 1200}
+    APIGateway->>NATS: 27. PUBLISH tenant.analytics.query_complexity<br/>{tenant_id: "tenant_456", complexity: "high", success_rate: 1.0, response_time_ms: 2500}
+
+    %% Final Response
+    APIGateway-->>ChatbotUI: 28. 200 OK<br/>{answer: "Based on the Q4 financial documents, here are the key metrics: Revenue increased 15% to $2.3M, Net profit margin improved to 12%, Operating expenses decreased 8%...", citations: ["[1] Q4_Financial_Report.pdf, page 3", "[2] Q4_Executive_Summary.pdf, page 1"], trace: ["Router: advanced tier selected", "Retrieval: 8 documents found", "AI: comprehensive analysis generated"]}
+
+    RealtimeGateway-->>ChatbotUI: 29. WebSocket message<br/>{type: "response_complete", session_id: "sess_789", total_chunks: 3}
+
+    %% Error Handling and Fallbacks
+    alt Router service unavailable
+        RouterService-->>APIGateway: 503 Service Unavailable<br/>{error: "Router service down"}
+        APIGateway->>RetrievalService: Direct retrieval (fallback)<br/>Skip intelligent routing
+        Note over APIGateway: Use default retrieval strategy<br/>Log service degradation
+    end
+
+    alt Vector search timeout
+        VectorDB-->>RetrievalService: 504 Gateway Timeout<br/>{error: "Vector search timeout"}
+        RetrievalService->>Postgres: 30. SELECT * FROM document_chunks<br/>Fallback to keyword search
+        Postgres-->>RetrievalService: Keyword search results
+        Note over RetrievalService: Graceful degradation<br/>Use traditional search as fallback
+    end
+
+    alt Model gateway error
+        ModelGateway-->>APIGateway: 500 Error<br/>{error: "OpenAI API rate limit exceeded"}
+        APIGateway->>Redis: 31. SET retry:model_gateway:req_101<br/>Queue for retry with backoff
+        APIGateway-->>ChatbotUI: 503 Error<br/>{error: "AI service temporarily unavailable", retry_after: 60}
+    end
+
+    %% Advanced Features
+    Note over RetrievalService,VectorDB: === Advanced Retrieval Features ===
+    RetrievalService->>RetrievalService: 32. Hybrid search:<br/>- Vector similarity: 0.89<br/>- Keyword matching: 0.92<br/>- Metadata filtering: 0.95<br/>- Combined score: 0.91
+
+    RetrievalService->>RetrievalService: 33. Reranking with ML model:<br/>- Document relevance: 0.89<br/>- Content quality: 0.85<br/>- Freshness: 0.92<br/>- Final rank: 1
+
+    %% Background Optimization
+    Note over RetrievalService,Postgres: Background: Query optimization<br/>Index maintenance<br/>Cache warming<br/>Performance analytics<br/>Cost optimization

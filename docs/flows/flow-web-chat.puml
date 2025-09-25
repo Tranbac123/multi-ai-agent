@@ -1,0 +1,86 @@
+@startuml Flow-Web-Chat
+title Web Chat Flow - User to AI Response with Web Search
+
+participant "User" as User
+participant "AI Chatbot UI\n:3001" as ChatbotUI
+participant "API Gateway\n:8000" as APIGateway
+participant "Model Gateway\n:8080" as ModelGateway
+participant "Tools Service\n:8082" as ToolsService
+participant "FIRECRAWL API" as FIRECRAWL
+participant "OpenAI API" as OpenAI
+participant "Redis\n:6379" as Redis
+participant "PostgreSQL\n:5432" as Postgres
+participant "NATS\n:4222" as NATS
+participant "Usage Metering\n:8095" as UsageMetering
+participant "Audit Log\n:8096" as AuditLog
+
+== User starts chat session ==
+User -> ChatbotUI : 1. Opens chatbot interface
+ChatbotUI -> APIGateway : 2. GET /healthz\nCheck service health
+APIGateway --> ChatbotUI : 200 OK\n{status: "healthy", services: {...}}
+
+== User sends message ==
+User -> ChatbotUI : 3. Types message: "What's the weather in HCM?"
+ChatbotUI -> APIGateway : 4. POST /ask\nHeaders: Content-Type: application/json\nBody: {query: "What's the weather in HCM?", session_id: "sess_123"}
+
+== API Gateway processing ==
+APIGateway -> Redis : 5. GET session:sess_123\nRetrieve session context
+Redis --> APIGateway : Session data or null
+
+APIGateway -> Postgres : 6. SELECT * FROM audit_log\nLog incoming request
+note right of APIGateway : JWT verification (if auth enabled)\nRate limiting check\nTenant context injection
+
+== Web search detection and execution ==
+note right of APIGateway : Detect web search keywords:\n"weather", "latest", "news"
+APIGateway -> ToolsService : 7. POST /v1/tools/exec\nHeaders: X-Request-Id: req_456, X-Tenant-Id: tenant_789\nBody: {name: "web_search", args: {query: "weather HCM today"}}
+
+ToolsService -> FIRECRAWL : 8. POST /v1/search\nHeaders: Authorization: Bearer fc-xxx\nBody: {query: "weather HCM today", limit: 5}
+FIRECRAWL --> ToolsService : 200 OK\n{data: [{title: "...", content: "...", url: "..."}]}
+ToolsService --> APIGateway : 200 OK\n{success: true, output: "Combined search results..."}
+
+== AI model processing ==
+APIGateway -> ModelGateway : 9. POST /v1/chat\nHeaders: Authorization: Bearer sk-xxx\nBody: {messages: [{role: "system", content: "You have web data: ..."}, {role: "user", content: "What's the weather in HCM?"}], model: "gpt-4o-mini"}
+
+ModelGateway -> OpenAI : 10. POST /v1/chat/completions\nHeaders: Authorization: Bearer sk-xxx\nBody: {model: "gpt-4o-mini", messages: [...], temperature: 0.7}
+OpenAI --> ModelGateway : 200 OK\n{choices: [{message: {content: "Based on current data..."}}], usage: {...}}
+ModelGateway --> APIGateway : 200 OK\n{content: "Based on current weather data...", usage: {...}}
+
+== Response processing ==
+APIGateway -> Redis : 11. SET session:sess_123\nUpdate session with response
+APIGateway -> Postgres : 12. INSERT INTO audit_log\nLog successful response
+
+== Side effects - Usage tracking and audit ==
+APIGateway -> UsageMetering : 13. POST /usage\nHeaders: X-Tenant-Id: tenant_789\nBody: {service: "api-gateway", endpoint: "/ask", tokens_used: 150, cost: 0.001}
+UsageMetering -> Postgres : 14. INSERT INTO usage_log\nTrack usage for billing
+UsageMetering --> APIGateway : 200 OK
+
+APIGateway -> AuditLog : 15. POST /audit\nHeaders: X-Tenant-Id: tenant_789\nBody: {action: "chat_query", user_id: "user_123", query: "What's the weather in HCM?", success: true}
+AuditLog -> Postgres : 16. INSERT INTO audit_events\nLog audit event
+AuditLog --> APIGateway : 200 OK
+
+== Event publishing ==
+APIGateway -> NATS : 17. PUBLISH tenant.usage.api_gateway\n{tenant_id: "tenant_789", endpoint: "/ask", tokens: 150, timestamp: "..."}
+APIGateway -> NATS : 18. PUBLISH tenant.audit.chat_query\n{tenant_id: "tenant_789", user_id: "user_123", action: "chat_query", timestamp: "..."}
+
+== Final response ==
+APIGateway --> ChatbotUI : 19. 200 OK\n{answer: "Based on current weather data, HCM is 31°C, cloudy with chance of rain...", citations: ["[1] Live web data via FIRECRAWL"], trace: ["Web scraping successful", "OpenAI API call successful"]}
+
+ChatbotUI --> User : 20. Display response with citations\nShow live weather information
+
+== Error handling branch ==
+alt Error in web search
+    ToolsService --> APIGateway : 500 Error\n{success: false, output: "FIRECRAWL API error"}
+    APIGateway -> ModelGateway : Continue with AI-only response\nNo web context
+    note right of APIGateway : Graceful degradation\nAI responds without live data
+end
+
+alt Error in AI model
+    ModelGateway --> APIGateway : 500 Error\nOpenAI API timeout
+    APIGateway --> ChatbotUI : 200 OK\n{answer: "I apologize, but I'm having trouble...", citations: [], trace: ["AI service temporarily unavailable"]}
+    ChatbotUI --> User : Display error message\nSuggest retry
+end
+
+== Background processing ==
+note over APIGateway, Redis : Background: Session TTL cleanup\nAudit log archival\nUsage aggregation
+
+@enduml

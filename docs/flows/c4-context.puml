@@ -1,0 +1,103 @@
+@startuml C4-Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Multi-AI-Agent Platform - System Context
+
+Person(user, "User", "End users interacting with the AI chatbot")
+Person(admin, "Administrator", "Platform administrators managing tenants and system")
+Person(developer, "Developer", "Service developers and maintainers")
+
+System(chatbot, "AI Chatbot UI", "React-based chatbot interface with real-time web search capabilities")
+System(web_frontend, "Web Frontend", "React/Vite web application for general platform access")
+System(admin_portal, "Admin Portal", "FastAPI-based administrative interface for tenant management")
+
+System_Boundary(platform, "Multi-AI-Agent Platform") {
+    System(api_gateway, "API Gateway", "FastAPI service providing authentication, rate limiting, and request routing")
+    
+    System_Boundary(data_plane, "Data Plane") {
+        System(model_gateway, "Model Gateway", "AI model routing and provider management")
+        System(retrieval_service, "Retrieval Service", "Document retrieval and RAG capabilities")
+        System(tools_service, "Tools Service", "External tools integration with FIRECRAWL web search")
+        System(router_service, "Router Service", "Intelligent request routing and load balancing")
+        System(realtime_gateway, "Realtime Gateway", "WebSocket connections and real-time communication")
+        System(chat_adapters, "Chat Adapters", "Multi-channel chat integration (Facebook, Zalo, TikTok)")
+        System(semantic_cache, "Semantic Cache", "Intelligent response caching and optimization")
+        System(migration_runner, "Migration Runner", "Database schema management and migrations")
+        System(event_relay, "Event Relay", "Event processing and webhook delivery")
+    }
+    
+    System_Boundary(control_plane, "Control Plane") {
+        System(config_service, "Config Service", "Configuration management and environment settings")
+        System(policy_adapter, "Policy Adapter", "Policy enforcement and compliance management")
+        System(feature_flags, "Feature Flags", "Runtime feature toggles and A/B testing")
+        System(registry_service, "Registry Service", "Service discovery and manifest management")
+        System(usage_metering, "Usage Metering", "Usage tracking and billing calculations")
+        System(audit_log, "Audit Log", "Comprehensive audit logging and compliance")
+        System(notifications, "Notifications", "Multi-channel notifications and alerts")
+    }
+    
+    System_Boundary(infrastructure, "Infrastructure") {
+        SystemDb(postgres, "PostgreSQL", "Primary database with multi-tenant RLS")
+        SystemDb(redis, "Redis", "Caching, session storage, and pub/sub")
+        SystemDb(nats, "NATS JetStream", "Event streaming and message queuing")
+        SystemDb(vector_db, "Vector Database", "Embeddings and semantic search")
+    }
+}
+
+System_Ext(openai, "OpenAI API", "GPT models for AI inference")
+System_Ext(anthropic, "Anthropic API", "Claude models for AI inference")
+System_Ext(firecrawl, "FIRECRAWL API", "Web scraping and search capabilities")
+System_Ext(stripe, "Stripe API", "Payment processing and billing")
+System_Ext(facebook, "Facebook Messenger", "Social media chat platform")
+System_Ext(zalo, "Zalo Chat", "Vietnamese messaging platform")
+System_Ext(tiktok, "TikTok Chat", "Social media messaging")
+
+' User interactions
+user --> chatbot : Uses chatbot interface
+user --> web_frontend : Accesses web application
+admin --> admin_portal : Manages tenants and system
+
+' Frontend to API Gateway
+chatbot --> api_gateway : HTTP POST /ask
+web_frontend --> api_gateway : HTTP REST API
+admin_portal --> api_gateway : HTTP Admin API
+
+' API Gateway to Data Plane
+api_gateway --> model_gateway : AI model requests
+api_gateway --> retrieval_service : Document retrieval
+api_gateway --> tools_service : Web search/scraping
+api_gateway --> router_service : Request routing
+api_gateway --> realtime_gateway : WebSocket connections
+
+' Data Plane to External APIs
+model_gateway --> openai : AI completions
+model_gateway --> anthropic : AI completions
+tools_service --> firecrawl : Web scraping
+
+' Chat Adapters External Integration
+facebook --> chat_adapters : Webhook messages
+zalo --> chat_adapters : Webhook messages
+tiktok --> chat_adapters : Webhook messages
+chat_adapters --> api_gateway : Normalized messages
+
+' Control Plane interactions
+api_gateway --> config_service : Configuration
+api_gateway --> policy_adapter : Policy checks
+api_gateway --> feature_flags : Feature toggles
+api_gateway --> usage_metering : Usage tracking
+api_gateway --> audit_log : Audit events
+
+' Infrastructure dependencies
+api_gateway --> postgres : Data storage
+api_gateway --> redis : Caching/sessions
+api_gateway --> nats : Event streaming
+retrieval_service --> vector_db : Embeddings
+usage_metering --> stripe : Payment processing
+
+' Developer interactions
+developer --> api_gateway : API development
+developer --> postgres : Database management
+developer --> redis : Cache management
+developer --> nats : Event management
+
+@enduml

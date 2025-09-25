@@ -1,0 +1,101 @@
+@startuml Flow-Chat-Adapters
+title Chat Adapters Flow - Multi-Channel Integration
+
+participant "Facebook Messenger" as Facebook
+participant "Zalo Chat" as Zalo
+participant "TikTok Chat" as TikTok
+participant "Chat Adapters Service\n:8006" as ChatAdapters
+participant "API Gateway\n:8000" as APIGateway
+participant "Model Gateway\n:8080" as ModelGateway
+participant "Tools Service\n:8082" as ToolsService
+participant "Realtime Gateway\n:8084" as RealtimeGateway
+participant "Redis\n:6379" as Redis
+participant "PostgreSQL\n:5432" as Postgres
+participant "NATS\n:4222" as NATS
+participant "Usage Metering\n:8095" as UsageMetering
+participant "Audit Log\n:8096" as AuditLog
+
+== Facebook Messenger Integration ==
+Facebook -> ChatAdapters : 1. POST /facebook/webhook\nHeaders: X-Hub-Signature: sha1=xxx\nBody: {object: "page", entry: [{messaging: [{sender: {id: "user_123"}, message: {text: "Hello, what can you help me with?"}}]}]}
+
+ChatAdapters -> ChatAdapters : 2. Verify webhook signature\nParse Facebook message format
+ChatAdapters -> Redis : 3. GET facebook:user_123\nRetrieve user session
+Redis --> ChatAdapters : Session data or null
+
+ChatAdapters -> APIGateway : 4. POST /ask\nHeaders: X-Platform: facebook, X-User-ID: user_123, X-Tenant-Id: tenant_facebook\nBody: {query: "Hello, what can you help me with?", session_id: "fb_sess_123"}
+
+APIGateway -> ToolsService : 5. POST /v1/tools/exec\nBody: {name: "web_search", args: {query: "assistant capabilities"}}
+ToolsService --> APIGateway : 200 OK\n{success: true, output: "AI assistant capabilities..."}
+
+APIGateway -> ModelGateway : 6. POST /v1/chat\nBody: {messages: [{role: "system", content: "You are a helpful assistant..."}, {role: "user", content: "Hello, what can you help me with?"}]}
+ModelGateway --> APIGateway : 200 OK\n{content: "Hello! I can help you with various tasks..."}
+
+APIGateway -> UsageMetering : 7. POST /usage\nBody: {service: "chat-adapters", platform: "facebook", tokens_used: 85}
+APIGateway -> AuditLog : 8. POST /audit\nBody: {action: "facebook_message", user_id: "user_123", platform: "facebook"}
+
+APIGateway --> ChatAdapters : 9. 200 OK\n{answer: "Hello! I can help you with various tasks...", citations: ["[1] Live web data"], trace: ["Web search successful", "AI response generated"]}
+
+ChatAdapters -> Facebook : 10. POST /v2.6/me/messages\nHeaders: Authorization: Bearer PAGE_ACCESS_TOKEN\nBody: {recipient: {id: "user_123"}, message: {text: "Hello! I can help you with various tasks..."}}
+
+== Zalo Chat Integration ==
+Zalo -> ChatAdapters : 11. POST /zalo/webhook\nHeaders: X-Zalo-Signature: sha256=xxx\nBody: {sender: {id: "zalo_user_456"}, recipient: {id: "zalo_oa_789"}, message: {text: "Can you check the latest AI news?"}, timestamp: 1640995200}
+
+ChatAdapters -> ChatAdapters : 12. Verify Zalo signature\nParse Zalo message format
+ChatAdapters -> Redis : 13. GET zalo:user_456\nRetrieve Zalo user context
+
+ChatAdapters -> APIGateway : 14. POST /ask\nHeaders: X-Platform: zalo, X-User-ID: user_456, X-Tenant-Id: tenant_zalo\nBody: {query: "Can you check the latest AI news?", session_id: "zalo_sess_456"}
+
+APIGateway -> ToolsService : 15. POST /v1/tools/exec\nBody: {name: "web_search", args: {query: "latest AI news 2024"}}
+ToolsService --> APIGateway : 200 OK\n{success: true, output: "Latest AI news: GPT-4 updates, new models..."}
+
+APIGateway -> ModelGateway : 16. POST /v1/chat\nBody: {messages: [{role: "system", content: "You have access to latest AI news..."}, {role: "user", content: "Can you check the latest AI news?"}]}
+ModelGateway --> APIGateway : 200 OK\n{content: "Here are the latest AI developments: GPT-4 improvements, new language models..."}
+
+APIGateway --> ChatAdapters : 17. 200 OK\n{answer: "Here are the latest AI developments...", citations: ["[1] Live web data via FIRECRAWL"], trace: ["Web search successful"]}
+
+ChatAdapters -> Zalo : 18. POST /v2.0/oa/message\nHeaders: Authorization: Bearer ZALO_OA_TOKEN\nBody: {recipient: {user_id: "user_456"}, message: {text: "Here are the latest AI developments..."}}
+
+== TikTok Chat Integration ==
+TikTok -> ChatAdapters : 19. POST /tiktok/webhook\nHeaders: X-TikTok-Signature: sha256=xxx\nBody: {msg_id: "msg_789", from: {user_id: "tiktok_user_789"}, msg_type: "text", content: {text: "What's trending in tech?"}, timestamp: 1640995300}
+
+ChatAdapters -> ChatAdapters : 20. Verify TikTok signature\nParse TikTok message format
+ChatAdapters -> Redis : 21. GET tiktok:user_789\nRetrieve TikTok user context
+
+ChatAdapters -> APIGateway : 22. POST /ask\nHeaders: X-Platform: tiktok, X-User-ID: user_789, X-Tenant-Id: tenant_tiktok\nBody: {query: "What's trending in tech?", session_id: "tiktok_sess_789"}
+
+APIGateway -> ToolsService : 23. POST /v1/tools/exec\nBody: {name: "web_search", args: {query: "trending technology 2024"}}
+ToolsService --> APIGateway : 200 OK\n{success: true, output: "Trending tech: AI, blockchain, quantum computing..."}
+
+APIGateway -> ModelGateway : 24. POST /v1/chat\nBody: {messages: [{role: "system", content: "You have access to trending tech topics..."}, {role: "user", content: "What's trending in tech?"}]}
+ModelGateway --> APIGateway : 200 OK\n{content: "Here's what's trending in tech: AI advancements, blockchain innovations..."}
+
+APIGateway --> ChatAdapters : 25. 200 OK\n{answer: "Here's what's trending in tech...", citations: ["[1] Live web data"], trace: ["Web search successful"]}
+
+ChatAdapters -> TikTok : 26. POST /v1/messages/send\nHeaders: Authorization: Bearer TIKTOK_ACCESS_TOKEN\nBody: {to_user_id: "user_789", msg_type: "text", content: {text: "Here's what's trending in tech..."}}
+
+== Real-time Updates ==
+ChatAdapters -> RealtimeGateway : 27. WebSocket /ws/{tenant_id}\nSubscribe to real-time updates
+RealtimeGateway -> NATS : 28. SUBSCRIBE tenant.{tenant_id}.updates\nListen for platform updates
+
+== Error Handling ==
+alt Webhook verification fails
+    ChatAdapters --> Facebook : 401 Unauthorized\nInvalid signature
+    note right of ChatAdapters : Log security event\nBlock unauthorized access
+end
+
+alt Platform API error
+    ChatAdapters -> Facebook : POST /v2.6/me/messages\nMessage delivery attempt
+    Facebook --> ChatAdapters : 400 Bad Request\nInvalid user ID or message format
+    ChatAdapters -> Redis : 29. SET error:facebook:user_123\nLog delivery failure for retry
+    note right of ChatAdapters : Implement retry logic\nDead letter queue for failed messages
+end
+
+alt Rate limiting
+    APIGateway --> ChatAdapters : 429 Too Many Requests\nRate limit exceeded
+    ChatAdapters --> Facebook : 30. POST /v2.6/me/messages\nBody: {message: {text: "I'm receiving too many requests. Please wait a moment."}}
+end
+
+== Background Processing ==
+note over ChatAdapters, Postgres : Background: Message delivery tracking\nAnalytics aggregation\nUser engagement metrics\nPlatform-specific optimizations
+
+@enduml

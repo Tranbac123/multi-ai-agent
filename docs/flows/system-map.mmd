@@ -1,0 +1,127 @@
+graph TB
+    %% External Dependencies
+    subgraph "External Services"
+        OpenAI["OpenAI API<br/>GPT Models"]
+        Anthropic["Anthropic API<br/>Claude Models"]
+        FIRECRAWL["FIRECRAWL API<br/>Web Scraping"]
+        Stripe["Stripe API<br/>Payments"]
+    end
+
+    %% Infrastructure
+    subgraph "Infrastructure"
+        Postgres["PostgreSQL<br/>:5432<br/>(Database)"]
+        Redis["Redis<br/>:6379<br/>(Cache/Sessions)"]
+        NATS["NATS JetStream<br/>:4222<br/>(Events)"]
+        VectorDB["Vector Database<br/>(Embeddings)"]
+    end
+
+    %% Frontend Services
+    subgraph "Frontend Layer"
+        WebFrontend["Web Frontend<br/>:3000<br/>(React/Vite)"]
+        ChatbotUI["AI Chatbot UI<br/>:3001<br/>(React)"]
+        AdminPortal["Admin Portal<br/>:8099<br/>(FastAPI)"]
+    end
+
+    %% Data Plane Services
+    subgraph "Data Plane"
+        APIGateway["API Gateway<br/>:8000<br/>(FastAPI)"]
+        ModelGateway["Model Gateway<br/>:8080<br/>(AI Routing)"]
+        RetrievalService["Retrieval Service<br/>:8081<br/>(RAG)"]
+        ToolsService["Tools Service<br/>:8082<br/>(FIRECRAWL)"]
+        RouterService["Router Service<br/>:8083<br/>(Routing)"]
+        RealtimeGateway["Realtime Gateway<br/>:8084<br/>(WebSocket)"]
+        ChatAdapters["Chat Adapters<br/>:8006<br/>(Multi-channel)"]
+        SemanticCache["Semantic Cache<br/>:8085<br/>(Caching)"]
+        MigrationRunner["Migration Runner<br/>:8086<br/>(DB Migrations)"]
+        EventRelay["Event Relay<br/>:8087<br/>(Webhooks)"]
+    end
+
+    %% Control Plane Services
+    subgraph "Control Plane"
+        ConfigService["Config Service<br/>:8090<br/>(Configuration)"]
+        PolicyAdapter["Policy Adapter<br/>:8091<br/>(Policies)"]
+        FeatureFlags["Feature Flags<br/>:8092<br/>(Toggles)"]
+        RegistryService["Registry Service<br/>:8094<br/>(Discovery)"]
+        UsageMetering["Usage Metering<br/>:8095<br/>(Billing)"]
+        AuditLog["Audit Log<br/>:8096<br/>(Compliance)"]
+        Notifications["Notifications<br/>:8097<br/>(Alerts)"]
+    end
+
+    %% User Interactions
+    User --> WebFrontend
+    User --> ChatbotUI
+    Admin --> AdminPortal
+
+    %% Frontend to API Gateway
+    WebFrontend -.->|"HTTP GET/POST<br/>CORS enabled"| APIGateway
+    ChatbotUI -.->|"HTTP POST /ask<br/>JSON"| APIGateway
+    AdminPortal -.->|"HTTP REST<br/>Admin APIs"| APIGateway
+
+    %% API Gateway to Data Plane
+    APIGateway -->|"HTTP POST /v1/chat<br/>Model requests"| ModelGateway
+    APIGateway -->|"HTTP POST /v1/tools/exec<br/>Web search/scraping"| ToolsService
+    APIGateway -->|"HTTP POST /search<br/>Document retrieval"| RetrievalService
+    APIGateway -->|"HTTP POST /route<br/>Request routing"| RouterService
+    APIGateway -->|"WebSocket /ws/{tenant}<br/>Real-time updates"| RealtimeGateway
+
+    %% Data Plane Internal Communication
+    ModelGateway -->|"HTTP POST<br/>AI completions"| OpenAI
+    ModelGateway -->|"HTTP POST<br/>AI completions"| Anthropic
+    ToolsService -->|"HTTP POST<br/>Web scraping"| FIRECRAWL
+    RouterService -->|"HTTP POST<br/>Intelligent routing"| ModelGateway
+    RetrievalService -->|"Vector search<br/>Embeddings"| VectorDB
+
+    %% Chat Adapters External Integration
+    ChatAdapters -->|"HTTP POST /webhook<br/>Facebook/Zalo/TikTok"| APIGateway
+    Facebook["Facebook Messenger"] -->|"Webhook"| ChatAdapters
+    Zalo["Zalo Chat"] -->|"Webhook"| ChatAdapters
+    TikTok["TikTok Chat"] -->|"Webhook"| ChatAdapters
+
+    %% Control Plane Interactions
+    APIGateway -->|"HTTP GET<br/>Configuration"| ConfigService
+    APIGateway -->|"HTTP POST<br/>Policy checks"| PolicyAdapter
+    APIGateway -->|"HTTP GET<br/>Feature flags"| FeatureFlags
+    APIGateway -->|"HTTP GET<br/>Service discovery"| RegistryService
+    APIGateway -->|"HTTP POST<br/>Usage tracking"| UsageMetering
+    APIGateway -->|"HTTP POST<br/>Audit events"| AuditLog
+    APIGateway -->|"HTTP POST<br/>Notifications"| Notifications
+
+    %% Infrastructure Dependencies
+    APIGateway -->|"SQL queries<br/>ACID transactions"| Postgres
+    APIGateway -->|"Cache/Sessions<br/>Pub/Sub"| Redis
+    APIGateway -->|"Event streaming<br/>Guaranteed delivery"| NATS
+
+    ModelGateway -->|"Cache<br/>Rate limiting"| Redis
+    RetrievalService -->|"Document storage<br/>RLS isolation"| Postgres
+    ToolsService -->|"Cache<br/>Tool results"| Redis
+    RouterService -->|"Feature store<br/>ML models"| Redis
+    RealtimeGateway -->|"Session storage<br/>Message queues"| Redis
+    RealtimeGateway -->|"Event streaming<br/>Real-time updates"| NATS
+
+    %% Control Plane Infrastructure
+    ConfigService -->|"Configuration storage<br/>Environment settings"| Redis
+    PolicyAdapter -->|"Policy cache<br/>Decision cache"| Redis
+    FeatureFlags -->|"Feature state<br/>A/B testing"| Redis
+    RegistryService -->|"Service registry<br/>Health checks"| Redis
+    UsageMetering -->|"Usage data<br/>Billing events"| Postgres
+    AuditLog -->|"Audit trail<br/>Compliance logs"| Postgres
+    Notifications -->|"Notification queue<br/>Delivery tracking"| Redis
+
+    %% Event Flows
+    APIGateway -.->|"Usage events<br/>tenant.usage.*"| NATS
+    APIGateway -.->|"Audit events<br/>tenant.audit.*"| NATS
+    ModelGateway -.->|"Model events<br/>model.usage.*"| NATS
+    ToolsService -.->|"Tool events<br/>tool.execution.*"| NATS
+
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef dataplane fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef controlplane fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef infrastructure fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef external fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class WebFrontend,ChatbotUI,AdminPortal frontend
+    class APIGateway,ModelGateway,RetrievalService,ToolsService,RouterService,RealtimeGateway,ChatAdapters,SemanticCache,MigrationRunner,EventRelay dataplane
+    class ConfigService,PolicyAdapter,FeatureFlags,RegistryService,UsageMetering,AuditLog,Notifications controlplane
+    class Postgres,Redis,NATS,VectorDB infrastructure
+    class OpenAI,Anthropic,FIRECRAWL,Stripe,Facebook,Zalo,TikTok external

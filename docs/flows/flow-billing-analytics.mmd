@@ -1,0 +1,117 @@
+sequenceDiagram
+    participant APIGateway as API Gateway<br/>:8000
+    participant ModelGateway as Model Gateway<br/>:8080
+    participant ToolsService as Tools Service<br/>:8082
+    participant UsageMetering as Usage Metering<br/>:8095
+    participant BillingService as Billing Service<br/>:8006
+    participant AnalyticsService as Analytics Service<br/>:8004
+    participant AuditLog as Audit Log<br/>:8096
+    participant Postgres as PostgreSQL<br/>:5432
+    participant Redis as Redis<br/>:6379
+    participant NATS as NATS<br/>:4222
+    participant Stripe as Stripe API<br/>(Payments)
+    participant WebFrontend as Web Frontend<br/>:3000
+    participant AdminPortal as Admin Portal<br/>:8099
+
+    %% Real-time Usage Tracking
+    Note over APIGateway,AdminPortal: === Real-time Usage Tracking and Billing ===
+    APIGateway->>UsageMetering: 1. POST /usage<br/>Headers: X-Tenant-Id: tenant_123, X-Service: api-gateway<br/>Body: {service: "api-gateway", endpoint: "/ask", tokens_used: 150, cost: 0.001, timestamp: "2024-01-15T10:30:00Z"}
+
+    UsageMetering->>Postgres: 2. INSERT INTO usage_log<br/>Body: {tenant_id: "tenant_123", service: "api-gateway", endpoint: "/ask", tokens: 150, cost: 0.001, timestamp: "2024-01-15T10:30:00Z"}
+    
+    UsageMetering->>Redis: 3. INCR tenant:tenant_123:usage:api_gateway<br/>Real-time usage counter
+    UsageMetering->>Redis: 4. INCRBY tenant:tenant_123:cost:current_month<br/>Add to monthly cost
+    
+    UsageMetering->>Postgres: 5. UPDATE tenant_usage<br/>SET current_month_tokens = current_month_tokens + 150,<br/>current_month_cost = current_month_cost + 0.001<br/>WHERE tenant_id = 'tenant_123'
+
+    %% Cost Threshold Check
+    UsageMetering->>Postgres: 6. SELECT * FROM tenant_limits<br/>WHERE tenant_id = 'tenant_123'
+    Postgres-->>UsageMetering: {monthly_limit: 100.00, current_cost: 45.67, alert_threshold: 80.00}
+
+    alt Cost threshold exceeded
+        UsageMetering->>BillingService: 7. POST /alerts/cost_threshold<br/>Body: {tenant_id: "tenant_123", current_cost: 81.23, limit: 100.00, threshold: 80.00}
+        BillingService->>NATS: 8. PUBLISH tenant.alerts.cost_warning<br/>{tenant_id: "tenant_123", alert_type: "cost_threshold", severity: "warning"}
+    end
+
+    %% Model Gateway Usage Tracking
+    ModelGateway->>UsageMetering: 9. POST /usage<br/>Body: {service: "model-gateway", provider: "openai", model: "gpt-4o-mini", input_tokens: 1200, output_tokens: 380, cost: 0.024}
+    
+    UsageMetering->>Postgres: 10. INSERT INTO model_usage<br/>Body: {tenant_id: "tenant_123", provider: "openai", model: "gpt-4o-mini", input_tokens: 1200, output_tokens: 380, cost: 0.024}
+
+    %% Tools Service Usage
+    ToolsService->>UsageMetering: 11. POST /usage<br/>Body: {service: "tools-service", tool: "web_search", api_calls: 1, cost: 0.005, provider: "firecrawl"}
+    
+    UsageMetering->>Postgres: 12. INSERT INTO tool_usage<br/>Body: {tenant_id: "tenant_123", tool: "web_search", api_calls: 1, cost: 0.005}
+
+    %% Analytics Processing
+    Note over APIGateway,AdminPortal: === Analytics and KPI Calculation ===
+    AnalyticsService->>Postgres: 13. SELECT * FROM usage_log<br/>WHERE tenant_id = 'tenant_123'<br/>AND created_at >= '2024-01-01'
+    Postgres-->>AnalyticsService: Usage data for current month
+
+    AnalyticsService->>AnalyticsService: 14. Calculate KPIs:<br/>- Total API calls: 1,247<br/>- Average response time: 2.3s<br/>- Success rate: 98.5%<br/>- Cost per request: $0.037<br/>- Peak usage: 14:30-15:00
+
+    AnalyticsService->>Redis: 15. SET analytics:tenant_123:daily<br/>Cache daily analytics for 24 hours
+
+    %% Dashboard Data Generation
+    WebFrontend->>AnalyticsService: 16. GET /analytics/tenant_123/kpis<br/>Headers: Authorization: Bearer jwt_token
+    AnalyticsService->>Postgres: 17. SELECT * FROM usage_analytics<br/>WHERE tenant_id = 'tenant_123'<br/>ORDER BY date DESC LIMIT 30
+
+    AnalyticsService-->>WebFrontend: 18. 200 OK<br/>{kpis: {total_requests: 1247, avg_response_time: 2.3, success_rate: 98.5, monthly_cost: 45.67, peak_hour: "14:30-15:00"}, trends: {...}}
+
+    %% Admin Portal Analytics
+    AdminPortal->>AnalyticsService: 19. GET /admin/analytics/summary<br/>Headers: Authorization: Bearer admin_jwt
+    AnalyticsService->>Postgres: 20. SELECT COUNT(*) as total_tenants,<br/>SUM(current_month_cost) as total_revenue,<br/>AVG(success_rate) as avg_success_rate<br/>FROM tenant_analytics
+
+    AnalyticsService-->>AdminPortal: 21. 200 OK<br/>{summary: {total_tenants: 156, total_revenue: 12543.67, avg_success_rate: 97.8, active_tenants: 142}}
+
+    %% Billing and Invoice Generation
+    Note over APIGateway,AdminPortal: === Billing and Invoice Processing ===
+    BillingService->>Postgres: 22. SELECT * FROM tenant_usage<br/>WHERE billing_cycle_end <= NOW()<br/>AND invoice_status = 'pending'
+    Postgres-->>BillingService: Tenants due for billing
+
+    loop For each tenant
+        BillingService->>Postgres: 23. SELECT * FROM usage_log<br/>WHERE tenant_id = 'tenant_456'<br/>AND created_at >= '2023-12-01'<br/>AND created_at < '2024-01-01'
+        
+        BillingService->>BillingService: 24. Generate invoice:<br/>- Base subscription: $50.00<br/>- API usage: $23.45<br/>- Tool usage: $5.67<br/>- Total: $79.12
+        
+        BillingService->>Postgres: 25. INSERT INTO invoices<br/>Body: {tenant_id: "tenant_456", amount: 79.12, period: "2023-12", status: "generated", due_date: "2024-01-15"}
+        
+        BillingService->>Stripe: 26. POST /v1/invoices<br/>Headers: Authorization: Bearer sk_test_xxx<br/>Body: {customer: "cus_tenant_456", amount: 7912, currency: "usd", description: "AI Platform Usage - December 2023"}
+        Stripe-->>BillingService: 200 OK<br/>{id: "in_1ABC123", status: "draft", hosted_invoice_url: "https://invoice.stripe.com/i/..."}
+        
+        BillingService->>NATS: 27. PUBLISH tenant.billing.invoice_generated<br/>{tenant_id: "tenant_456", invoice_id: "in_1ABC123", amount: 79.12}
+    end
+
+    %% Payment Processing
+    Stripe->>BillingService: 28. POST /webhooks/stripe<br/>Headers: X-Stripe-Signature: t=1234567890,v1=xxx<br/>Body: {type: "invoice.payment_succeeded", data: {object: {id: "in_1ABC123", customer: "cus_tenant_456", amount_paid: 7912}}}
+
+    BillingService->>Postgres: 29. UPDATE invoices<br/>SET status = 'paid', paid_at = NOW()<br/>WHERE stripe_invoice_id = 'in_1ABC123'
+
+    BillingService->>NATS: 30. PUBLISH tenant.billing.payment_succeeded<br/>{tenant_id: "tenant_456", invoice_id: "in_1ABC123", amount: 79.12}
+
+    %% Audit and Compliance
+    Note over APIGateway,AdminPortal: === Audit and Compliance Tracking ===
+    AuditLog->>Postgres: 31. INSERT INTO audit_events<br/>Body: {tenant_id: "tenant_123", action: "usage_tracked", service: "api-gateway", user_id: "user_456", timestamp: "2024-01-15T10:30:00Z", metadata: {tokens: 150, cost: 0.001}}
+
+    AuditLog->>Postgres: 32. INSERT INTO compliance_log<br/>Body: {tenant_id: "tenant_123", event_type: "data_access", data_type: "usage_metrics", access_method: "api", timestamp: "2024-01-15T10:30:00Z"}
+
+    %% Real-time Monitoring and Alerts
+    AnalyticsService->>NATS: 33. PUBLISH system.metrics.usage_spike<br/>{tenant_id: "tenant_123", current_rate: 45.2, threshold: 40.0, alert_level: "warning"}
+
+    AnalyticsService->>Redis: 34. SET alert:tenant_123:usage_spike<br/>Cache alert state for 1 hour
+
+    %% Error Handling
+    alt Usage tracking fails
+        UsageMetering-->>APIGateway: 500 Error<br/>{error: "Database connection failed"}
+        APIGateway->>Redis: 35. SET failed_usage:tenant_123:req_789<br/>Queue for retry
+        APIGateway->>NATS: 36. PUBLISH system.errors.usage_tracking_failed<br/>{tenant_id: "tenant_123", error: "Database connection failed", retry_count: 1}
+    end
+
+    alt Billing service unavailable
+        BillingService-->>AnalyticsService: 503 Service Unavailable<br/>{error: "Billing service maintenance"}
+        AnalyticsService->>Redis: 37. SET billing_maintenance:true<br/>Cache maintenance state
+        Note over AnalyticsService: Graceful degradation<br/>Continue analytics without billing data
+    end
+
+    %% Background Processing
+    Note over UsageMetering,Postgres: Background: Usage aggregation<br/>Cost optimization analysis<br/>Anomaly detection<br/>Compliance reporting<br/>Revenue forecasting

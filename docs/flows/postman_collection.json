@@ -1,0 +1,556 @@
+{
+  "info": {
+    "name": "Multi-AI-Agent Platform - Local Development",
+    "description": "Postman collection for testing the Multi-AI-Agent Platform services in local development environment",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost",
+      "type": "string"
+    },
+    {
+      "key": "api_gateway_port",
+      "value": "8000",
+      "type": "string"
+    },
+    {
+      "key": "model_gateway_port",
+      "value": "8080",
+      "type": "string"
+    },
+    {
+      "key": "tools_service_port",
+      "value": "8082",
+      "type": "string"
+    },
+    {
+      "key": "retrieval_service_port",
+      "value": "8081",
+      "type": "string"
+    },
+    {
+      "key": "router_service_port",
+      "value": "8083",
+      "type": "string"
+    },
+    {
+      "key": "admin_portal_port",
+      "value": "8099",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "tenant_123",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "sess_456",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "API Gateway",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{api_gateway_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{api_gateway_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Root Endpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{api_gateway_port}}/",
+              "host": ["{{base_url}}"],
+              "port": "{{api_gateway_port}}",
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ask Question (Main Chat)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{tenant_id}}"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "req_{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What's the weather like today?\",\n  \"session_id\": \"{{session_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{api_gateway_port}}/ask",
+              "host": ["{{base_url}}"],
+              "port": "{{api_gateway_port}}",
+              "path": ["ask"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chat Completion API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful AI assistant.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Hello, how are you?\"\n    }\n  ],\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 1000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{api_gateway_port}}/v1/chat",
+              "host": ["{{base_url}}"],
+              "port": "{{api_gateway_port}}",
+              "path": ["v1", "chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Web Scrape",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{api_gateway_port}}/web-scrape",
+              "host": ["{{base_url}}"],
+              "port": "{{api_gateway_port}}",
+              "path": ["web-scrape"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Model Gateway",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{model_gateway_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{model_gateway_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chat Completion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Explain quantum computing in simple terms\"\n    }\n  ],\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{model_gateway_port}}/v1/chat",
+              "host": ["{{base_url}}"],
+              "port": "{{model_gateway_port}}",
+              "path": ["v1", "chat"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tools Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{tools_service_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{tools_service_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Available Tools",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{tools_service_port}}/v1/tools",
+              "host": ["{{base_url}}"],
+              "port": "{{tools_service_port}}",
+              "path": ["v1", "tools"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Web Search Tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"web_search\",\n  \"args\": {\n    \"query\": \"latest AI news 2024\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{tools_service_port}}/v1/tools/exec",
+              "host": ["{{base_url}}"],
+              "port": "{{tools_service_port}}",
+              "path": ["v1", "tools", "exec"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Web Scrape Tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"web_scrape\",\n  \"args\": {\n    \"url\": \"https://news.ycombinator.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{tools_service_port}}/v1/tools/exec",
+              "host": ["{{base_url}}"],
+              "port": "{{tools_service_port}}",
+              "path": ["v1", "tools", "exec"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Echo Tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"echo\",\n  \"args\": {\n    \"text\": \"Hello from Postman!\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{tools_service_port}}/v1/tools/exec",
+              "host": ["{{base_url}}"],
+              "port": "{{tools_service_port}}",
+              "path": ["v1", "tools", "exec"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Retrieval Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{retrieval_service_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{retrieval_service_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"financial performance Q4 2023\",\n  \"limit\": 5,\n  \"filters\": {\n    \"document_types\": [\"reports\", \"presentations\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{retrieval_service_port}}/search",
+              "host": ["{{base_url}}"],
+              "port": "{{retrieval_service_port}}",
+              "path": ["search"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Router Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{router_service_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{router_service_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Route Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Find all documents about Q4 financial performance and summarize the key metrics\",\n  \"context\": {\n    \"user_id\": \"user_123\",\n    \"session_id\": \"{{session_id}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:{{router_service_port}}/route",
+              "host": ["{{base_url}}"],
+              "port": "{{router_service_port}}",
+              "path": ["route"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Portal",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:{{admin_portal_port}}/healthz",
+              "host": ["{{base_url}}"],
+              "port": "{{admin_portal_port}}",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}:{{admin_portal_port}}/admin/dashboard",
+              "host": ["{{base_url}}"],
+              "port": "{{admin_portal_port}}",
+              "path": ["admin", "dashboard"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat Adapters",
+      "item": [
+        {
+          "name": "Facebook Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature",
+                "value": "sha1=your_signature_here"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"page\",\n  \"entry\": [\n    {\n      \"messaging\": [\n        {\n          \"sender\": {\n            \"id\": \"user_123\"\n          },\n          \"message\": {\n            \"text\": \"Hello, what can you help me with?\"\n          }\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:8006/facebook/webhook",
+              "host": ["{{base_url}}"],
+              "port": "8006",
+              "path": ["facebook", "webhook"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Zalo Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Zalo-Signature",
+                "value": "sha256=your_signature_here"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sender\": {\n    \"id\": \"zalo_user_456\"\n  },\n  \"recipient\": {\n    \"id\": \"zalo_oa_789\"\n  },\n  \"message\": {\n    \"text\": \"Can you check the latest AI news?\"\n  },\n  \"timestamp\": 1640995200\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}:8006/zalo/webhook",
+              "host": ["{{base_url}}"],
+              "port": "8006",
+              "path": ["zalo", "webhook"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane Services",
+      "item": [
+        {
+          "name": "Config Service - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:8090/healthz",
+              "host": ["{{base_url}}"],
+              "port": "8090",
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Feature Flags - Get Flags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:8092/features/{{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "port": "8092",
+              "path": ["features", "{{tenant_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Usage Metering - Get Usage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}:8095/usage/{{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "port": "8095",
+              "path": ["usage", "{{tenant_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

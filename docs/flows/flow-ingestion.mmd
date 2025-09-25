@@ -1,0 +1,91 @@
+sequenceDiagram
+    participant User as User
+    participant WebFrontend as Web Frontend<br/>:3000
+    participant APIGateway as API Gateway<br/>:8000
+    participant IngestionService as Ingestion Service<br/>:8004
+    participant RetrievalService as Retrieval Service<br/>:8081
+    participant VectorDB as Vector Database<br/>(Embeddings)
+    participant Postgres as PostgreSQL<br/>:5432
+    participant Redis as Redis<br/>:6379
+    participant NATS as NATS<br/>:4222
+    participant AuditLog as Audit Log<br/>:8096
+    participant UsageMetering as Usage Metering<br/>:8095
+
+    %% Document Upload Flow
+    Note over User,UsageMetering: === Document Upload and Processing ===
+    User->>WebFrontend: 1. Upload document (PDF, DOCX, TXT)<br/>Select file: "company_handbook.pdf"
+    WebFrontend->>APIGateway: 2. POST /documents/upload<br/>Headers: Content-Type: multipart/form-data, X-Tenant-Id: tenant_123<br/>Body: {file: "company_handbook.pdf", metadata: {title: "Company Handbook", category: "HR"}}
+
+    APIGateway->>Redis: 3. GET tenant:tenant_123<br/>Validate tenant permissions
+    Redis-->>APIGateway: Tenant config with upload limits
+
+    APIGateway->>AuditLog: 4. POST /audit<br/>Body: {action: "document_upload", tenant_id: "tenant_123", file_name: "company_handbook.pdf", size: 2048000}
+    AuditLog->>Postgres: 5. INSERT INTO audit_events<br/>Log upload event
+
+    APIGateway->>IngestionService: 6. POST /documents/upload<br/>Headers: X-Request-Id: req_789, X-Tenant-Id: tenant_123<br/>Body: {file: binary_data, metadata: {title: "Company Handbook", category: "HR"}}
+
+    %% Document Processing
+    IngestionService->>IngestionService: 7. Extract text from PDF<br/>PII detection and redaction<br/>Chunking strategy (512 tokens)
+
+    IngestionService->>VectorDB: 8. Generate embeddings<br/>POST /embeddings<br/>Body: {text_chunks: ["chunk1", "chunk2", ...], model: "text-embedding-ada-002"}
+    VectorDB-->>IngestionService: 200 OK<br/>{embeddings: [[0.1, 0.2, ...], [0.3, 0.4, ...], ...]}
+
+    IngestionService->>Postgres: 9. INSERT INTO documents<br/>Body: {tenant_id: "tenant_123", title: "Company Handbook", file_path: "/uploads/doc_456.pdf", status: "processing"}
+    IngestionService->>Postgres: 10. INSERT INTO document_chunks<br/>Body: {document_id: "doc_456", chunk_index: 0, content: "chunk1", embedding_id: "emb_001"}
+
+    IngestionService->>VectorDB: 11. POST /index<br/>Body: {tenant_id: "tenant_123", document_id: "doc_456", chunks: [{id: "chunk_001", embedding: [0.1, 0.2, ...], metadata: {...}}]}
+    VectorDB-->>IngestionService: 200 OK<br/>{indexed: true, chunks_count: 15}
+
+    IngestionService->>Postgres: 12. UPDATE documents<br/>SET status = 'indexed', chunks_count = 15<br/>WHERE id = 'doc_456'
+
+    %% Event Publishing
+    IngestionService->>NATS: 13. PUBLISH tenant.ingestion.document_indexed<br/>{tenant_id: "tenant_123", document_id: "doc_456", chunks_count: 15, timestamp: "..."}
+
+    IngestionService->>UsageMetering: 14. POST /usage<br/>Body: {service: "ingestion", tenant_id: "tenant_123", action: "document_upload", tokens_used: 5120, cost: 0.01}
+    UsageMetering->>Postgres: 15. INSERT INTO usage_log<br/>Track processing costs
+
+    IngestionService-->>APIGateway: 16. 200 OK<br/>{document_id: "doc_456", status: "indexed", chunks_count: 15, processing_time_ms: 2500}
+
+    APIGateway-->>WebFrontend: 17. 200 OK<br/>{success: true, document_id: "doc_456", message: "Document successfully indexed"}
+
+    %% Semantic Search Flow (Post-Indexing)
+    Note over User,UsageMetering: === Semantic Search After Indexing ===
+    User->>WebFrontend: 18. Search: "What are the vacation policies?"
+    WebFrontend->>APIGateway: 19. POST /search/semantic<br/>Headers: X-Tenant-Id: tenant_123<br/>Body: {query: "What are the vacation policies?", filters: {category: "HR"}}
+
+    APIGateway->>RetrievalService: 20. POST /search<br/>Headers: X-Tenant-Id: tenant_123<br/>Body: {query: "What are the vacation policies?", limit: 5}
+
+    RetrievalService->>VectorDB: 21. POST /search<br/>Body: {query: "What are the vacation policies?", tenant_id: "tenant_123", limit: 5, similarity_threshold: 0.8}
+    VectorDB-->>RetrievalService: 200 OK<br/>{results: [{chunk_id: "chunk_023", similarity: 0.92, content: "Vacation policies: Employees are entitled to..."}, ...]}
+
+    RetrievalService->>Postgres: 22. SELECT * FROM document_chunks<br/>WHERE id IN ('chunk_023', 'chunk_045', ...)
+    Postgres-->>RetrievalService: Chunk data with metadata
+
+    RetrievalService-->>APIGateway: 23. 200 OK<br/>{results: [{content: "Vacation policies: Employees are entitled to 20 days annual leave...", document: "Company Handbook", page: 45}, ...], total_results: 3}
+
+    APIGateway->>UsageMetering: 24. POST /usage<br/>Body: {service: "retrieval", tenant_id: "tenant_123", action: "semantic_search", queries_count: 1}
+    APIGateway->>AuditLog: 25. POST /audit<br/>Body: {action: "semantic_search", tenant_id: "tenant_123", query: "What are the vacation policies?", results_count: 3}
+
+    APIGateway-->>WebFrontend: 26. 200 OK<br/>{results: [{content: "Vacation policies...", source: "Company Handbook", page: 45, relevance: 0.92}, ...]}
+
+    %% Error Handling
+    alt Document processing fails
+        IngestionService-->>APIGateway: 500 Error<br/>{error: "Text extraction failed", document_id: "doc_456"}
+        APIGateway->>Postgres: 27. UPDATE documents<br/>SET status = 'failed', error_message = 'Text extraction failed'<br/>WHERE id = 'doc_456'
+        APIGateway-->>WebFrontend: 500 Error<br/>{error: "Document processing failed", retry_after: 60}
+    end
+
+    alt Vector indexing fails
+        VectorDB-->>IngestionService: 500 Error<br/>{error: "Indexing service unavailable"}
+        IngestionService->>Redis: 28. SET failed_indexing:doc_456<br/>Queue for retry
+        IngestionService->>NATS: 29. PUBLISH tenant.ingestion.retry_required<br/>{document_id: "doc_456", retry_count: 1}
+        Note over IngestionService: Implement exponential backoff<br/>Dead letter queue for persistent failures
+    end
+
+    alt Search timeout
+        RetrievalService-->>APIGateway: 504 Gateway Timeout<br/>{error: "Vector search timeout"}
+        APIGateway-->>WebFrontend: 504 Error<br/>{error: "Search temporarily unavailable", retry_after: 30}
+    end
+
+    %% Background Processing
+    Note over IngestionService,Postgres: Background: Document cleanup<br/>Embedding optimization<br/>Index maintenance<br/>Usage analytics aggregation<br/>Compliance reporting
