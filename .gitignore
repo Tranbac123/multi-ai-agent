@@ -108,3 +108,5 @@ frontend/*/.cache/
 *.temp
 .tmp/
 .temp/
+
+note.txt
