@@ -29,46 +29,46 @@ The Multi-Tenant AIaaS Platform is a production-grade, event-driven microservice
 │                              API GATEWAY LAYER                                  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │  • Authentication & Authorization                                               │
-│  • Rate Limiting & Quota Enforcement                                           │
-│  • Request Routing & Load Balancing                                            │
-│  • WebSocket Proxy & Sticky Sessions                                           │
-│  • Middleware: Billing, Tenant Context, Validation                             │
+│  • Rate Limiting & Quota Enforcement                                            │
+│  • Request Routing & Load Balancing                                             │
+│  • WebSocket Proxy & Sticky Sessions                                            │
+│  • Middleware: Billing, Tenant Context, Validation                              │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              BUSINESS LAYER                                     │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  Orchestrator Service    │  Router Service      │  Realtime Service           │
-│  • Workflow Engine       │  • AI Routing        │  • WebSocket Management     │
-│  • Saga Orchestration    │  • Feature Extraction│  • Backpressure Handling    │
-│  • Tool Integration      │  • Bandit Policy     │  • Session Management       │
-│  • LangGraph/FSM         │  • Canary Management │  • Message Queuing          │
+│  Orchestrator Service    │  Router Service      │  Realtime Service             │
+│  • Workflow Engine       │  • AI Routing        │  • WebSocket Management       │
+│  • Saga Orchestration    │  • Feature Extraction│  • Backpressure Handling      │
+│  • Tool Integration      │  • Bandit Policy     │  • Session Management         │
+│  • LangGraph/FSM         │  • Canary Management │  • Message Queuing            │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              DATA LAYER                                         │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  Analytics Service       │  Billing Service      │  Ingestion Service         │
-│  • CQRS Read Models      │  • Usage Tracking     │  • Document Processing     │
-│  • KPI Dashboards        │  • Invoice Generation │  • Vector Indexing         │
-│  • Reporting Engine      │  • Payment Processing │  • Embedding Generation    │
+│  Analytics Service       │  Billing Service      │  Ingestion Service           │
+│  • CQRS Read Models      │  • Usage Tracking     │  • Document Processing       │
+│  • KPI Dashboards        │  • Invoice Generation │  • Vector Indexing           │
+│  • Reporting Engine      │  • Payment Processing │  • Embedding Generation      │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              INFRASTRUCTURE LAYER                               │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  PostgreSQL (RLS)        │  Redis Cluster       │  NATS JetStream            │
-│  • Multi-tenant Data     │  • Session Storage    │  • Event Streaming         │
-│  • Row-Level Security    │  • Rate Limiting      │  • Message Queuing         │
-│  • ACID Transactions     │  • Caching Layer      │  • Dead Letter Queues      │
-│                          │                      │                             │
-│  Vector Database         │  Observability Stack │  Kubernetes Cluster        │
-│  • Embedding Storage     │  • Prometheus         │  • Auto-scaling (KEDA/HPA) │
-│  • Semantic Search       │  • Grafana Dashboards │  • Service Mesh (mTLS)     │
-│  • Tenant Isolation      │  • Jaeger Tracing    │  • Network Policies        │
+│  PostgreSQL (RLS)        │  Redis Cluster       │  NATS JetStream               │
+│  • Multi-tenant Data     │  • Session Storage    │  • Event Streaming           │
+│  • Row-Level Security    │  • Rate Limiting      │  • Message Queuing           │
+│  • ACID Transactions     │  • Caching Layer      │  • Dead Letter Queues        │
+│                          │                      │                               │
+│  Vector Database         │  Observability Stack │  Kubernetes Cluster           │
+│  • Embedding Storage     │  • Prometheus         │  • Auto-scaling (KEDA/HPA)   │
+│  • Semantic Search       │  • Grafana Dashboards │  • Service Mesh (mTLS)       │
+│  • Tenant Isolation      │  • Jaeger Tracing    │  • Network Policies           │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 

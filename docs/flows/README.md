@@ -16,12 +16,14 @@ The platform consists of **20+ services** organized into three main layers:
 For a comprehensive visual understanding of the system, check out these enhanced diagrams:
 
 ### **🌟 Recommended Visual Flows**
+
 1. **[detailed-visual-flow.mmd](detailed-visual-flow.mmd)** - Enhanced system map with emojis and detailed service descriptions
 2. **[detailed-sequence-flow.mmd](detailed-sequence-flow.mmd)** - Step-by-step user journey with visual elements and detailed interactions
 3. **[comprehensive-data-flow.mmd](comprehensive-data-flow.mmd)** - Complete data flow showing all input types and processing paths
 4. **[complete-architecture-flow.mmd](complete-architecture-flow.mmd)** - Full architecture with all layers, services, and connections
 
 These diagrams provide:
+
 - 🎨 **Visual Enhancement**: Emojis and color coding for better readability
 - 📊 **Detailed Descriptions**: Comprehensive service features and capabilities
 - 🔄 **Complete Flows**: End-to-end request processing with all interactions
@@ -29,29 +31,29 @@ These diagrams provide:
 
 ## 🗺️ Diagrams Overview
 
-| Diagram | Format | Description | Key Flows |
-|---------|--------|-------------|-----------|
-| [system-map.mmd](system-map.mmd) | Mermaid | Complete system architecture with all services and connections | All services, external APIs, infrastructure |
-| [detailed-visual-flow.mmd](detailed-visual-flow.mmd) | Mermaid | **Enhanced visual system map with detailed service descriptions** | **Complete architecture with emojis and detailed features** |
-| [detailed-sequence-flow.mmd](detailed-sequence-flow.mmd) | Mermaid | **Detailed step-by-step sequence with visual elements** | **Complete user journey with emojis and detailed interactions** |
-| [comprehensive-data-flow.mmd](comprehensive-data-flow.mmd) | Mermaid | **Comprehensive data flow showing all input types and processing paths** | **Chat, Documents, Social, Admin processing paths** |
-| [complete-architecture-flow.mmd](complete-architecture-flow.mmd) | Mermaid | **Complete architecture with all layers and detailed connections** | **Full system with all services, features, and connections** |
-| [flow-web-chat.mmd](flow-web-chat.mmd) | Mermaid | End-to-end web chat flow with real-time search | User → Chatbot → API Gateway → AI + Web Search |
-| [flow-chat-adapters.mmd](flow-chat-adapters.mmd) | Mermaid | Multi-channel chat integration (Facebook, Zalo, TikTok) | Social platforms → Chat Adapters → Core services |
-| [flow-ingestion.mmd](flow-ingestion.mmd) | Mermaid | Document upload, processing, and semantic search | Document upload → Vector indexing → Search |
-| [flow-retrieval.mmd](flow-retrieval.mmd) | Mermaid | Complex retrieval with router intelligence | Query → Router → Retrieval → AI processing |
-| [flow-billing-analytics.mmd](flow-billing-analytics.mmd) | Mermaid | Usage tracking, billing, and analytics | Usage events → Billing → Invoice generation |
+| Diagram                                                          | Format  | Description                                                              | Key Flows                                                       |
+| ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| [system-map.mmd](system-map.mmd)                                 | Mermaid | Complete system architecture with all services and connections           | All services, external APIs, infrastructure                     |
+| [detailed-visual-flow.mmd](detailed-visual-flow.mmd)             | Mermaid | **Enhanced visual system map with detailed service descriptions**        | **Complete architecture with emojis and detailed features**     |
+| [detailed-sequence-flow.mmd](detailed-sequence-flow.mmd)         | Mermaid | **Detailed step-by-step sequence with visual elements**                  | **Complete user journey with emojis and detailed interactions** |
+| [comprehensive-data-flow.mmd](comprehensive-data-flow.mmd)       | Mermaid | **Comprehensive data flow showing all input types and processing paths** | **Chat, Documents, Social, Admin processing paths**             |
+| [complete-architecture-flow.mmd](complete-architecture-flow.mmd) | Mermaid | **Complete architecture with all layers and detailed connections**       | **Full system with all services, features, and connections**    |
+| [flow-web-chat.mmd](flow-web-chat.mmd)                           | Mermaid | End-to-end web chat flow with real-time search                           | User → Chatbot → API Gateway → AI + Web Search                  |
+| [flow-chat-adapters.mmd](flow-chat-adapters.mmd)                 | Mermaid | Multi-channel chat integration (Facebook, Zalo, TikTok)                  | Social platforms → Chat Adapters → Core services                |
+| [flow-ingestion.mmd](flow-ingestion.mmd)                         | Mermaid | Document upload, processing, and semantic search                         | Document upload → Vector indexing → Search                      |
+| [flow-retrieval.mmd](flow-retrieval.mmd)                         | Mermaid | Complex retrieval with router intelligence                               | Query → Router → Retrieval → AI processing                      |
+| [flow-billing-analytics.mmd](flow-billing-analytics.mmd)         | Mermaid | Usage tracking, billing, and analytics                                   | Usage events → Billing → Invoice generation                     |
 
 ### PlantUML Variants
 
-| Diagram | Format | Description |
-|---------|--------|-------------|
-| [c4-context.puml](c4-context.puml) | PlantUML | C4 Context diagram showing system boundaries |
-| [flow-web-chat.puml](flow-web-chat.puml) | PlantUML | PlantUML version of web chat flow |
-| [flow-chat-adapters.puml](flow-chat-adapters.puml) | PlantUML | PlantUML version of chat adapters flow |
-| [flow-ingestion.puml](flow-ingestion.puml) | PlantUML | PlantUML version of ingestion flow |
-| [flow-retrieval.puml](flow-retrieval.puml) | PlantUML | PlantUML version of retrieval flow |
-| [flow-billing-analytics.puml](flow-billing-analytics.puml) | PlantUML | PlantUML version of billing flow |
+| Diagram                                                    | Format   | Description                                  |
+| ---------------------------------------------------------- | -------- | -------------------------------------------- |
+| [c4-context.puml](c4-context.puml)                         | PlantUML | C4 Context diagram showing system boundaries |
+| [flow-web-chat.puml](flow-web-chat.puml)                   | PlantUML | PlantUML version of web chat flow            |
+| [flow-chat-adapters.puml](flow-chat-adapters.puml)         | PlantUML | PlantUML version of chat adapters flow       |
+| [flow-ingestion.puml](flow-ingestion.puml)                 | PlantUML | PlantUML version of ingestion flow           |
+| [flow-retrieval.puml](flow-retrieval.puml)                 | PlantUML | PlantUML version of retrieval flow           |
+| [flow-billing-analytics.puml](flow-billing-analytics.puml) | PlantUML | PlantUML version of billing flow             |
 
 ## 🛠️ How to Render
 
@@ -94,11 +96,13 @@ plantuml -tpng docs/flows/flow-*.puml
 ## 🔍 Key Service Ports
 
 ### Frontend Services
+
 - **AI Chatbot UI**: `:3001` (React)
 - **Web Frontend**: `:3000` (React/Vite)
 - **Admin Portal**: `:8099` (FastAPI)
 
 ### Data Plane Services
+
 - **API Gateway**: `:8000` (FastAPI)
 - **Model Gateway**: `:8080` (AI Routing)
 - **Retrieval Service**: `:8081` (RAG)
@@ -108,6 +112,7 @@ plantuml -tpng docs/flows/flow-*.puml
 - **Chat Adapters**: `:8006` (Multi-channel)
 
 ### Control Plane Services
+
 - **Config Service**: `:8090` (Configuration)
 - **Policy Adapter**: `:8091` (Policies)
 - **Feature Flags**: `:8092` (Toggles)
@@ -117,6 +122,7 @@ plantuml -tpng docs/flows/flow-*.puml
 - **Notifications**: `:8097` (Alerts)
 
 ### Infrastructure
+
 - **PostgreSQL**: `:5432` (Database)
 - **Redis**: `:6379` (Cache/Sessions)
 - **NATS JetStream**: `:4222` (Events)
@@ -124,21 +130,25 @@ plantuml -tpng docs/flows/flow-*.puml
 ## 🔄 Protocol Patterns
 
 ### HTTP/REST
+
 - **Solid edges** in Mermaid diagrams
 - Standard REST API calls with JSON payloads
 - Headers: `Authorization`, `X-Request-Id`, `X-Tenant-Id`
 
 ### WebSocket
+
 - **Thick edges** in Mermaid diagrams
 - Real-time bidirectional communication
 - Used for streaming responses and live updates
 
 ### Event Streaming
+
 - **Dashed edges** in Mermaid diagrams
 - NATS JetStream for reliable event delivery
 - Topics: `tenant.usage.*`, `tenant.audit.*`, `tenant.alerts.*`
 
 ### gRPC
+
 - **Dotted edges** in Mermaid diagrams
 - High-performance inter-service communication
 - Protocol buffers for serialization
@@ -155,16 +165,19 @@ Each flow diagram includes error handling branches showing:
 ## 📈 Performance Considerations
 
 ### Caching Strategy
+
 - **Redis**: Session storage, feature flags, usage counters
 - **Application Cache**: Query results, embeddings, analytics
 - **CDN**: Static assets and API responses
 
 ### Load Balancing
+
 - **API Gateway**: Request distribution and health checks
 - **Router Service**: Intelligent tier selection
 - **Model Gateway**: Provider failover and load balancing
 
 ### Monitoring
+
 - **Usage Tracking**: Real-time cost monitoring and alerts
 - **Audit Logging**: Comprehensive activity tracking
 - **Performance Metrics**: Response times, throughput, error rates
@@ -172,11 +185,13 @@ Each flow diagram includes error handling branches showing:
 ## 🔐 Security Features
 
 ### Authentication & Authorization
+
 - **JWT Tokens**: Stateless authentication
 - **Tenant Isolation**: Row-level security (RLS)
 - **API Key Management**: Secure external API access
 
 ### Data Protection
+
 - **PII Detection**: Automatic sensitive data identification
 - **Field-level Encryption**: KMS integration for sensitive fields
 - **Audit Trail**: Complete activity logging for compliance

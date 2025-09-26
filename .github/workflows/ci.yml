@@ -1,300 +1,302 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 env:
-  PYTHON_VERSION: "3.11"
-  POETRY_VERSION: "1.6.1"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  pre-commit:
-    name: Pre-commit hooks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install pre-commit
-        run: |
-          pip install pre-commit
-      - name: Run pre-commit
-        run: pre-commit run --all-files
-
-  linting:
-    name: Code Quality (Black, Ruff, MyPy)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install black ruff mypy pytest
-      - name: Run Black formatter
-        run: black --check --diff .
-      - name: Run Ruff linter
-        run: ruff check .
-      - name: Run MyPy type checker
-        run: mypy . --ignore-missing-imports
-
-  unit-tests:
-    name: Unit Tests
+  # Lint and test all services
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        service:
+          [
+            api-gateway,
+            orchestrator,
+            router-service,
+            model-gateway,
+            retrieval-service,
+            ingestion-service,
+            analytics-service,
+            billing-service,
+            realtime-gateway,
+            config-service,
+            usage-metering,
+          ]
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('services/' + matrix.service + '/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+        - name: Install dependencies
+          run: |
+            # Determine service path based on service name
+            if [[ "${{ matrix.service }}" =~ ^(api-gateway|model-gateway|orchestrator|router-service|realtime-gateway|ingestion-service|analytics-service|retrieval-service|tools-service|memory-service|chat-adapters|semantic-cache-service|event-relay-service|migration-runner|agents-service|eval-service)$ ]]; then
+              SERVICE_PATH="apps/data-plane/${{ matrix.service }}"
+            else
+              SERVICE_PATH="apps/control-plane/${{ matrix.service }}"
+            fi
+            
+            cd $SERVICE_PATH
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install pytest pytest-cov black flake8 mypy
+
+      - name: Run linting
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio pytest-cov
-      - name: Run unit tests
+          # Determine service path based on service name
+          if [[ "${{ matrix.service }}" =~ ^(api-gateway|model-gateway|orchestrator|router-service|realtime-gateway|ingestion-service|analytics-service|retrieval-service|tools-service|memory-service|chat-adapters|semantic-cache-service|event-relay-service|migration-runner|agents-service|eval-service)$ ]]; then
+            SERVICE_PATH="apps/data-plane/${{ matrix.service }}"
+          else
+            SERVICE_PATH="apps/control-plane/${{ matrix.service }}"
+          fi
+          
+          cd $SERVICE_PATH
+          python -m black --check src/ tests/
+          python -m flake8 src/ tests/
+          python -m mypy src/
+
+      - name: Run tests
         run: |
-          pytest tests/unit/ -v --cov=. --cov-report=xml --cov-report=term-missing
+          # Determine service path based on service name
+          if [[ "${{ matrix.service }}" =~ ^(api-gateway|model-gateway|orchestrator|router-service|realtime-gateway|ingestion-service|analytics-service|retrieval-service|tools-service|memory-service|chat-adapters|semantic-cache-service|event-relay-service|migration-runner|agents-service|eval-service)$ ]]; then
+            SERVICE_PATH="apps/data-plane/${{ matrix.service }}"
+          else
+            SERVICE_PATH="apps/control-plane/${{ matrix.service }}"
+          fi
+          
+          cd $SERVICE_PATH
+          python -m pytest tests/ -v --cov=src --cov-report=xml
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
+          # Determine service path based on service name
+          file: ${{ contains('api-gateway,model-gateway,orchestrator,router-service,realtime-gateway,ingestion-service,analytics-service,retrieval-service,tools-service,memory-service,chat-adapters,semantic-cache-service,event-relay-service,migration-runner,agents-service,eval-service', matrix.service) && 'apps/data-plane/' || 'apps/control-plane/' }}${{ matrix.service }}/coverage.xml
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}-coverage
 
-  integration-tests:
-    name: Integration Tests
+  # Contract tests
+  contract-tests:
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install jsonschema pytest
+
+      - name: Validate event schemas
+        run: |
+          python -m pytest contract-tests/ -v
+
+      - name: Check schema compatibility
+        run: |
+          python scripts/check_schema_compatibility.py
+
+  # Build Docker images
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, contract-tests]
+    strategy:
+      matrix:
+        service:
+          [
+            api-gateway,
+            orchestrator,
+            router-service,
+            model-gateway,
+            retrieval-service,
+            ingestion-service,
+            analytics-service,
+            billing-service,
+            realtime-gateway,
+            config-service,
+            usage-metering,
+          ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          # Determine service path based on service name
+          context: ${{ contains('api-gateway,model-gateway,orchestrator,router-service,realtime-gateway,ingestion-service,analytics-service,retrieval-service,tools-service,memory-service,chat-adapters,semantic-cache-service,event-relay-service,migration-runner,agents-service,eval-service', matrix.service) && 'apps/data-plane/' || 'apps/control-plane/' }}${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Docker Compose smoke test
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: build
+
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_agent
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
       redis:
-        image: redis:7
-        ports:
-          - 6379:6379
+        image: redis:7-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio redis
-      - name: Run integration tests
-        run: pytest tests/integration/ -v --tb=short
 
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio
-      - name: Run E2E tests
-        run: pytest tests/e2e/ -v --tb=short
+      nats:
+        image: nats:2.10-alpine
+        command: ["-js", "-m", "8222"]
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8222/healthz"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-  performance-tests:
-    name: Performance Regression Tests
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest locust
-      - name: Run performance tests
-        run: |
-          pytest tests/performance/ -v --tb=short
-          python scripts/performance_regression_check.py
-      - name: Upload performance reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: performance-reports
-          path: reports/performance/
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  flakiness-detection:
-    name: Flakiness Detection
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+      - name: Create environment file
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-      - name: Run flakiness detection
-        run: |
-          python scripts/flakiness_ci_integration.py --max-retries 3
-      - name: Upload flakiness reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: flakiness-reports
-          path: reports/flakiness/
+          cat > dev-env/.env << EOF
+          DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+          REDIS_URL=redis://redis:6379
+          NATS_URL=nats://nats:4222
+          JWT_SECRET_KEY=test-secret-key
+          OPENAI_API_KEY=test-key
+          ANTHROPIC_API_KEY=test-key
+          FIRECRAWL_API_KEY=test-key
+          EOF
 
-  security-scan:
-    name: Security Scan (SAST/DAST)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+      - name: Start core services
         run: |
-          python -m pip install --upgrade pip
-          pip install bandit safety
-      - name: Run Bandit security scan
-        run: bandit -r . -f json -o reports/security/bandit-report.json || true
-      - name: Run Safety dependency scan
-        run: safety check --json --output reports/security/safety-report.json || true
-      - name: Upload security reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-reports
-          path: reports/security/
+          cd dev-env
+          docker-compose --profile core up -d --build
 
-  observability-tests:
-    name: Observability Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+      - name: Wait for services to be ready
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-      - name: Run observability tests
-        run: pytest tests/observability/ -v --tb=short
+          sleep 30
+          # Check API Gateway health
+          curl -f http://localhost:8000/healthz || exit 1
+          # Check Orchestrator health
+          curl -f http://localhost:8081/healthz || exit 1
+          # Check Router Service health
+          curl -f http://localhost:8083/healthz || exit 1
 
-  chaos-tests:
-    name: Chaos Engineering Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+      - name: Run smoke tests
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-      - name: Run chaos tests
-        run: pytest tests/chaos/ -v --tb=short
+          # Test API Gateway
+          curl -f http://localhost:8000/healthz
+          curl -f http://localhost:8000/readyz
 
-  contract-tests:
-    name: Contract Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-      - name: Run contract tests
-        run: pytest tests/contract/ -v --tb=short
+          # Test Orchestrator
+          curl -f http://localhost:8081/healthz
+          curl -f http://localhost:8081/readyz
 
-  realtime-tests:
-    name: Realtime & WebSocket Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-      - name: Run realtime tests
-        run: pytest tests/realtime/ -v --tb=short
+          # Test Router Service
+          curl -f http://localhost:8083/healthz
+          curl -f http://localhost:8083/readyz
 
-  parallel-test-summary:
-    name: Test Summary
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          cd dev-env
+          docker-compose logs
+
+  # Security scan
+  security:
     runs-on: ubuntu-latest
-    needs:
-      [
-        pre-commit,
-        linting,
-        unit-tests,
-        integration-tests,
-        e2e-tests,
-        performance-tests,
-        flakiness-detection,
-        security-scan,
-        observability-tests,
-        chaos-tests,
-        contract-tests,
-        realtime-tests,
-      ]
-    if: always()
+    needs: build
+
     steps:
-      - name: Check test results
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-gateway:latest
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  # Deploy to staging (on main branch)
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [build, smoke-test, security]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
         run: |
-          echo "Pre-commit: ${{ needs.pre-commit.result }}"
-          echo "Linting: ${{ needs.linting.result }}"
-          echo "Unit Tests: ${{ needs.unit-tests.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "E2E Tests: ${{ needs.e2e-tests.result }}"
-          echo "Performance Tests: ${{ needs.performance-tests.result }}"
-          echo "Flakiness Detection: ${{ needs.flakiness-detection.result }}"
-          echo "Security Scan: ${{ needs.security-scan.result }}"
-          echo "Observability Tests: ${{ needs.observability-tests.result }}"
-          echo "Chaos Tests: ${{ needs.chaos-tests.result }}"
-          echo "Contract Tests: ${{ needs.contract-tests.result }}"
-          echo "Realtime Tests: ${{ needs.realtime-tests.result }}"
-      - name: Overall status
-        run: |
-          if [[ "${{ needs.pre-commit.result }}" == "success" && 
-                "${{ needs.linting.result }}" == "success" && 
-                "${{ needs.unit-tests.result }}" == "success" && 
-                "${{ needs.integration-tests.result }}" == "success" && 
-                "${{ needs.e2e-tests.result }}" == "success" && 
-                "${{ needs.performance-tests.result }}" == "success" && 
-                "${{ needs.observability-tests.result }}" == "success" && 
-                "${{ needs.chaos-tests.result }}" == "success" && 
-                "${{ needs.contract-tests.result }}" == "success" && 
-                "${{ needs.realtime-tests.result }}" == "success" ]]; then
-            echo "All critical tests passed!"
-            exit 0
-          else
-            echo "Some tests failed!"
-            exit 1
-          fi
+          echo "Deploying to staging environment..."
+          # Add your staging deployment commands here
+          # For example: kubectl apply -f k8s/staging/

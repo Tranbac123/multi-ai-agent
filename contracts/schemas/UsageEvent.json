@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UsageEvent",
+  "description": "Event tracking service usage for billing and analytics",
+  "type": "object",
+  "required": [
+    "event_id",
+    "timestamp",
+    "service_name",
+    "user_id",
+    "tenant_id",
+    "event_type",
+    "resource_type",
+    "quantity"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this usage event"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the event occurred"
+    },
+    "service_name": {
+      "type": "string",
+      "enum": [
+        "api-gateway",
+        "model-gateway",
+        "orchestrator",
+        "router-service",
+        "retrieval-service",
+        "ingestion-service",
+        "analytics-service",
+        "billing-service",
+        "realtime-gateway",
+        "config-service",
+        "usage-metering"
+      ],
+      "description": "Name of the service that generated this event"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the user who triggered this usage"
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the tenant organization"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "api_call",
+        "model_inference",
+        "document_ingestion",
+        "vector_search",
+        "real_time_message",
+        "data_analytics",
+        "configuration_change"
+      ],
+      "description": "Type of usage event"
+    },
+    "resource_type": {
+      "type": "string",
+      "enum": [
+        "tokens",
+        "requests",
+        "documents",
+        "searches",
+        "messages",
+        "analytics_queries",
+        "config_changes"
+      ],
+      "description": "Type of resource being consumed"
+    },
+    "quantity": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Amount of resource consumed"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "tokens",
+        "requests",
+        "documents",
+        "searches",
+        "messages",
+        "queries",
+        "changes"
+      ],
+      "description": "Unit of measurement for the quantity"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the usage event",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "description": "Request ID for tracing"
+        },
+        "model_name": {
+          "type": "string",
+          "description": "AI model used (for model inference events)"
+        },
+        "document_size": {
+          "type": "number",
+          "description": "Size of document in bytes (for ingestion events)"
+        },
+        "response_time_ms": {
+          "type": "number",
+          "description": "Response time in milliseconds"
+        },
+        "error_code": {
+          "type": "string",
+          "description": "Error code if the operation failed"
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "description": "Cost information for this usage",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cost amount in USD"
+        },
+        "currency": {
+          "type": "string",
+          "default": "USD",
+          "description": "Currency code"
+        },
+        "rate": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Rate per unit"
+        }
+      }
+    }
+  }
+}

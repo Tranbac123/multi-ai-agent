@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RealtimeMessage",
+  "description": "Event for real-time messaging between services and clients",
+  "type": "object",
+  "required": [
+    "message_id",
+    "timestamp",
+    "channel",
+    "message_type",
+    "payload"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this message"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the message was created"
+    },
+    "channel": {
+      "type": "string",
+      "description": "Channel or topic this message is sent to"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "chat_message",
+        "status_update",
+        "notification",
+        "system_alert",
+        "progress_update",
+        "error_message",
+        "data_stream",
+        "heartbeat"
+      ],
+      "description": "Type of real-time message"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message payload data"
+    },
+    "sender": {
+      "type": "object",
+      "description": "Information about the message sender",
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "description": "Name of the service sending the message"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the user sending the message"
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session ID for the sender"
+        }
+      }
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the recipient user"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session ID for the recipient"
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "WebSocket connection ID"
+          }
+        }
+      },
+      "description": "List of message recipients"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the message",
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the tenant organization"
+        },
+        "request_id": {
+          "type": "string",
+          "description": "Request ID for tracing"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "urgent"],
+          "default": "normal",
+          "description": "Priority level of this message"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional expiration time for this message"
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of delivery retries"
+        },
+        "delivery_status": {
+          "type": "string",
+          "enum": ["pending", "delivered", "failed", "expired"],
+          "default": "pending",
+          "description": "Current delivery status"
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "description": "Message routing information",
+      "properties": {
+        "routing_key": {
+          "type": "string",
+          "description": "Routing key for message distribution"
+        },
+        "exchange": {
+          "type": "string",
+          "description": "Message exchange name"
+        },
+        "queue": {
+          "type": "string",
+          "description": "Target queue name"
+        }
+      }
+    }
+  }
+}

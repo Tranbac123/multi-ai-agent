@@ -1,0 +1,422 @@
+version: "3.8"
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ai_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+      - ./db/seed.sql:/seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_agent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-agent-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-agent-network
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222", "--store_dir", "/data"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8222/healthz",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-agent-network
+
+  # Observability Stack
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8889:8889" # Prometheus metrics
+    depends_on:
+      - prometheus
+      - jaeger
+    networks:
+      - ai-agent-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    networks:
+      - ai-agent-network
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    networks:
+      - ai-agent-network
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - ai-agent-network
+
+  # Core Services (Always Running)
+  api-gateway:
+    build:
+      context: ../apps/data-plane/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=api-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+
+  orchestrator:
+    build:
+      context: ../apps/data-plane/orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+
+  router-service:
+    build:
+      context: ../apps/data-plane/router-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=router-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+
+  # Data Plane Services
+  model-gateway:
+    build:
+      context: ../apps/data-plane/model-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=model-gateway
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - data-plane
+      - core
+
+  retrieval-service:
+    build:
+      context: ../apps/data-plane/retrieval-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=retrieval-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - data-plane
+      - core
+
+  ingestion-service:
+    build:
+      context: ../apps/data-plane/ingestion-service
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=ingestion-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - data-plane
+
+  analytics-service:
+    build:
+      context: ../apps/data-plane/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=analytics-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - analytics
+
+  billing-service:
+    build:
+      context: ../apps/control-plane/billing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=billing-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - billing
+
+  realtime-gateway:
+    build:
+      context: ../apps/data-plane/realtime-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8087"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=realtime-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - realtime
+
+  # Control Plane Services
+  config-service:
+    build:
+      context: ../apps/control-plane/config-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=config-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - control-plane
+
+  usage-metering:
+    build:
+      context: ../apps/control-plane/usage-metering
+      dockerfile: Dockerfile
+    ports:
+      - "8094:8094"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_agent
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=usage-metering
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8094/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-agent-network
+    profiles:
+      - control-plane
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  ai-agent-network:
+    driver: bridge

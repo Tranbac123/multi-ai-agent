@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OrchestratorStep",
+  "description": "Event representing a step in an orchestrated workflow",
+  "type": "object",
+  "required": [
+    "step_id",
+    "workflow_id",
+    "timestamp",
+    "step_name",
+    "status",
+    "service_name"
+  ],
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this workflow step"
+    },
+    "workflow_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the parent workflow"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the step occurred"
+    },
+    "step_name": {
+      "type": "string",
+      "description": "Human-readable name of this step"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "retrying"
+      ],
+      "description": "Current status of this step"
+    },
+    "service_name": {
+      "type": "string",
+      "enum": [
+        "api-gateway",
+        "model-gateway",
+        "orchestrator",
+        "router-service",
+        "retrieval-service",
+        "ingestion-service",
+        "analytics-service",
+        "billing-service",
+        "realtime-gateway",
+        "config-service",
+        "usage-metering"
+      ],
+      "description": "Name of the service executing this step"
+    },
+    "step_type": {
+      "type": "string",
+      "enum": [
+        "api_call",
+        "model_inference",
+        "data_processing",
+        "validation",
+        "transformation",
+        "notification",
+        "condition_check",
+        "parallel_execution",
+        "sequential_execution"
+      ],
+      "description": "Type of step being executed"
+    },
+    "input_data": {
+      "type": "object",
+      "description": "Input data for this step"
+    },
+    "output_data": {
+      "type": "object",
+      "description": "Output data from this step"
+    },
+    "error": {
+      "type": "object",
+      "description": "Error information if the step failed",
+      "properties": {
+        "error_code": {
+          "type": "string",
+          "description": "Error code"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "error_details": {
+          "type": "object",
+          "description": "Additional error details"
+        },
+        "stack_trace": {
+          "type": "string",
+          "description": "Stack trace for debugging"
+        }
+      }
+    },
+    "execution_time_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Time taken to execute this step in milliseconds"
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of times this step has been retried"
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 3,
+      "description": "Maximum number of retries allowed"
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "IDs of steps that should be executed next"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about this step",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the user who initiated this workflow"
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the tenant organization"
+        },
+        "request_id": {
+          "type": "string",
+          "description": "Request ID for tracing"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "urgent"],
+          "default": "normal",
+          "description": "Priority level of this step"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorizing this step"
+        }
+      }
+    }
+  }
+}
